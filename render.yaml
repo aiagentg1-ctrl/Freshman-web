@@ -1,0 +1,21 @@
+services:
+  # Python Telegram Bot with HTTP server for Render health checks
+  - type: web
+    name: mirkuz-telegram-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    # Bot runs in background; uvicorn serves the FastAPI app on the
+    # public port. Point Vercel API_BASE_URL at this service's URL.
+    startCommand: python bot.py & exec uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: ADMIN_SECRET
+        value: mirkuz123
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: WEBHOOK_URL
+        sync: false
+

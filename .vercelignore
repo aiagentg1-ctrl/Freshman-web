@@ -1,0 +1,20 @@
+# Ignore Python bot files
+bot.py
+app.py
+database.py
+models.py
+requirements.txt
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+render.yaml
+
+# Ignore static game hub
+static-game-hub/
+
+# Keep only game-hub for Vercel
+templates/
+bot/

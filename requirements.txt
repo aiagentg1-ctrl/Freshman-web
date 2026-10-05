@@ -1,0 +1,10 @@
+aiogram>=3.0.0
+aiohttp
+python-dotenv
+aiosqlite
+sqlalchemy
+greenlet
+fastapi
+uvicorn
+pydantic
+asyncpg
