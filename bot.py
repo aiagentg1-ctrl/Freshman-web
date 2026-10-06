@@ -161,6 +161,8 @@ async def start_http_server():
 async def main():
     await init_db()
     runner = await start_http_server()
+    await bot.delete_webhook(drop_pending_updates=False)
+    print("Telegram webhook cleared; starting polling")
     polling_task = asyncio.create_task(dp.start_polling(bot))
     try:
         await polling_task

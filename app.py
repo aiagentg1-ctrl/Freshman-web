@@ -69,7 +69,8 @@ async def lifespan(app: FastAPI):
             print(f"Migration warning: {e}")
 
     webhook_url = os.getenv("WEBHOOK_URL")
-    if webhook_url:
+    bot_mode = os.getenv("BOT_MODE", "polling").lower()
+    if webhook_url and bot_mode == "webhook":
         try:
             from bot import bot
             await bot.set_webhook(url=f"{webhook_url}/webhook")
@@ -77,7 +78,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"Failed to set webhook: {e}")
     else:
-        print("Running in polling mode (no WEBHOOK_URL set)")
+        print("Running in polling mode")
 
     yield
 

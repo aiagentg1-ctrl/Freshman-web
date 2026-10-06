@@ -16,6 +16,8 @@ services:
         sync: false
       - key: ADMIN_SECRET
         sync: false
+      - key: BOT_MODE
+        value: polling
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: WEBHOOK_URL
