@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame, LockKeyhole, RefreshCw, X } from "lucide-react";
+import { Flame, Lock, RefreshCw, X } from "lucide-react";
 import BottomNav, { Tab } from "../../components/tma/BottomNav";
 import HomeScreen from "../../components/tma/HomeScreen";
 import NotesScreen from "../../components/tma/NotesScreen";
@@ -193,7 +193,7 @@ export default function TMAPage() {
       ) : deviceStatus !== "active" ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-            <LockKeyhole className="h-7 w-7" />
+            <Lock className="h-7 w-7" />
           </div>
           <h1 className="mt-4 text-xl font-bold text-slate-900">
             {deviceStatus === "locked" ? "Fresho is active elsewhere" : deviceStatus === "signed_out" ? "Signed out" : "Fresho needs Telegram"}
