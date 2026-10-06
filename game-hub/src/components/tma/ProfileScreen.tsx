@@ -7,7 +7,7 @@ import { streamLabel } from "../../lib/subjects";
 import { getTelegramUser, TelegramUser } from "../../lib/telegram";
 
 const GRADES = [9, 10, 11, 12];
-const SUPPORT_URL = "https://t.me/Quill_Academy";
+const SUPPORT_URL = "https://t.me/AAU101";
 
 export default function ProfileScreen({
   telegramUser,

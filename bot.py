@@ -19,9 +19,9 @@ ADMIN_URL = os.getenv("ADMIN_URL", "https://mirkuz-grade9-12bot.vercel.app/admin
 # Override any of these via environment variables in production.
 REQUIRED_CHANNELS = [
     {
-        "id": os.getenv("CHANNEL_1_ID", "-1002657816685"),
-        "url": os.getenv("CHANNEL_1_URL", "https://t.me/Quill_Academy"),
-        "name": os.getenv("CHANNEL_1_NAME", "Quill Academy"),
+        "id": os.getenv("CHANNEL_1_ID", "-1002656898914"),
+        "url": os.getenv("CHANNEL_1_URL", "https://t.me/AAU101"),
+        "name": os.getenv("CHANNEL_1_NAME", "AAU101"),
     },
     {
         "id": os.getenv("CHANNEL_2_ID", "-1002435524867"),
