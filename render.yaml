@@ -8,12 +8,14 @@ services:
     # public port. Point Vercel API_BASE_URL at this service's URL.
     startCommand: python bot.py & exec uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: DATABASE_URL
+        sync: false
       - key: BOT_TOKEN
         sync: false
       - key: ADMIN_ID
         sync: false
       - key: ADMIN_SECRET
-        value: mirkuz123
+        sync: false
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: WEBHOOK_URL
