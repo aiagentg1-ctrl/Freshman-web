@@ -57,7 +57,7 @@ def get_join_keyboard():
 
 def get_app_button():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎯 Practice EUEE", web_app=WebAppInfo(url=MINI_APP_URL))],
+        [InlineKeyboardButton(text="📚 Study for Final/mid exam", web_app=WebAppInfo(url=MINI_APP_URL))],
     ])
 
 
@@ -81,8 +81,8 @@ async def cmd_start(message: Message):
         return
 
     await message.answer(
-        "🎓 Welcome to Mirkuz — your EUEE exam prep companion!\n\n"
-        "Practice real EUEE past exams and read chapter notes for Grades 9–12, "
+        "🎓 Welcome to Mirkuz — your final and mid exam study companion!\n\n"
+        "Study with real past exams and read chapter notes for Grades 9–12, "
         "all inside the app. Tap below to begin:",
         reply_markup=get_app_button(),
     )
