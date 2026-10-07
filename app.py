@@ -120,6 +120,8 @@ ADMIN_SECRET = (
     or "mirkuz123"
 )
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+BROWSER_DEMO_MODE = os.getenv("BROWSER_DEMO_MODE", "false").lower() == "true"
+BROWSER_DEMO_USER_ID = int(os.getenv("BROWSER_DEMO_USER_ID", "900000001"))
 PREMIUM_CHANNEL_IDS = {
     "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "-1004479037964"),
     "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "-1004342138729"),
@@ -161,6 +163,8 @@ async def require_active_device_session(
     device_id: Optional[str],
     session_token: Optional[str],
 ) -> int:
+    if BROWSER_DEMO_MODE and user_id == BROWSER_DEMO_USER_ID:
+        return user_id
     if not user_id or not device_id or not session_token:
         raise HTTPException(status_code=401, detail="An active Fresho device session is required")
     result = await session.execute(
@@ -218,6 +222,13 @@ async def require_premium_membership(session, user_id: int) -> None:
 async def enforce_single_device_session(request: Request, call_next):
     path = request.url.path
     if request.method == "OPTIONS" or not path.startswith("/api/") or path.startswith("/api/auth/device-session"):
+        return await call_next(request)
+
+    if (
+        BROWSER_DEMO_MODE
+        and request.headers.get("x-fresho-demo-mode") == "true"
+        and request.headers.get("x-fresho-user-id") == str(BROWSER_DEMO_USER_ID)
+    ):
         return await call_next(request)
 
     supplied_admin_secret = (

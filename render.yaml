@@ -18,6 +18,10 @@ services:
         sync: false
       - key: BOT_MODE
         value: polling
+      - key: BROWSER_DEMO_MODE
+        value: "true"
+      - key: BROWSER_DEMO_USER_ID
+        value: "900000001"
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: WEBHOOK_URL

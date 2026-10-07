@@ -208,6 +208,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   const headers = new Headers(options?.headers);
   headers.set("Content-Type", "application/json");
+  if (process.env.NEXT_PUBLIC_BROWSER_DEMO_MODE === "true") {
+    headers.set("X-Fresho-Demo-Mode", "true");
+    headers.set(
+      "X-Fresho-User-Id",
+      process.env.NEXT_PUBLIC_BROWSER_DEMO_USER_ID || "900000001"
+    );
+  }
   if (typeof window !== "undefined") {
     const userId = localStorage.getItem("freshoTelegramUserId");
     const deviceId = localStorage.getItem("freshoDeviceId");

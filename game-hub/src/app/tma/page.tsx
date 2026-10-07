@@ -36,6 +36,8 @@ function isCompleteProfile(
 }
 
 export default function TMAPage() {
+  const browserDemoMode = process.env.NEXT_PUBLIC_BROWSER_DEMO_MODE === "true";
+  const browserDemoUserId = Number(process.env.NEXT_PUBLIC_BROWSER_DEMO_USER_ID || "900000001");
   const [activeTab, setActiveTab] = useState<Tab>("practice");
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null);
   const [profile, setProfile] = useState<LocalProfile | null>(null);
@@ -49,8 +51,18 @@ export default function TMAPage() {
   useEffect(() => {
     expandTelegramApp();
     const tgUser = getTelegramUser();
-    setTelegramUser(tgUser);
+    const demoUser = browserDemoMode
+      ? { id: browserDemoUserId, first_name: "Demo Student" }
+      : null;
+    const effectiveUser = tgUser || demoUser;
+    setTelegramUser(effectiveUser);
     const initData = getTelegramInitData();
+    if (browserDemoMode && !initData) {
+      localStorage.setItem("freshoTelegramUserId", String(browserDemoUserId));
+      setDeviceStatus("active");
+      setBooting(false);
+      return;
+    }
     if (!tgUser?.id || !initData) {
       setDeviceStatus("auth_required");
       setDeviceError("Open the app using the Study for Final/mid exam button in the Telegram bot.");
