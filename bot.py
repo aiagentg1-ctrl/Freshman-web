@@ -19,8 +19,8 @@ from models import User, EueeExam, Note
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8939756135:AAF0ELtBCbJmn-W1yrFATdnj3fXhQRmPS7k")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "1439864634"))
-MINI_APP_URL = os.getenv("MINI_APP_URL", "https://mirkuz-grade9-12bot.vercel.app/tma")
-ADMIN_URL = os.getenv("ADMIN_URL", "https://mirkuz-grade9-12bot.vercel.app/admin")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://freshman-web.onrender.com/tma")
+ADMIN_URL = os.getenv("ADMIN_URL", "https://freshman-web.onrender.com/admin")
 
 # Users must be members of BOTH channels before the Mini App is unlocked.
 # Override any of these via environment variables in production.
@@ -62,10 +62,13 @@ def get_join_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_app_button():
-    return InlineKeyboardMarkup(inline_keyboard=[
+def get_app_button(is_admin: bool = False):
+    buttons = [
         [InlineKeyboardButton(text="📚 Study for Final/mid exam", web_app=WebAppInfo(url=MINI_APP_URL))],
-    ])
+    ]
+    if is_admin:
+        buttons.append([InlineKeyboardButton(text="📝 Admin Dashboard", web_app=WebAppInfo(url=ADMIN_URL))])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def get_admin_menu():
@@ -91,7 +94,7 @@ async def cmd_start(message: Message):
         "🎓 Welcome to Mirkuz — your final and mid exam study companion!\n\n"
         "Study with real past exams and read chapter notes for Grades 9–12, "
         "all inside the app. Tap below to begin:",
-        reply_markup=get_app_button(),
+        reply_markup=get_app_button(message.from_user.id == ADMIN_ID),
     )
 
 
@@ -108,7 +111,7 @@ async def verify_membership(callback: CallbackQuery):
         "✅ Membership verified!\n\n"
         "🎓 Mirkuz — EUEE exam prep for Grades 9–12.\n"
         "Tap below to open the app and start practicing:",
-        reply_markup=get_app_button(),
+        reply_markup=get_app_button(callback.from_user.id == ADMIN_ID),
     )
 
 
