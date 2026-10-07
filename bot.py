@@ -1,7 +1,14 @@
 import asyncio
 import os
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    MenuButtonWebApp,
+    Message,
+    WebAppInfo,
+)
 from aiogram.filters import CommandStart, Command
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -158,10 +165,27 @@ async def start_http_server():
     return runner
 
 
+async def configure_menu_buttons():
+    await bot.set_chat_menu_button(
+        menu_button=MenuButtonWebApp(
+            text="Study for Final/mid exam",
+            web_app=WebAppInfo(url=MINI_APP_URL),
+        )
+    )
+    await bot.set_chat_menu_button(
+        chat_id=ADMIN_ID,
+        menu_button=MenuButtonWebApp(
+            text="Admin Dashboard",
+            web_app=WebAppInfo(url=ADMIN_URL),
+        ),
+    )
+
+
 async def main():
     await init_db()
     runner = await start_http_server()
     await bot.delete_webhook(drop_pending_updates=False)
+    await configure_menu_buttons()
     print("Telegram webhook cleared; starting polling")
     polling_task = asyncio.create_task(dp.start_polling(bot))
     try:
