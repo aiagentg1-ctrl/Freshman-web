@@ -36,6 +36,7 @@ export default function ProfileScreen({
     city: string;
     grade: number;
     stream: StreamKey;
+    selected_subjects: string[];
   }) => void;
   onSignOut: () => Promise<void>;
 }) {
