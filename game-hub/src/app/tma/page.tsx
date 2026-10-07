@@ -261,6 +261,7 @@ export default function TMAPage() {
               initialCity={profile.city}
               grade={profile.grade}
               stream={profile.stream}
+              selectedSubjects={profile.selected_subjects}
               onProfileChange={handleProfileChange}
               onSignOut={handleDeviceSignOut}
             />

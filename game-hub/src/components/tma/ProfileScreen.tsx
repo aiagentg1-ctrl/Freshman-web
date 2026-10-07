@@ -17,6 +17,7 @@ export default function ProfileScreen({
   initialCity,
   grade,
   stream,
+  selectedSubjects,
   onProfileChange,
   onSignOut,
 }: {
@@ -27,6 +28,7 @@ export default function ProfileScreen({
   initialCity?: string;
   grade: number;
   stream: StreamKey;
+  selectedSubjects: string[];
   onProfileChange: (profile: {
     full_name: string;
     custom_name?: string;
@@ -86,6 +88,7 @@ export default function ProfileScreen({
       city: city.trim(),
       grade,
       stream,
+      selected_subjects: selectedSubjects,
     };
     localStorage.setItem("mirkuzProfile", JSON.stringify(profile));
     onProfileChange(profile);
@@ -98,6 +101,7 @@ export default function ProfileScreen({
         const result = await updateUser(userId, {
           first_name: telegramUser?.first_name,
           ...profile,
+          selected_subjects: selectedSubjects,
         });
         const savedProfile = {
           ...profile,
