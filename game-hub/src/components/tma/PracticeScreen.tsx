@@ -187,7 +187,7 @@ export default function PracticeScreen({
     const chapterAsExam: Exam = {
       id: chapter.id,
       subject: chapter.subject,
-      year: `Grade ${chapter.grade} • Chapter ${chapter.chapter_number}`,
+      year: `Chapter ${chapter.chapter_number}`,
       title: chapter.title,
       custom_tag: "Chapter Practice",
       question_count: chapter.question_count,
@@ -477,7 +477,7 @@ export default function PracticeScreen({
                       </span>
                       <span className="block font-semibold text-slate-900">{subject.label}</span>
                       <span className="mt-1 flex items-center justify-between gap-1 text-xs text-slate-500">
-                        {count ? `${count} question sets` : "Browse grades"}
+                        {count ? `${count} question sets` : "Browse chapters"}
                         <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
                       </span>
                     </button>
@@ -493,24 +493,15 @@ export default function PracticeScreen({
               >
                 <ChevronLeft className="h-5 w-5" /> Subjects
               </button>
-              <h2 className="pb-1 text-lg font-bold text-slate-900">{subjectLabel(view.subject)} · Grade</h2>
-              {[9, 10, 11, 12].map((chapterGrade) => {
-                const count = chapterExamsForStream.filter(
-                  (chapter) => chapter.subject === view.subject && chapter.grade === chapterGrade
-                ).length;
-                return (
-                  <button
-                    key={chapterGrade}
-                    onClick={() => setView({ kind: "chapterList", subject: view.subject, grade: chapterGrade })}
-                    className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left shadow-sm"
-                  >
-                    <GraduationCap className="h-5 w-5 shrink-0 text-violet-600" />
-                    <span className="flex-1 font-semibold text-slate-900">Grade {chapterGrade}</span>
-                    <span className="text-xs text-slate-500">{count} sets</span>
-                    <ChevronRight className="h-5 w-5 text-slate-300" />
-                  </button>
-                );
-              })}
+              <h2 className="pb-1 text-lg font-bold text-slate-900">{subjectLabel(view.subject)} chapters</h2>
+              <button
+                onClick={() => setView({ kind: "chapterList", subject: view.subject, grade })}
+                className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left shadow-sm"
+              >
+                <GraduationCap className="h-5 w-5 shrink-0 text-violet-600" />
+                <span className="flex-1 font-semibold text-slate-900">Chapter sets</span>
+                <ChevronRight className="h-5 w-5 text-slate-300" />
+              </button>
             </div>
           ) : view.kind === "chapterList" ? (
             <div className="space-y-3">
@@ -518,13 +509,13 @@ export default function PracticeScreen({
                 onClick={() => setView({ kind: "chapterGrades", subject: view.subject })}
                 className="flex items-center gap-1 text-sm font-medium text-slate-500"
               >
-                <ChevronLeft className="h-5 w-5" /> Grades
+                <ChevronLeft className="h-5 w-5" /> Subjects
               </button>
-              <h2 className="pb-1 text-lg font-bold text-slate-900">{subjectLabel(view.subject)} · Grade {view.grade}</h2>
+              <h2 className="pb-1 text-lg font-bold text-slate-900">{subjectLabel(view.subject)} chapters</h2>
               {chapterExamsForStream.filter(
                 (chapter) => chapter.subject === view.subject && chapter.grade === view.grade
               ).length === 0 ? (
-                <EmptyState title="No questions for this grade" subtitle="Chapter questions will appear here once uploaded." />
+                <EmptyState title="No questions yet" subtitle="Chapter questions will appear here once uploaded." />
               ) : (
                 chapterExamsForStream
                   .filter((chapter) => chapter.subject === view.subject && chapter.grade === view.grade)

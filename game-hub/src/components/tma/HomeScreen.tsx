@@ -25,8 +25,6 @@ export default function HomeScreen({
 }) {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
-  const [showMatrikBreakdown, setShowMatrikBreakdown] = useState(false);
-  const [showEstimatedScore, setShowEstimatedScore] = useState(false);
   const [inProgressExam, setInProgressExam] = useState<ExamMeta | null>(null);
   const [recentAttempts, setRecentAttempts] = useState<RecentExamAttempt[]>([]);
   const [reviewAttempt, setReviewAttempt] = useState<RecentExamAttempt | null>(null);
@@ -102,14 +100,7 @@ export default function HomeScreen({
       }
     })() ?? null;
   const lastScore = lastResult?.scorePercentage ?? stats?.last_score ?? null;
-  const matrikExamDate = new Date("2027-06-21T00:00:00+03:00");
-  const daysUntilMatrik = Math.max(0, Math.ceil((matrikExamDate.getTime() - Date.now()) / 86_400_000));
-  const matrikScore = progress?.matrik_score;
-  const completedMatrikSubjects = matrikScore?.subjects_completed ?? 0;
-  const totalMatrikSubjects = matrikScore?.subjects_total ?? 6;
-  const completedSubjectAverage = completedMatrikSubjects > 0
-    ? (matrikScore?.score ?? 0) / completedMatrikSubjects
-    : null;
+  const gpa = lastScore == null ? null : Math.min(4, Math.max(0, lastScore / 25));
 
   if (reviewAttempt) {
     return <AttemptReview attempt={reviewAttempt} onBack={() => setReviewAttempt(null)} />;
@@ -130,7 +121,7 @@ export default function HomeScreen({
         </div>
         <div className="mt-4 inline-flex items-center gap-1.5 bg-white/15 rounded-full px-3 py-1.5 text-xs font-semibold">
           <Sparkles className="w-3.5 h-3.5" />
-          Grade {grade} • {streamLabel(stream)}
+          Freshman {streamLabel(stream)}
         </div>
       </div>
 
@@ -220,78 +211,20 @@ export default function HomeScreen({
           </section>
         )}
 
-        {grade >= 11 && (
-          <section className="flex items-center gap-4 rounded-xl border border-rose-100 bg-white p-4 shadow-sm">
-            <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-rose-50 text-rose-700">
-              <span className="text-xl font-extrabold leading-none">{daysUntilMatrik}</span>
-              <span className="mt-1 text-[9px] font-bold uppercase">days</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-wide text-rose-700">Matrik countdown</p>
-              <p className="mt-0.5 text-sm font-semibold text-slate-900">June 21, 2027</p>
-              <p className="text-xs text-slate-500">Keep your preparation moving.</p>
+        {gpa !== null && (
+          <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Academic performance</p>
+            <div className="mt-2 flex items-end justify-between">
+              <div>
+                <p className="text-3xl font-extrabold text-slate-900">{gpa.toFixed(2)} <span className="text-base font-semibold text-slate-400">/ 4.00 GPA</span></p>
+                <p className="mt-1 text-sm text-slate-500">Calculated from your exam score.</p>
+              </div>
+              <TrendingUp className="h-7 w-7 text-emerald-600" />
             </div>
           </section>
         )}
 
-        {/* Estimated EUEE Score Badge */}
-        {grade >= 11 && progress?.matrik_score ? (
-          <section className="overflow-hidden rounded-2xl bg-slate-900 p-5 text-white shadow-lg">
-            <div className="flex items-center gap-3 border-b border-white/15 pb-4">
-              {telegramUser?.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={telegramUser.photo_url} alt="" className="h-14 w-14 rounded-full border-2 border-cyan-400 object-cover" />
-              ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-cyan-400 bg-slate-700 text-xl font-bold">
-                  {(progress.custom_name || progress.full_name || progress.first_name || "S").charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className="truncate text-base font-bold uppercase">{progress.custom_name || progress.full_name || progress.first_name}</p>
-                <p className="truncate text-xs text-slate-300">{progress.school || streamLabel(stream)}</p>
-              </div>
-            </div>
-            <div className="mt-4 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Estimated EUEE Score</p>
-                <p className="mt-1 text-3xl font-extrabold">{Math.round(progress.matrik_score.score ?? 0)} <span className="text-base font-semibold text-slate-300">/ 600</span></p>
-              </div>
-              <div className="rounded-xl bg-cyan-600 px-4 py-2 text-right">
-                <p className="text-[10px] font-bold uppercase text-cyan-100">Completed subject avg.</p>
-                <p className="text-xl font-bold">{completedSubjectAverage === null ? "--" : `${completedSubjectAverage.toFixed(2)}%`}</p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <div className="mb-1 flex justify-between text-[11px] text-slate-300">
-                <span>Estimate coverage</span>
-                <span>{completedMatrikSubjects}/{totalMatrikSubjects} subjects</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
-                <div className="h-full rounded-full bg-cyan-300" style={{ width: `${matrikScore?.coverage_percent ?? 0}%` }} />
-              </div>
-            </div>
-            <button
-              type="button"
-              aria-expanded={showMatrikBreakdown}
-              onClick={() => setShowMatrikBreakdown((show) => !show)}
-              className="mt-4 flex min-h-10 w-full items-center justify-between rounded-lg bg-white/10 px-3 text-sm font-semibold hover:bg-white/15"
-            >
-              Subject averages <ChevronDown className={`h-4 w-4 transition-transform ${showMatrikBreakdown ? "rotate-180" : ""}`} />
-            </button>
-            {showMatrikBreakdown && (
-              <div className="mt-2 space-y-2">
-                {Object.entries(progress.matrik_score.breakdown || {}).map(([subject, score]) => (
-                  <div key={subject} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm">
-                    <span className="capitalize text-slate-200">{subjectLabel(subject)}</span>
-                    <span className="font-bold">{Number(score).toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-        {/* Average Score for Grades 9-10 only */}
+        {/* Legacy average score fallback */}
         {grade <= 10 && progress?.average_score && (
           <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3">

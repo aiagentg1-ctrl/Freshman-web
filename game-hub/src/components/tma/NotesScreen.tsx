@@ -149,20 +149,7 @@ export default function NotesScreen({
             <ChevronLeft className="w-5 h-5" /> Back
           </button>
           <h1 className="text-xl font-bold text-slate-900">{subjectLabel(view.subject)}</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Grade {view.grade} • {completedCount}/{chapters.length} chapters completed</p>
-          <div className="mt-3 grid grid-cols-4 gap-1 rounded-lg bg-slate-100 p-1">
-            {GRADES.map((availableGrade) => (
-              <button
-                key={availableGrade}
-                type="button"
-                onClick={() => availableGrade !== view.grade && selectGrade(view.subject, availableGrade)}
-                className={`rounded-md py-2 text-xs font-semibold ${availableGrade === view.grade ? "bg-[#1D70F5] text-white" : "text-slate-600 hover:bg-white"}`}
-                aria-pressed={availableGrade === view.grade}
-              >
-                Grade {availableGrade}
-              </button>
-            ))}
-          </div>
+          <p className="text-xs text-slate-500 mt-0.5">{completedCount}/{chapters.length} chapters completed</p>
           {chapters.length > 0 && (
             <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
               <div
@@ -181,7 +168,7 @@ export default function NotesScreen({
           ) : chapters.length === 0 ? (
             <EmptyState
               title="No chapters yet"
-              subtitle={`Grade ${view.grade} ${subjectLabel(view.subject)} notes will appear here once uploaded.`}
+              subtitle={`${subjectLabel(view.subject)} notes will appear here once uploaded.`}
             />
           ) : (
             chapters.map((chapter) => {
@@ -242,28 +229,17 @@ export default function NotesScreen({
             <ChevronLeft className="w-5 h-5" /> Back
           </button>
           <h1 className="text-xl font-bold text-slate-900">{subjectLabel(view.subject)}</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Choose your grade level</p>
+          <p className="text-xs text-slate-500 mt-0.5">Choose a subject to browse its chapters</p>
         </div>
 
         <div className="px-4 py-4">
-          <div className="bg-slate-100 rounded-2xl p-1.5 grid grid-cols-4 gap-1">
-            {GRADES.map((g) => (
-              <button
-                key={g}
-                onClick={() => selectGrade(view.subject, g)}
-                className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  g === grade
-                    ? "bg-[#1D70F5] text-white shadow-sm"
-                    : "bg-white text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {g}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-slate-400 text-center mt-3">
-            Your grade ({grade}) is highlighted — pick any level to browse its chapters.
-          </p>
+          <button
+            type="button"
+            onClick={() => void selectGrade(view.subject, grade)}
+            className="w-full rounded-xl bg-[#1D70F5] py-3 text-sm font-semibold text-white"
+          >
+            Browse chapters
+          </button>
         </div>
       </div>
     );
@@ -301,7 +277,7 @@ export default function NotesScreen({
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-slate-900">{subject.label}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Grades 9–12 chapters</p>
+                <p className="text-xs text-slate-500 mt-0.5">Open chapters</p>
               </div>
               <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
             </button>

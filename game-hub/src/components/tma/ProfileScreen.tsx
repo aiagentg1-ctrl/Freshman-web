@@ -171,7 +171,7 @@ export default function ProfileScreen({
               <p className="text-xs text-slate-500">@{telegramUser.username}</p>
             )}
             <p className="text-xs text-slate-400 mt-0.5">
-              Grade {grade} • {streamLabel(stream)}
+              Freshman {streamLabel(stream)}
             </p>
           </div>
         </div>
@@ -204,12 +204,10 @@ export default function ProfileScreen({
               <div className="bg-white/10 rounded-xl p-3 text-center">
                 <Target className="w-5 h-5 mx-auto mb-1" />
                 <p className="text-lg font-bold">
-                  {userProgress.score_type === "matrik" && userProgress.matrik_score?.eligible
-                    ? userProgress.matrik_score.score
-                    : userProgress.average_score || 0}
+                  {userProgress.average_score ? (userProgress.average_score / 25).toFixed(2) : "0.00"}
                 </p>
                 <p className="text-[10px] text-violet-100">
-                  {userProgress.score_type === "matrik" ? "Matrik" : "Avg"} Score
+                  GPA / 4.00
                 </p>
               </div>
               <div className="bg-white/10 rounded-xl p-3 text-center">
@@ -280,8 +278,7 @@ export default function ProfileScreen({
           <h3 className="text-sm font-bold text-slate-900 mb-3">Academic Info</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-500">Grade Level</span>
-              <span className="text-sm font-bold text-slate-900 bg-blue-50 px-3 py-1 rounded-lg">{grade}</span>
+              <span className="text-sm text-slate-500">Department</span>
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-sm text-slate-500">Stream</span>
@@ -289,7 +286,7 @@ export default function ProfileScreen({
             </div>
           </div>
           <p className="text-xs text-slate-400 mt-3">
-            ⚠️ Grade level and stream cannot be changed after initial selection. Please choose carefully.
+            Your department is set during onboarding.
           </p>
         </div>
 
