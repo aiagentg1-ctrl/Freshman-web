@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
-from sqlalchemy import delete as sqlalchemy_delete
+from sqlalchemy import delete as sqlalchemy_delete, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 import hashlib
 import hmac
@@ -14,6 +14,7 @@ import json
 import uvicorn
 import os
 import secrets
+from typing import Any
 from pydantic import BaseModel, validator
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
@@ -775,6 +776,7 @@ def serialize_exam(exam: EueeExam, include_content: bool = False) -> dict:
         "question_count": exam.question_count,
         "duration_minutes": exam.duration_minutes,
         "content_type": exam.content_type,
+        "semester": exam.semester,
         "is_premium": exam.is_premium,
         "is_published": exam.is_published,
     }
@@ -790,6 +792,7 @@ def serialize_note(note: Note, include_content: bool = False) -> dict:
         "grade": note.grade,
         "stream": note.stream.value if note.stream else None,
         "chapter_number": note.chapter_number,
+        "semester": note.semester,
         "title": note.title,
         "is_premium": note.is_premium,
         "is_published": note.is_published,
@@ -832,6 +835,7 @@ class UserProfileUpsert(BaseModel):
     city: Optional[str] = None
     grade: Optional[int] = None
     stream: Optional[str] = None
+    selected_subjects: Optional[List[str]] = None
 
     @validator('grade')
     def validate_optional_grade(cls, v):
@@ -855,6 +859,7 @@ class ExamCreate(BaseModel):
     duration_minutes: int
     content_type: str = "html"
     content_data: str
+    semester: str = "all"
     is_premium: bool = False
     is_published: bool = True
 
@@ -913,6 +918,7 @@ class NoteCreate(BaseModel):
     chapter_number: int
     title: str
     html_content: str
+    semester: str = "all"
     is_premium: bool = False
     is_published: bool = True
 
@@ -967,6 +973,7 @@ async def get_user(user_id: int):
             "city": user.city,
             "grade": user.grade,
             "stream": user.stream.value,
+            "selected_subjects": json.loads(user.selected_subjects or "[]"),
         }
 
 
@@ -987,6 +994,7 @@ async def update_user(user_id: int, update: UserUpdate):
                 city=update.city.strip() if update.city else "",
                 grade=update.grade,
                 stream=StreamEnum[update.stream],
+                selected_subjects=json.dumps(update.selected_subjects or []),
             )
             session.add(user)
         else:
@@ -1006,6 +1014,8 @@ async def update_user(user_id: int, update: UserUpdate):
                 user.city = update.city.strip()
             user.grade = update.grade
             user.stream = new_stream
+            if update.selected_subjects is not None:
+                user.selected_subjects = json.dumps(update.selected_subjects)
 
             # Note: Matrik scores are preserved in the database fields (natural_matrik_score, social_matrik_score)
             # When stream changes, the old score is retained and can be viewed via the API with ?stream parameter
@@ -1022,6 +1032,7 @@ async def update_user(user_id: int, update: UserUpdate):
             "city": user.city,
             "grade": user.grade,
             "stream": user.stream.value,
+            "selected_subjects": json.loads(user.selected_subjects or "[]"),
         }
 
 
@@ -1058,6 +1069,8 @@ async def upsert_user_profile(update: UserProfileUpsert):
                 user.grade = update.grade
             if update.stream is not None:
                 user.stream = StreamEnum[update.stream]
+            if update.selected_subjects is not None:
+                user.selected_subjects = json.dumps(update.selected_subjects)
 
         await session.commit()
         await session.refresh(user)
@@ -1070,6 +1083,7 @@ async def upsert_user_profile(update: UserProfileUpsert):
             "city": user.city,
             "grade": user.grade,
             "stream": user.stream.value,
+            "selected_subjects": json.loads(user.selected_subjects or "[]"),
         }
 
 
@@ -1564,6 +1578,7 @@ async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_ad
             duration_minutes=exam.duration_minutes,
             content_type=exam.content_type,
             content_data=exam.content_data,
+            semester=exam.semester,
             is_premium=exam.is_premium,
             is_published=exam.is_published,
         )
@@ -1591,6 +1606,7 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
         db_exam.duration_minutes = exam.duration_minutes
         db_exam.content_type = exam.content_type
         db_exam.content_data = exam.content_data
+        db_exam.semester = exam.semester
         await session.commit()
         return serialize_exam(db_exam, include_content=True)
 
@@ -1851,7 +1867,8 @@ async def get_notes(subject: Optional[str] = None, grade: Optional[int] = None, 
         if grade:
             query = query.where(Note.grade == grade)
         if stream:
-            query = query.where(Note.stream == StreamEnum[stream.upper()])
+            selected_stream = StreamEnum[stream.upper()]
+            query = query.where(or_(Note.stream == selected_stream, Note.stream == StreamEnum.GENERAL, Note.stream.is_(None)))
         if not include_drafts:
             query = query.where(Note.is_published == True)
 
@@ -1880,6 +1897,7 @@ async def create_note(note: NoteCreate, admin_verified: bool = Depends(verify_ad
             chapter_number=note.chapter_number,
             title=note.title,
             html_content=note.html_content,
+            semester=note.semester,
             is_premium=note.is_premium,
             is_published=note.is_published,
         )
@@ -1905,6 +1923,7 @@ async def update_note(note_id: int, note: NoteCreate, admin_verified: bool = Dep
         db_note.is_published = note.is_published
         db_note.title = note.title
         db_note.html_content = note.html_content
+        db_note.semester = note.semester
         await session.commit()
         return serialize_note(db_note, include_content=True)
 
@@ -1953,6 +1972,7 @@ class ChapterExamCreate(BaseModel):
     question_count: int
     content_type: str = "html"
     content_data: str
+    semester: str = "all"
     is_premium: bool = False
     is_published: bool = True
 
@@ -1994,6 +2014,7 @@ def serialize_chapter_exam(exam: ChapterExam, include_content: bool = False) -> 
         "title": exam.title,
         "question_count": exam.question_count,
         "content_type": exam.content_type,
+        "semester": exam.semester,
         "is_premium": exam.is_premium,
         "is_published": exam.is_published,
     }
@@ -2040,7 +2061,8 @@ async def get_chapter_exams(
             if grade:
                 query = query.where(ChapterExam.grade == grade)
             if stream:
-                query = query.where(ChapterExam.stream == StreamEnum[stream.upper()])
+                selected_stream = StreamEnum[stream.upper()]
+                query = query.where(or_(ChapterExam.stream == selected_stream, ChapterExam.stream == StreamEnum.GENERAL, ChapterExam.stream.is_(None)))
             if note_id:
                 query = query.where(ChapterExam.note_id == note_id)
             if not include_drafts:
@@ -2121,6 +2143,7 @@ async def create_chapter_exam(exam: ChapterExamCreate, admin_verified: bool = De
             question_count=exam.question_count,
             content_type=exam.content_type,
             content_data=exam.content_data,
+            semester=exam.semester,
             is_premium=exam.is_premium,
             is_published=exam.is_published,
         )
@@ -2150,6 +2173,7 @@ async def update_chapter_exam(exam_id: int, exam: ChapterExamCreate, admin_verif
         db_exam.question_count = exam.question_count
         db_exam.content_type = exam.content_type
         db_exam.content_data = exam.content_data
+        db_exam.semester = exam.semester
         db_exam.is_premium = exam.is_premium
         db_exam.is_published = exam.is_published
         await session.commit()

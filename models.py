@@ -19,6 +19,13 @@ class StreamEnum(enum.Enum):
 
 
 class SubjectEnum(enum.Enum):
+    LOGIC = "logic"
+    PSYCHOLOGY = "psychology"
+    COMMUNICATIVE_ENGLISH = "communicative_english"
+    EMERGING_TECHNOLOGY = "emerging_technology"
+    ANTHROPOLOGY = "anthropology"
+    GLOBAL_TRENDS = "global_trends"
+    ENTREPRENEURSHIP = "entrepreneurship"
     ENGLISH = "english"
     PHYSICS = "physics"
     CHEMISTRY = "chemistry"
@@ -41,6 +48,7 @@ class User(Base):
     city = Column(String, nullable=True, default="")
     grade = Column(Integer, nullable=False)
     stream = Column(Enum(StreamEnum), nullable=False)
+    selected_subjects = Column(Text, nullable=False, default="[]", server_default="[]")
     # Legacy columns kept nullable so inserts still succeed on databases
     # created before the high-school-only pivot.
     referred_by = Column(BigInteger, nullable=True)
@@ -86,6 +94,7 @@ class EueeExam(Base):
     # "html" = interactive exam markup, "pdf" = a URL or data URI to a PDF.
     content_type = Column(String, nullable=False, default="html", server_default="html")
     content_data = Column(Text, nullable=False)
+    semester = Column(String, nullable=False, default="all", server_default="all")
     is_premium = Column(Boolean, nullable=False, default=False, server_default="0")
     is_published = Column(Boolean, nullable=False, default=True, server_default="1")
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -114,6 +123,7 @@ class Note(Base):
     chapter_number = Column(Integer, nullable=False)
     title = Column(String, nullable=False)
     html_content = Column(Text, nullable=False)
+    semester = Column(String, nullable=False, default="all", server_default="all")
     is_premium = Column(Boolean, nullable=False, default=False, server_default="0")
     is_published = Column(Boolean, nullable=False, default=True, server_default="1")
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -164,6 +174,7 @@ class ChapterExam(Base):
     question_count = Column(Integer, nullable=False)
     content_type = Column(String, nullable=False, default="html", server_default="html")
     content_data = Column(Text, nullable=False)
+    semester = Column(String, nullable=False, default="all", server_default="all")
     is_premium = Column(Boolean, nullable=False, default=False, server_default="0")
     is_published = Column(Boolean, nullable=False, default=True, server_default="1")
     created_at = Column(DateTime, default=datetime.utcnow)

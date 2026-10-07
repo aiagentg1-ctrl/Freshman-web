@@ -51,7 +51,7 @@ export default function NotesScreen({
     setView({ kind: "chapters", subject, grade });
     setChapters([]);
     try {
-      const notes = await getNotes(subject, grade);
+      const notes = await getNotes(subject, grade, stream);
       setChapters(notes.sort((a, b) => a.chapter_number - b.chapter_number || a.id - b.id));
     } catch {
       setChapters([]);

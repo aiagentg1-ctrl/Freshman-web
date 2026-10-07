@@ -13,6 +13,7 @@ export interface ExamMeta {
   content_type: ExamContentType;
   is_premium: boolean;
   is_published: boolean;
+  semester?: string;
 }
 
 export interface Exam extends ExamMeta {
@@ -29,6 +30,7 @@ export interface NoteMeta {
   title: string;
   is_premium: boolean;
   is_published: boolean;
+  semester?: string;
 }
 
 export interface Note extends NoteMeta {
@@ -47,6 +49,7 @@ export interface ChapterExamMeta {
   content_type: ExamContentType;
   is_premium: boolean;
   is_published: boolean;
+  semester?: string;
 }
 
 export interface ChapterExam extends ChapterExamMeta {
@@ -65,6 +68,7 @@ export interface ChapterExamInput {
   content_data: string;
   is_premium: boolean;
   is_published: boolean;
+  semester?: string;
 }
 
 export interface UserProfile {
@@ -76,6 +80,7 @@ export interface UserProfile {
   city: string;
   grade: number;
   stream: string;
+  selected_subjects: string[];
 }
 
 export interface UserStats {
@@ -327,9 +332,10 @@ export async function submitExamAttempt(
   });
 }
 
-export async function getNotes(subject: string, grade: number): Promise<NoteMeta[]> {
+export async function getNotes(subject: string, grade: number, stream?: string): Promise<NoteMeta[]> {
+  const streamParam = stream ? `&stream=${encodeURIComponent(stream)}` : "";
   return request<NoteMeta[]>(
-    `/api/notes?subject=${encodeURIComponent(subject)}&grade=${grade}`
+    `/api/notes?subject=${encodeURIComponent(subject)}&grade=${grade}${streamParam}`
   );
 }
 
@@ -449,6 +455,7 @@ export async function updateUser(
     city?: string;
     grade: number;
     stream: string;
+    selected_subjects: string[];
   }
 ): Promise<UserProfile> {
   return request<UserProfile>("/api/user/profile", {

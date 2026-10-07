@@ -1,26 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { GraduationCap } from "lucide-react";
+import { Check, GraduationCap } from "lucide-react";
 import type { StreamKey } from "../../lib/api";
-
-const GRADES = [9, 10, 11, 12];
+import { subjectLabel, subjectsForStream } from "../../lib/subjects";
 
 export default function OnboardingScreen({
   onComplete,
 }: {
-  onComplete: (grade: number, stream: StreamKey) => void;
+  onComplete: (stream: Exclude<StreamKey, "general">, subjects: string[]) => void;
 }) {
-  const [grade, setGrade] = useState<number | null>(null);
-  const [stream, setStream] = useState<StreamKey | null>(null);
-
-  // Grades 9 & 10 follow the common curriculum — no stream choice.
-  const needsStream = grade !== null && grade >= 11;
-  const ready = grade !== null && (needsStream ? stream !== null : true);
+  const [stream, setStream] = useState<Exclude<StreamKey, "general"> | null>(null);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const availableSubjects = stream ? subjectsForStream(stream) : [];
+  const ready = stream !== null && selectedSubjects.length > 0;
 
   const complete = () => {
-    if (!ready || grade === null) return;
-    onComplete(grade, needsStream ? stream! : "general");
+    if (!ready || !stream) return;
+    onComplete(stream, selectedSubjects);
   };
 
   return (
@@ -30,63 +27,52 @@ export default function OnboardingScreen({
       </div>
       <h1 className="text-2xl font-bold text-slate-900 text-center">Welcome to Mirkuz</h1>
       <p className="text-sm text-slate-500 text-center mt-1 mb-8">
-        EUEE prep for Ethiopian high school students
+        Freshman courses for university students
       </p>
 
       <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-4">
-        <h3 className="text-sm font-bold text-slate-900 mb-3">Your Grade</h3>
-        <div className="grid grid-cols-4 gap-2">
-          {GRADES.map((g) => (
+        <h3 className="text-sm font-bold text-slate-900 mb-3">Choose your department</h3>
+        <div className="grid grid-cols-2 gap-2">
+          {(["natural", "social"] as const).map((department) => (
             <button
-              key={g}
+              key={department}
               onClick={() => {
-                setGrade(g);
-                setStream(null);
+                setStream(department);
+                setSelectedSubjects([]);
               }}
               className={`py-3 rounded-xl text-sm font-semibold border transition-colors ${
-                grade === g
+                stream === department
                   ? "bg-[#1D70F5] text-white border-[#1D70F5]"
                   : "bg-slate-50 text-slate-600 border-slate-100"
               }`}
             >
-              {g}
+              {department === "natural" ? "🔬 Natural Science" : "📚 Social Science"}
             </button>
           ))}
         </div>
       </div>
 
-      {needsStream && (
+      {stream && (
         <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-6">
-          <h3 className="text-sm font-bold text-slate-900 mb-3">Your Stream</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => setStream("natural")}
-              className={`py-3.5 rounded-xl text-sm font-semibold border transition-colors ${
-                stream === "natural"
-                  ? "bg-[#1D70F5] text-white border-[#1D70F5]"
-                  : "bg-slate-50 text-slate-600 border-slate-100"
-              }`}
-            >
-              🔬 Natural Science
-            </button>
-            <button
-              onClick={() => setStream("social")}
-              className={`py-3.5 rounded-xl text-sm font-semibold border transition-colors ${
-                stream === "social"
-                  ? "bg-[#1D70F5] text-white border-[#1D70F5]"
-                  : "bg-slate-50 text-slate-600 border-slate-100"
-              }`}
-            >
-              📚 Social Science
-            </button>
+          <h3 className="text-sm font-bold text-slate-900 mb-3">Choose your subjects</h3>
+          <p className="text-xs text-slate-500 mb-3">You can update these choices later.</p>
+          <div className="grid grid-cols-1 gap-2">
+            {availableSubjects.map((subject) => {
+              const selected = selectedSubjects.includes(subject.key);
+              return (
+                <button
+                  key={subject.key}
+                  type="button"
+                  onClick={() => setSelectedSubjects((current) => selected ? current.filter((key) => key !== subject.key) : [...current, subject.key])}
+                  className={`flex items-center justify-between rounded-xl border px-3 py-3 text-left text-sm font-semibold transition-colors ${selected ? "border-[#1D70F5] bg-blue-50 text-[#1D70F5]" : "border-slate-100 bg-slate-50 text-slate-700"}`}
+                >
+                  <span>{subjectLabel(subject.key)}</span>
+                  {selected && <Check className="h-4 w-4" />}
+                </button>
+              );
+            })}
           </div>
         </div>
-      )}
-
-      {grade !== null && !needsStream && (
-        <p className="text-xs text-slate-500 text-center mb-6 -mt-1">
-          Grades 9–10 follow the General curriculum — all subjects included.
-        </p>
       )}
 
       <button

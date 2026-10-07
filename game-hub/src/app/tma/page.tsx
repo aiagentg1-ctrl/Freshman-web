@@ -19,19 +19,20 @@ interface LocalProfile {
   city?: string;
   grade: number;
   stream: StreamKey;
+  selected_subjects: string[];
 }
 
 const VALID_STREAMS: StreamKey[] = ["general", "natural", "social"];
 
 function isCompleteProfile(
-  p: { grade?: number | null; stream?: string | null } | null
+  p: { grade?: number | null; stream?: string | null; selected_subjects?: string[] } | null
 ): p is LocalProfile {
   return (
     !!p &&
-    typeof p.grade === "number" &&
-    p.grade >= 9 &&
-    p.grade <= 12 &&
-    VALID_STREAMS.includes((p.stream || "").toLowerCase() as StreamKey)
+    p.grade === 12 &&
+    VALID_STREAMS.includes((p.stream || "").toLowerCase() as StreamKey) &&
+    Array.isArray(p.selected_subjects) &&
+    p.selected_subjects.length > 0
   );
 }
 
@@ -103,6 +104,7 @@ export default function TMAPage() {
             city: remote.city || "",
             grade: remote.grade,
             stream: remote.stream.toLowerCase() as StreamKey,
+            selected_subjects: remote.selected_subjects || [],
           });
         } else {
           try {
@@ -158,15 +160,15 @@ export default function TMAPage() {
     };
   }, [telegramUser?.id, profile]);
 
-  const handleOnboardingComplete = async (grade: number, stream: StreamKey) => {
+  const handleOnboardingComplete = async (stream: Exclude<StreamKey, "general">, selected_subjects: string[]) => {
     const fullName = telegramUser
       ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ")
       : "";
-    const next = { full_name: fullName, custom_name: undefined, school: "", city: "", grade, stream };
+    const next = { full_name: fullName, custom_name: undefined, school: "", city: "", grade: 12, stream, selected_subjects };
     localStorage.setItem("mirkuzProfile", JSON.stringify(next));
     if (telegramUser) {
       try {
-        await updateUser(telegramUser.id, { first_name: telegramUser.first_name, full_name: fullName, grade, stream });
+        await updateUser(telegramUser.id, { first_name: telegramUser.first_name, full_name: fullName, grade: 12, stream, selected_subjects });
       } catch (error) {
         console.error("Failed to save onboarding profile:", error);
       }
