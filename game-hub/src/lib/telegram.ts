@@ -17,24 +17,30 @@ export function getTelegramInitData(): string {
 
 export function getTelegramUser(): TelegramUser | null {
   const tg = getTelegramWebApp();
-  console.log("getTelegramUser - tg:", tg);
-  console.log("getTelegramUser - initDataUnsafe:", tg?.initDataUnsafe);
-  console.log("getTelegramUser - user:", tg?.initDataUnsafe?.user);
-
-  // Try to get user from Telegram WebApp
   const user = tg?.initDataUnsafe?.user;
   if (user) {
-    console.log("getTelegramUser - returning user from Telegram:", user);
     return user;
   }
 
-  // Fallback: try to get user from URL parameters (for testing/debugging)
+  // Some Telegram clients omit initDataUnsafe.user while keeping the signed payload.
+  const rawUser = new URLSearchParams(tg?.initData || "").get("user");
+  if (rawUser) {
+    try {
+      const parsedUser = JSON.parse(rawUser) as TelegramUser;
+      if (typeof parsedUser.id === "number" && parsedUser.id > 0) {
+        return parsedUser;
+      }
+    } catch {
+      // Let the caller show the normal Telegram-only error state.
+    }
+  }
+
+  // Development fallback for explicitly supplied test parameters.
   if (typeof window !== "undefined") {
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get("user_id");
     const firstName = urlParams.get("first_name") || "Test User";
     if (userId) {
-      console.log("getTelegramUser - returning user from URL params:", { id: Number(userId), first_name: firstName });
       return {
         id: Number(userId),
         first_name: firstName,
@@ -42,7 +48,6 @@ export function getTelegramUser(): TelegramUser | null {
     }
   }
 
-  console.log("getTelegramUser - no user found");
   return null;
 }
 

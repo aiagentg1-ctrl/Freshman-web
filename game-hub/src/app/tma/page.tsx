@@ -53,7 +53,7 @@ export default function TMAPage() {
     const initData = getTelegramInitData();
     if (!tgUser?.id || !initData) {
       setDeviceStatus("auth_required");
-      setDeviceError("Open Fresho from its Telegram bot to verify your account.");
+      setDeviceError("Open the app using the Study for Final/mid exam button in the Telegram bot.");
       setBooting(false);
       return;
     }
