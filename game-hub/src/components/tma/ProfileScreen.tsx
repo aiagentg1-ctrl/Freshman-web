@@ -122,8 +122,8 @@ export default function ProfileScreen({
           custom_name: result.custom_name || undefined,
           university: result.university,
           region: result.region,
-          school: result.school,
-          city: result.city,
+          school: result.school || "",
+          city: result.city || "",
         };
         localStorage.setItem("mirkuzProfile", JSON.stringify(savedProfile));
         onProfileChange(savedProfile);
