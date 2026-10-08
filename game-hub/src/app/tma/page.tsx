@@ -286,6 +286,7 @@ export default function TMAPage() {
             <NotesScreen
               stream={profile.stream}
               grade={profile.grade}
+              university={profile.university}
               telegramUserId={telegramUser?.id}
               isPremium={isPremium}
               onGetPremium={() => setShowPremiumDialog(true)}

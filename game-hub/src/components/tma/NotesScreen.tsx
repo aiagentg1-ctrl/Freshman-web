@@ -21,12 +21,14 @@ type View =
 export default function NotesScreen({
   stream,
   grade,
+  university,
   telegramUserId,
   isPremium,
   onGetPremium,
 }: {
   stream: StreamKey;
   grade: number;
+  university: string;
   telegramUserId?: number;
   isPremium: boolean;
   onGetPremium: () => void;
@@ -107,10 +109,12 @@ export default function NotesScreen({
       subject: view.chapterExam.subject,
       year: `Chapter ${view.chapterExam.chapter_number}`,
       title: view.chapterExam.title,
+      university,
       custom_tag: "Chapter Practice",
       question_count: view.chapterExam.question_count,
       duration_minutes: 180,
       content_type: view.chapterExam.content_type,
+      exam_type: "final",
       is_premium: view.chapterExam.is_premium,
       is_published: view.chapterExam.is_published,
       content_data: view.chapterExam.content_data,
