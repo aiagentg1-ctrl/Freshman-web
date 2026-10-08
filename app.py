@@ -125,7 +125,8 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
         path = request.url.path
-        if not path.startswith("/api/") or path.startswith("/api/auth/device-session"):
+        # Skip device session check for admin routes and auth routes
+        if not path.startswith("/api/") or path.startswith("/api/auth/device-session") or path.startswith("/api/admin/"):
             return await call_next(request)
 
         if (
@@ -146,16 +147,28 @@ class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
         try:
             user_id = int(request.headers.get("x-fresho-user-id", ""))
         except ValueError:
-            return JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
+            response = JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
 
         device_id = request.headers.get("x-fresho-device-id")
         token = request.headers.get("x-fresho-session-token")
         if not device_id or not token:
-            return JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
+            response = JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
 
         user_path = path.removeprefix("/api/user/").split("/", 1)[0]
         if user_path.isdigit() and int(user_path) != user_id:
-            return JSONResponse({"detail": "Fresho session user does not match the requested account"}, status_code=403)
+            response = JSONResponse({"detail": "Fresho session user does not match the requested account"}, status_code=403)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            return response
 
         async with AsyncSessionLocal() as session:
             result = await session.execute(
@@ -167,7 +180,11 @@ class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
                 or active.device_id != device_id
                 or not hmac.compare_digest(active.token_hash, hash_device_session(token))
             ):
-                return JSONResponse({"detail": "Fresho session is active on another device or has ended"}, status_code=409)
+                response = JSONResponse({"detail": "Fresho session is active on another device or has ended"}, status_code=409)
+                response.headers["Access-Control-Allow-Origin"] = "*"
+                response.headers["Access-Control-Allow-Methods"] = "*"
+                response.headers["Access-Control-Allow-Headers"] = "*"
+                return response
 
         return await call_next(request)
 
