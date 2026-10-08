@@ -16,7 +16,7 @@ import PremiumDialog from "../../components/tma/PremiumDialog";
 interface LocalProfile {
   full_name: string;
   custom_name?: string;
-  university?: string;
+  university: string;
   region?: string;
   school?: string;
   city?: string;
@@ -29,10 +29,17 @@ interface LocalProfile {
 const VALID_STREAMS: StreamKey[] = ["general", "natural", "social"];
 
 function isCompleteProfile(
-  p: { grade?: number | null; stream?: string | null; selected_subjects?: string[] } | null
+  p: {
+    grade?: number | null;
+    stream?: string | null;
+    selected_subjects?: string[];
+    university?: string | null;
+  } | null
 ): p is LocalProfile {
   return (
     !!p &&
+    typeof p.university === "string" &&
+    p.university.trim().length > 0 &&
     p.grade === 12 &&
     VALID_STREAMS.includes((p.stream || "").toLowerCase() as StreamKey) &&
     Array.isArray(p.selected_subjects) &&
