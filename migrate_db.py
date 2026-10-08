@@ -19,6 +19,8 @@ async def migrate_database():
         if dialect == "postgresql":
             # Add XP and leveling columns
             migrations = [
+                ("ALTER TABLE euee_exams ADD COLUMN IF NOT EXISTS exam_type VARCHAR NOT NULL DEFAULT 'final'", "exam_type"),
+                ("ALTER TABLE euee_exams ADD COLUMN IF NOT EXISTS university VARCHAR", "university"),
                 ("ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER NOT NULL DEFAULT 0", "xp"),
                 ("ALTER TABLE users ADD COLUMN IF NOT EXISTS level INTEGER NOT NULL DEFAULT 1", "level"),
                 ("ALTER TABLE users ADD COLUMN IF NOT EXISTS daily_streak INTEGER NOT NULL DEFAULT 0", "daily_streak"),
@@ -36,6 +38,16 @@ async def migrate_database():
                     print(f"[OK] Added/verified column: {column_name}")
                 except Exception as e:
                     print(f"[WARN] Error adding column {column_name}: {e}")
+
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS university_logos (
+                    id SERIAL PRIMARY KEY,
+                    university VARCHAR NOT NULL UNIQUE,
+                    data_uri TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            print("[OK] Added/verified table: university_logos")
 
             # Update existing users to have default values
             print("\nUpdating existing users with default values...")

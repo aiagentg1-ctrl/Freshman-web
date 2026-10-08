@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { Crown, Medal, Trophy } from "lucide-react";
 import { getLeaderboard, LeaderboardEntry, StreamKey } from "../../lib/api";
+import UniversityLogo from "./UniversityLogo";
 
-export default function Leaderboard({ stream }: { stream: StreamKey }) {
+export default function Leaderboard({ stream, university }: { stream: StreamKey; university: string }) {
   const [period, setPeriod] = useState<"weekly" | "all_time">("all_time");
   const [leaderboardType, setLeaderboardType] = useState<"score" | "xp">("score");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -23,7 +24,7 @@ export default function Leaderboard({ stream }: { stream: StreamKey }) {
     const refresh = () => {
       setLoading(true);
       setLoadError(null);
-      getLeaderboard(period, leaderboardType, userId, stream).then((data) => {
+      getLeaderboard(period, leaderboardType, userId, stream, university).then((data) => {
         if (!active) return;
         setEntries(data);
       }).catch((error: unknown) => {
@@ -47,7 +48,7 @@ export default function Leaderboard({ stream }: { stream: StreamKey }) {
       window.removeEventListener("mirkuz:profile-updated", refresh);
       window.removeEventListener("mirkuz:progress-updated", refresh);
     };
-  }, [leaderboardType, period, refreshKey, stream, userId]);
+  }, [leaderboardType, period, refreshKey, stream, university, userId]);
 
   const getRankBadge = (rank: number, isPremium = false) => {
     if (isPremium) {
@@ -156,6 +157,7 @@ export default function Leaderboard({ stream }: { stream: StreamKey }) {
               className={`flex items-center gap-3 rounded-xl border p-3 ${entry.is_current_user ? "border-[#1D70F5] bg-blue-50" : "border-slate-100 bg-slate-50"}`}
             >
               {getRankBadge(entry.rank, entry.is_premium)}
+              <UniversityLogo university={entry.university || "University"} logo={entry.university_logo} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h4 className="truncate text-sm font-semibold text-slate-900">{entry.display_name}</h4>

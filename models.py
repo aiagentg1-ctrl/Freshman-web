@@ -84,6 +84,15 @@ class ActiveDeviceSession(Base):
     last_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class UniversityLogo(Base):
+    """The single logo used to brand a university's exam content."""
+    __tablename__ = 'university_logos'
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    university = Column(String, nullable=False, unique=True, index=True)
+    data_uri = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class EueeExam(Base):
     """An EUEE past exam uploaded by an admin as HTML or a PDF link/blob."""
     __tablename__ = 'euee_exams'
@@ -91,6 +100,7 @@ class EueeExam(Base):
     subject = Column(Enum(SubjectEnum), nullable=False, index=True)
     year = Column(String, nullable=False)  # e.g. "2016 E.C." or "2024 G.C."
     title = Column(String, nullable=False)
+    university = Column(String, nullable=True, default="", server_default="")
     # Freeform admin label, e.g. "Pilot Exam", "EUEE Model", "National Exam".
     custom_tag = Column(String, nullable=False, default="", server_default="")
     question_count = Column(Integer, nullable=False)
@@ -99,7 +109,18 @@ class EueeExam(Base):
     content_type = Column(String, nullable=False, default="html", server_default="html")
     content_data = Column(Text, nullable=False)
     semester = Column(String, nullable=False, default="all", server_default="all")
+    exam_type = Column(String, nullable=False, default="final", server_default="final")
     is_premium = Column(Boolean, nullable=False, default=False, server_default="0")
+    is_published = Column(Boolean, nullable=False, default=True, server_default="1")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FlashCard(Base):
+    """An admin-authored HTML flash card shown in the student Game tab."""
+    __tablename__ = 'flash_cards'
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    html_content = Column(Text, nullable=False)
     is_published = Column(Boolean, nullable=False, default=True, server_default="1")
     created_at = Column(DateTime, default=datetime.utcnow)
 

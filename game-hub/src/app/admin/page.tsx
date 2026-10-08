@@ -24,6 +24,8 @@ import {
   adminDeleteChapterExam,
   getNoteChapterExam,
   adminToggleNotePublish,
+  adminGetUniversityLogo,
+  adminPutUniversityLogo,
   type AdminExamMeta,
   type NoteMeta,
   type AdminAnalytics,
@@ -33,6 +35,7 @@ import {
   type Note,
   type ChapterExam,
   type ChapterExamInput,
+  type UniversityLogo,
 } from "@/lib/api";
 import { inlineHtmlImageAssets } from "@/lib/htmlAssets";
 
@@ -58,7 +61,7 @@ const STREAMS = [
 
 const ADMIN_KEY_STORAGE = "mirkuzAdminKey";
 
-type TabType = "exams" | "notes" | "upload" | "analytics" | "suggestions";
+type TabType = "exams" | "notes" | "upload" | "logos" | "analytics" | "suggestions";
 
 function handleUnauthorized(): void {
   sessionStorage.removeItem(ADMIN_KEY_STORAGE);
@@ -188,6 +191,7 @@ export default function AdminDashboard() {
             { id: "exams" as TabType, label: "📝 Manage Exams" },
             { id: "notes" as TabType, label: "📚 Manage Notes" },
             { id: "upload" as TabType, label: "➕ Upload Content" },
+            { id: "logos" as TabType, label: "🖼️ University Logos" },
             { id: "analytics" as TabType, label: "📊 Analytics" },
             { id: "suggestions" as TabType, label: "📥 Subject Suggestions" },
           ].map((tab) => (
@@ -206,8 +210,111 @@ export default function AdminDashboard() {
         {activeTab === "exams" && <ExamsManager />}
         {activeTab === "notes" && <NotesManager />}
         {activeTab === "upload" && <ContentUploader />}
+        {activeTab === "logos" && <UniversityLogoManager />}
         {activeTab === "analytics" && <AnalyticsView />}
         {activeTab === "suggestions" && <SubjectSuggestionsManager />}
+      </div>
+    </div>
+  );
+}
+
+function UniversityLogoManager() {
+  const [logos, setLogos] = useState<UniversityLogo[]>([]);
+  const [university, setUniversity] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const load = async () => {
+    try {
+      setLogos(await adminGetUniversityLogo());
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not load university logos.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!university.trim() || !file) return;
+    setSaving(true);
+    setError("");
+    try {
+      const dataUri = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Could not read the selected image."));
+        reader.readAsDataURL(file);
+      });
+      await adminPutUniversityLogo({ university: university.trim(), data_uri: dataUri });
+      setMessage("University logo saved.");
+      setUniversity("");
+      setFile(null);
+      await load();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not save the logo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white rounded-xl p-5 shadow-sm">
+        <h2 className="text-xl font-bold text-gray-800 mb-3">Upload University Logo</h2>
+        <form onSubmit={submit} className="space-y-4">
+          <input
+            value={university}
+            onChange={(event) => setUniversity(event.target.value)}
+            className={inputClass}
+            placeholder="University name"
+            required
+          />
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={(event) => setFile(event.target.files?.[0] || null)}
+            className="block w-full text-sm text-gray-500"
+            required
+          />
+          <button
+            type="submit"
+            disabled={saving || loading}
+            className="w-full bg-[#1D70F5] text-white py-3 rounded-lg font-semibold disabled:opacity-60"
+          >
+            {saving ? "Saving..." : "Upload Logo"}
+          </button>
+        </form>
+        {message && <p className="mt-3 text-sm font-medium text-emerald-700">{message}</p>}
+        {error && <p className="mt-3 text-sm font-medium text-red-700">{error}</p>}
+      </div>
+
+      <div className="bg-white rounded-xl p-5 shadow-sm">
+        <h2 className="text-lg font-bold text-gray-800 mb-4">Saved Logos</h2>
+        {loading ? (
+          <p className="text-sm text-gray-500">Loading...</p>
+        ) : logos.length === 0 ? (
+          <p className="text-sm text-gray-500">No university logos have been uploaded.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {logos.map((logo) => (
+              <div key={logo.id} className="flex items-center gap-3 rounded-lg border border-gray-200 p-3">
+                <img src={logo.data_uri} alt={`${logo.university} logo`} className="h-14 w-14 rounded-lg object-contain p-1" />
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-800 truncate">{logo.university}</p>
+                  <p className="text-xs text-gray-500">Updated {new Date(logo.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1453,6 +1560,8 @@ function ExamUploader() {
   const [formData, setFormData] = useState({
     subject: "",
     year: "",
+    university: "",
+    examType: "final" as "final" | "mid",
     customTag: "",
     questionCount: "",
     durationMinutes: "",
@@ -1470,6 +1579,8 @@ function ExamUploader() {
     setFormData({
       subject: "",
       year: "",
+      university: "",
+      examType: "final",
       customTag: "",
       questionCount: "",
       durationMinutes: "",
@@ -1499,10 +1610,12 @@ function ExamUploader() {
         subject: formData.subject,
         year: formData.year,
         title: `${formData.subject.charAt(0).toUpperCase() + formData.subject.slice(1)} EUEE ${formData.year}`,
+        university: formData.university,
         custom_tag: formData.customTag,
         question_count: parseInt(formData.questionCount),
         duration_minutes: parseInt(formData.durationMinutes),
         content_type: formData.format,
+        exam_type: formData.examType,
         content_data: contentData,
         is_premium: formData.isPremium,
         is_published: formData.isPublished,
@@ -1533,6 +1646,30 @@ function ExamUploader() {
             placeholder="e.g. 2026, 2025, 2016 E.C."
             required
           />
+        </div>
+        <div>
+          <label className={labelClass}>University</label>
+          <input
+            type="text"
+            value={formData.university}
+            onChange={(e) => setFormData({ ...formData, university: e.target.value })}
+            className={inputClass}
+            placeholder="Exact university name"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className={labelClass}>Exam Type</label>
+          <select
+            value={formData.examType}
+            onChange={(e) => setFormData({ ...formData, examType: e.target.value as "final" | "mid" })}
+            className={inputClass}
+          >
+            <option value="final">Final Exam</option>
+            <option value="mid">Mid Exam</option>
+          </select>
         </div>
         <div>
           <label className={labelClass}>Custom Tag</label>
@@ -2122,10 +2259,12 @@ function EditExamModal({
     subject: exam.subject,
     year: exam.year,
     title: exam.title,
+    university: exam.university,
     custom_tag: exam.custom_tag,
     question_count: exam.question_count,
     duration_minutes: exam.duration_minutes,
     content_type: exam.content_type,
+    exam_type: exam.exam_type,
     content_data: exam.content_data,
     is_premium: exam.is_premium,
     is_published: exam.is_published,
@@ -2201,6 +2340,28 @@ function EditExamModal({
                 onChange={(e) => setFormData({ ...formData, custom_tag: e.target.value })}
                 className={inputClass}
               />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>University</label>
+              <input
+                type="text"
+                value={formData.university}
+                onChange={(e) => setFormData({ ...formData, university: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Exam Type</label>
+              <select
+                value={formData.exam_type}
+                onChange={(e) => setFormData({ ...formData, exam_type: e.target.value as "final" | "mid" })}
+                className={inputClass}
+              >
+                <option value="final">Final Exam</option>
+                <option value="mid">Mid Exam</option>
+              </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

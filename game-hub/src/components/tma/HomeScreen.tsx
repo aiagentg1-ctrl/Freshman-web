@@ -15,6 +15,7 @@ export default function HomeScreen({
   fullName,
   grade,
   stream,
+  university,
   selectedSubjects,
   isPremium,
   onContinueExam,
@@ -25,6 +26,7 @@ export default function HomeScreen({
   fullName: string;
   grade: number;
   stream: StreamKey;
+  university: string;
   selectedSubjects: string[];
   isPremium: boolean;
   onContinueExam: (exam: ExamMeta) => void;
@@ -396,7 +398,7 @@ export default function HomeScreen({
         </div>
 
         {/* Leaderboard */}
-        <Leaderboard stream={stream} />
+        <Leaderboard stream={stream} university={university} />
       </div>
     </div>
   );

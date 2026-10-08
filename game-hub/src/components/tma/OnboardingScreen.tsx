@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Check, GraduationCap, Send } from "lucide-react";
 import { submitSubjectSuggestion, type StreamKey } from "../../lib/api";
 import { subjectLabel, subjectsForStream } from "../../lib/subjects";
+import UniversityLogo from "./UniversityLogo";
+import UniversitySelect from "./UniversitySelect";
 
 export default function OnboardingScreen({
   onComplete,
@@ -58,12 +60,14 @@ export default function OnboardingScreen({
       <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-4 space-y-3">
         <div>
           <h3 className="text-sm font-bold text-slate-900 mb-2">University</h3>
-          <input
-            value={university}
-            onChange={(event) => setUniversity(event.target.value)}
-            placeholder="e.g. Addis Ababa University"
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5]"
-          />
+          <div className="flex items-center gap-3">
+            <UniversityLogo university={university || "University"} logo={null} />
+            <UniversitySelect
+              value={university}
+              onChange={setUniversity}
+              className="flex-1"
+            />
+          </div>
         </div>
         <div>
           <h3 className="text-sm font-bold text-slate-900 mb-2">Region</h3>

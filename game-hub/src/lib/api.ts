@@ -7,10 +7,12 @@ export interface ExamMeta {
   subject: string;
   year: string;
   title: string;
+  university: string;
   custom_tag: string;
   question_count: number;
   duration_minutes: number;
   content_type: ExamContentType;
+  exam_type: "final" | "mid";
   is_premium: boolean;
   is_published: boolean;
   semester?: string;
@@ -305,9 +307,11 @@ function getAdminHeaders(): HeadersInit {
   };
 }
 
-export async function getExams(subject?: string): Promise<ExamMeta[]> {
-  const params = subject ? `?subject=${encodeURIComponent(subject)}` : "";
-  return request<ExamMeta[]>(`/api/exams${params}`);
+export async function getExams(subject?: string, university?: string): Promise<ExamMeta[]> {
+  const params = new URLSearchParams();
+  if (subject) params.set("subject", subject);
+  if (university) params.set("university", university);
+  return request<ExamMeta[]>(`/api/exams?${params.toString()}`);
 }
 
 export async function getExam(id: number): Promise<Exam> {
@@ -538,6 +542,7 @@ export interface LeaderboardEntry {
   user_id: number;
   display_name: string;
   university: string | null;
+  university_logo?: string | null;
   region: string | null;
   attempt_count?: number;
   avg_score?: number;
@@ -553,12 +558,46 @@ export async function getLeaderboard(
   period: "weekly" | "all_time" = "all_time",
   type: "score" | "xp" = "score",
   userId?: number,
-  stream?: StreamKey
+  stream?: StreamKey,
+  university?: string
 ): Promise<LeaderboardEntry[]> {
   const params = new URLSearchParams({ period, type });
   if (userId) params.set("user_id", String(userId));
   if (stream) params.set("stream", stream);
+  if (university) params.set("university", university);
   return request<LeaderboardEntry[]>(`/api/leaderboard?${params}`);
+}
+
+export interface UniversityLogo {
+  id: number;
+  university: string;
+  data_uri: string;
+  created_at: string;
+}
+
+export async function adminGetUniversityLogo(): Promise<UniversityLogo[]> {
+  return request<UniversityLogo[]>("/api/admin/university-logo", {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminPutUniversityLogo(payload: {
+  university: string;
+  data_uri: string;
+}): Promise<UniversityLogo> {
+  return request<UniversityLogo>("/api/admin/university-logo", {
+    method: "PUT",
+    headers: getAdminHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getUniversityLogo(university: string): Promise<UniversityLogo | null> {
+  try {
+    return await request<UniversityLogo | null>(`/api/university-logo?university=${encodeURIComponent(university)}`);
+  } catch {
+    return null;
+  }
 }
 
 // Admin API functions

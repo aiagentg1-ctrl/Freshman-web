@@ -5,6 +5,8 @@ import { Check, HelpCircle, LogOut, Pencil, User, GraduationCap, MapPin, Trendin
 import { StreamKey, updateUser, getUserProgress, UserProgress } from "../../lib/api";
 import { streamLabel } from "../../lib/subjects";
 import { getTelegramUser, TelegramUser } from "../../lib/telegram";
+import UniversityLogo from "./UniversityLogo";
+import UniversitySelect from "./UniversitySelect";
 
 const GRADES = [9, 10, 11, 12];
 const SUPPORT_URL = "https://t.me/Mirkuz_support";
@@ -59,6 +61,7 @@ export default function ProfileScreen({
   const [hasEdits, setHasEdits] = useState(false);
   const [userProgress, setUserProgress] = useState<UserProgress | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [universityLogo, setUniversityLogo] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +87,19 @@ export default function ProfileScreen({
       window.removeEventListener("mirkuz:exam-attempt-saved", refreshProgress);
     };
   }, [telegramUser]);
+
+  useEffect(() => {
+    if (!university.trim()) {
+      setUniversityLogo(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch(`/api/university-logo?university=${encodeURIComponent(university)}`, { signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((logo) => setUniversityLogo(logo?.data_uri || null))
+      .catch(() => setUniversityLogo(null));
+    return () => controller.abort();
+  }, [university]);
 
   const dirty = hasEdits;
 
@@ -167,6 +183,7 @@ export default function ProfileScreen({
       <div className="flex-1 px-4 py-5 space-y-4">
         {/* Identity card */}
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4">
+          <UniversityLogo university={university || "University"} logo={universityLogo} className="h-14 w-14 rounded-full" />
           {telegramUser?.photo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -258,15 +275,12 @@ export default function ProfileScreen({
             <label className="text-xs font-semibold text-slate-500 mb-1.5 block flex items-center gap-1.5">
               <GraduationCap className="w-3.5 h-3.5" /> University
             </label>
-            <input
-              type="text"
+            <UniversitySelect
               value={university}
-              onChange={(e) => {
-                setUniversity(e.target.value);
+              onChange={(nextUniversity) => {
+                setUniversity(nextUniversity);
                 setHasEdits(true);
               }}
-              placeholder="e.g. Addis Ababa University"
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5] focus:border-transparent"
             />
           </div>
 

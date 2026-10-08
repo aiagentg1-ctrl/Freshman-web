@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
-from sqlalchemy import delete as sqlalchemy_delete, or_
+from sqlalchemy import delete as sqlalchemy_delete, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 import hashlib
 import hmac
@@ -25,7 +25,7 @@ from database import AsyncSessionLocal, init_db
 from models import (
     User, EueeExam, EueeExamAttempt, Note, SubjectEnum, StreamEnum,
     NoteCompletion, UserBadge, XpReward, ChapterExam, ChapterExamAttempt,
-    ActiveDeviceSession, SubjectSuggestion,
+    ActiveDeviceSession, SubjectSuggestion, UniversityLogo, FlashCard,
 )
 
 VALID_SUBJECTS = [s.value for s in SubjectEnum]
@@ -782,17 +782,38 @@ def serialize_exam(exam: EueeExam, include_content: bool = False) -> dict:
         "subject": exam.subject.value,
         "year": exam.year,
         "title": exam.title,
+        "university": exam.university or "",
         "custom_tag": exam.custom_tag or "",
         "question_count": exam.question_count,
         "duration_minutes": exam.duration_minutes,
         "content_type": exam.content_type,
         "semester": exam.semester,
+        "exam_type": exam.exam_type,
         "is_premium": exam.is_premium,
         "is_published": exam.is_published,
     }
     if include_content:
         data["content_data"] = exam.content_data
     return data
+
+
+def serialize_flash_card(flash_card: FlashCard) -> dict:
+    return {
+        "id": flash_card.id,
+        "title": flash_card.title,
+        "html_content": flash_card.html_content,
+        "is_published": flash_card.is_published,
+        "created_at": flash_card.created_at.isoformat(),
+    }
+
+
+def serialize_university_logo(logo: UniversityLogo) -> dict:
+    return {
+        "id": logo.id,
+        "university": logo.university,
+        "data_uri": logo.data_uri,
+        "created_at": logo.created_at.isoformat(),
+    }
 
 
 def serialize_note(note: Note, include_content: bool = False) -> dict:
@@ -888,12 +909,14 @@ class ExamCreate(BaseModel):
     subject: str
     year: str
     title: Optional[str] = None
+    university: Optional[str] = None
     custom_tag: Optional[str] = None
     question_count: int
     duration_minutes: int
     content_type: str = "html"
     content_data: str
     semester: str = "all"
+    exam_type: str = "final"
     is_premium: bool = False
     is_published: bool = True
 
@@ -933,6 +956,52 @@ class ExamCreate(BaseModel):
         if not v or len(v.strip()) < 8:
             raise ValueError('Exam content is required (HTML markup or a PDF URL/data URI)')
         return v.strip()
+
+    @validator('exam_type')
+    def validate_exam_type(cls, v):
+        v = v.strip().lower()
+        if v not in ('final', 'mid'):
+            raise ValueError('Exam type must be "final" or "mid"')
+        return v
+
+    @validator('university')
+    def validate_university(cls, v):
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+        return v
+
+
+class UniversityLogoCreate(BaseModel):
+    university: str
+    data_uri: str
+
+    @validator('university')
+    def validate_university(cls, v):
+        v = v.strip()
+        if len(v) < 2 or len(v) > 160:
+            raise ValueError('University name must be between 2 and 160 characters')
+        return v
+
+    @validator('data_uri')
+    def validate_data_uri(cls, v):
+        if not v.startswith('data:image/') or ';base64,' not in v:
+            raise ValueError('University logo must be a base64 image')
+        return v
+
+
+class FlashCardCreate(BaseModel):
+    title: str
+    html_content: str
+    is_published: bool = True
+
+    @validator('title')
+    def validate_title(cls, v):
+        v = v.strip()
+        if len(v) < 2 or len(v) > 160:
+            raise ValueError('Title must be between 2 and 160 characters')
+        return v
 
 
 class ExamAttemptCreate(BaseModel):
@@ -1553,8 +1622,9 @@ async def get_leaderboard(
     type: str = "score",
     user_id: Optional[int] = None,
     stream: Optional[str] = None,
+    university: Optional[str] = None,
 ):
-    """Get leaderboard - type can be 'score' (default) or 'xp'."""
+    """Get a global leaderboard or a university-scoped leaderboard."""
     if period not in {"weekly", "all_time"}:
         raise HTTPException(status_code=400, detail="Period must be 'weekly' or 'all_time'")
     if type not in {"score", "xp"}:
@@ -1565,6 +1635,10 @@ async def get_leaderboard(
             stream_filter = StreamEnum[stream.upper()]
         except KeyError as error:
             raise HTTPException(status_code=400, detail="Stream must be 'general', 'natural', or 'social'") from error
+    if university:
+        normalized_university = university.strip()
+        if not normalized_university:
+            raise HTTPException(status_code=400, detail="University cannot be empty")
 
     async with AsyncSessionLocal() as session:
         from sqlalchemy import func, desc
@@ -1587,11 +1661,25 @@ async def get_leaderboard(
                     )
                     .where(User.xp > 0)
                 )
+                if normalized_university:
+                    base = base.where(User.university == normalized_university)
 
                 leaderboard_query = base.order_by(desc(User.xp), desc(User.level), User.user_id)
                 result = await session.execute(leaderboard_query)
                 all_rows = result.all()
                 leaderboard = all_rows[:10]
+                logos = {}
+                if all_rows:
+                    university_names = {row[4] for row in all_rows if row[4]}
+                    logo_result = await session.execute(
+                        select(UniversityLogo).where(
+                            UniversityLogo.university.in_(university_names)
+                        )
+                    )
+                    logos = {
+                        logo.university: logo.data_uri
+                        for logo in logo_result.scalars().all()
+                    }
                 current_rank = next(
                     (index + 1 for index, row in enumerate(all_rows) if row.user_id == user_id),
                     None,
@@ -1611,6 +1699,7 @@ async def get_leaderboard(
                         "rank_info": get_rank(row.xp if row.xp is not None else 0),
                         "streak": row.daily_streak if row.daily_streak is not None else 0,
                         "is_premium": bool(row.premium_expires_at and row.premium_expires_at > datetime.utcnow()),
+                        "university_logo": logos.get(row[4]) if row[4] else None,
                         "is_current_user": row.user_id == user_id,
                     }
                     for i, row in enumerate(leaderboard)
@@ -1623,6 +1712,7 @@ async def get_leaderboard(
                         User.first_name,
                         User.full_name,
                         User.custom_name,
+                        User.university,
                         User.school,
                         User.city,
                         func.count(EueeExamAttempt.id).label("attempt_count"),
@@ -1638,15 +1728,29 @@ async def get_leaderboard(
                 )
                 if stream_filter:
                     base = base.where(User.stream == stream_filter)
+                if normalized_university:
+                    base = base.where(User.university == normalized_university)
 
                 if period == "weekly":
                     week_ago = datetime.utcnow() - timedelta(days=7)
                     base = base.where(EueeExamAttempt.created_at >= week_ago)
 
                 leaderboard_query = base.order_by(desc("best_score"), desc("avg_score"), User.user_id)
-                result = await session.execute(leaderboard_query)
+                result = await session.execute(leaderaderboard_query)
                 all_rows = result.all()
                 leaderboard = all_rows[:10]
+                logos = {}
+                if all_rows:
+                    university_names = {row[4] for row in all_rows if row[4]}
+                    logo_result = await session.execute(
+                        select(UniversityLogo).where(
+                            UniversityLogo.university.in_(university_names)
+                        )
+                    )
+                    logos = {
+                        logo.university: logo.data_uri
+                        for logo in logo_result.scalars().all()
+                    }
                 current_rank = next(
                     (index + 1 for index, row in enumerate(all_rows) if row.user_id == user_id),
                     None,
@@ -1659,11 +1763,13 @@ async def get_leaderboard(
                         "rank": current_rank if row.user_id == user_id and current_rank else i + 1,
                         "user_id": row.user_id,
                         "display_name": row.custom_name or row.first_name or "Anonymous Student",
+                        "university": row.university or None,
                         "school": row.school or None,
                         "city": row.city or None,
                         "attempt_count": row.attempt_count,
                         "avg_score": round(row.avg_score, 1) if row.avg_score is not None else 0,
                         "best_score": row.best_score,
+                        "university_logo": logos.get(row[4]) if row[4] else None,
                         "is_current_user": row.user_id == user_id,
                     }
                     for i, row in enumerate(leaderboard)
@@ -1676,18 +1782,28 @@ async def get_leaderboard(
 # ---------- EUEE exam endpoints ----------
 
 @app.get("/api/exams")
-async def get_exams(subject: Optional[str] = None, year: Optional[str] = None, include_drafts: bool = False):
+async def get_exams(
+    subject: Optional[str] = None,
+    year: Optional[str] = None,
+    university: Optional[str] = None,
+    include_drafts: bool = False,
+):
     async with AsyncSessionLocal() as session:
         query = select(EueeExam)
         if subject:
             query = query.where(EueeExam.subject == SubjectEnum[subject.upper()])
         if year:
             query = query.where(EueeExam.year == year)
+        if university:
+            query = query.where(EueeExam.university.ilike(university.strip()))
         if not include_drafts:
             query = query.where(EueeExam.is_published == True)
 
         result = await session.execute(query.order_by(EueeExam.year.desc()))
-        return [serialize_exam(exam) for exam in result.scalars().all()]
+        exams = result.scalars().all()
+        if university:
+            exams.sort(key=lambda exam: (1 if exam.exam_type == "final" else 0, exam.year), reverse=True)
+        return [serialize_exam(exam) for exam in exams]
 
 
 @app.get("/api/exams/{exam_id}")
@@ -1724,12 +1840,14 @@ async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_ad
             subject=SubjectEnum[exam.subject.upper()],
             year=exam.year,
             title=title,
+            university=exam.university.strip() if exam.university else "",
             custom_tag=(exam.custom_tag or "").strip(),
             question_count=exam.question_count,
             duration_minutes=exam.duration_minutes,
             content_type=exam.content_type,
             content_data=exam.content_data,
             semester=exam.semester,
+            exam_type=exam.exam_type,
             is_premium=exam.is_premium,
             is_published=exam.is_published,
         )
@@ -1749,6 +1867,7 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
 
         db_exam.subject = SubjectEnum[exam.subject.upper()]
         db_exam.year = exam.year
+        db_exam.university = exam.university.strip() if exam.university else ""
         db_exam.is_premium = exam.is_premium
         db_exam.is_published = exam.is_published
         db_exam.title = exam.title or db_exam.title
@@ -1758,6 +1877,7 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
         db_exam.content_type = exam.content_type
         db_exam.content_data = exam.content_data
         db_exam.semester = exam.semester
+        db_exam.exam_type = exam.exam_type
         await session.commit()
         return serialize_exam(db_exam, include_content=True)
 
@@ -2488,6 +2608,64 @@ async def get_note_chapter_exam(note_id: int):
 
 
 # ---------- Admin Dashboard endpoints ----------
+
+@app.get("/api/admin/university-logo")
+async def admin_get_university_logo(admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(UniversityLogo).order_by(UniversityLogo.university)
+        )
+        return [serialize_university_logo(logo) for logo in result.scalars().all()]
+
+
+@app.put("/api/admin/university-logo")
+async def admin_put_university_logo(
+    payload: UniversityLogoCreate,
+    admin_verified: bool = Depends(verify_admin_secret),
+):
+    data_uri = payload.data_uri.strip()
+    try:
+        image_data = data_uri.split(",", 1)[1]
+        if len(image_data) > 5_000_000:
+            raise HTTPException(status_code=413, detail="Logo is too large")
+        decoded = __import__("base64").b64decode(image_data, validate=True)
+        if not decoded:
+            raise HTTPException(status_code=400, detail="Logo image is invalid")
+    except (ValueError, TypeError) as error:
+        raise HTTPException(status_code=400, detail="Logo image is invalid") from error
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(UniversityLogo).where(UniversityLogo.university == payload.university)
+        )
+        logo = result.scalar_one_or_none()
+        if logo is None:
+            logo = UniversityLogo(university=payload.university, data_uri=data_uri)
+        else:
+            logo.data_uri = data_uri
+        session.add(logo)
+        await session.commit()
+        await session.refresh(logo)
+        return serialize_university_logo(logo)
+
+
+@app.get("/api/university-logo")
+async def get_university_logo(university: Optional[str] = None):
+    if university:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(UniversityLogo).where(
+                    UniversityLogo.university == university.strip()
+                )
+            )
+            logo = result.scalar_one_or_none()
+            return serialize_university_logo(logo) if logo else None
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(UniversityLogo).order_by(UniversityLogo.university)
+        )
+        return [serialize_university_logo(logo) for logo in result.scalars().all()]
+
 
 @app.get("/api/admin/exams")
 async def admin_get_exams(admin_verified: bool = Depends(verify_admin_secret)):

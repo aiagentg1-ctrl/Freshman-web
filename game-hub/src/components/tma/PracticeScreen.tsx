@@ -39,6 +39,7 @@ function yearSortKey(year: string): number {
 export default function PracticeScreen({
   stream,
   grade,
+  university,
   telegramUserId,
   telegramFirstName,
   resumeExam,
@@ -49,6 +50,7 @@ export default function PracticeScreen({
 }: {
   stream: StreamKey;
   grade: number;
+  university: string;
   telegramUserId?: number;
   telegramFirstName?: string;
   resumeExam?: ExamMeta | null;
@@ -71,7 +73,7 @@ export default function PracticeScreen({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getExams()
+    getExams(undefined, university)
       .then((data) => {
         if (!cancelled) setExams(data);
       })
@@ -82,7 +84,7 @@ export default function PracticeScreen({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [university]);
 
   useEffect(() => {
     let cancelled = false;

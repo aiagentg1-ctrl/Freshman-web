@@ -265,6 +265,7 @@ export default function TMAPage() {
             <PracticeScreen
               stream={profile.stream}
               grade={profile.grade}
+              university={profile.university}
               telegramUserId={telegramUser?.id}
               telegramFirstName={telegramUser?.first_name}
               resumeExam={resumeExam}
@@ -289,6 +290,7 @@ export default function TMAPage() {
               fullName={profile.custom_name || profile.full_name}
               grade={profile.grade}
               stream={profile.stream}
+              university={profile.university}
               selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}
               onContinueExam={handleContinueExam}

@@ -1,0 +1,28 @@
+"use client";
+
+import { GraduationCap } from "lucide-react";
+
+export default function UniversityLogo({
+  university,
+  logo,
+  className = "h-10 w-10",
+}: {
+  university: string;
+  logo?: string | null;
+  className?: string;
+}) {
+  return logo ? (
+    <img
+      src={logo}
+      alt={`${university} logo`}
+      className={`${className} shrink-0 rounded-xl border border-slate-100 bg-white object-contain p-1 shadow-sm`}
+    />
+  ) : (
+    <div
+      className={`${className} shrink-0 rounded-xl bg-blue-50 flex items-center justify-center text-[#1D70F5]`}
+      aria-label={`${university} logo unavailable`}
+    >
+      <GraduationCap className="h-5 w-5" />
+    </div>
+  );
+}
