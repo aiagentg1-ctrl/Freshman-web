@@ -92,7 +92,10 @@ async def lifespan(app: FastAPI):
         print(f"Failed to remove webhook: {e}")
 
 
-app = FastAPI(lifespan=lifespan, title="Mirkuz EUEE High School API")
+app = FastAPI(
+    lifespan=lifespan,
+    title="Mirkuz EUEE High School API"
+)
 
 ADMIN_SECRET = (
     os.getenv("ADMIN_SECRET")
@@ -122,9 +125,6 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
         path = request.url.path
-        # Let CORS middleware handle OPTIONS requests - return immediately with CORS headers
-        if request.method == "OPTIONS":
-            return await call_next(request)
         if not path.startswith("/api/") or path.startswith("/api/auth/device-session"):
             return await call_next(request)
 
@@ -172,15 +172,18 @@ class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+app.add_middleware(SingleDeviceSessionMiddleware)
+app.add_middleware(NoCacheMiddleware)
+
+# Add CORS middleware LAST so it executes FIRST on requests (to handle OPTIONS preflight)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
-app.add_middleware(SingleDeviceSessionMiddleware)
-app.add_middleware(NoCacheMiddleware)
 
 
 def telegram_user_from_init_data(init_data: str) -> int:
@@ -397,6 +400,12 @@ async def telegram_webhook(request: Request):
 @app.get("/")
 async def read_root():
     return {"status": "ok", "message": "Mirkuz EUEE High School API"}
+
+
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle OPTIONS requests for CORS preflight"""
+    return {"status": "ok"}
 
 
 # ---------- XP and Leveling System ----------
