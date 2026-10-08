@@ -330,11 +330,11 @@ export default function TMAPage() {
           <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </>
       )}
-      {showPremiumDialog && (
+      {showPremiumDialog && profile && (
         <PremiumDialog
-          fullName={fullName}
-          university={university}
-          stream={streamLabel(stream)}
+          fullName={profile.full_name}
+          university={profile.university}
+          stream={profile.stream}
           onClose={() => setShowPremiumDialog(false)}
         />
       )}
