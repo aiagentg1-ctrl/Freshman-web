@@ -14,7 +14,7 @@ export default function PremiumBanner({ onGetPremium }: { onGetPremium: () => vo
             <Sparkles className="h-3.5 w-3.5 text-amber-600" />
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">Fresho Premium</p>
           </div>
-          <p className="mt-0.5 truncate text-sm font-extrabold text-slate-900">199 ETB · 5 months</p>
+          <p className="mt-0.5 truncate text-sm font-extrabold text-slate-900">Unlock your complete study space</p>
         </div>
         <button
           type="button"

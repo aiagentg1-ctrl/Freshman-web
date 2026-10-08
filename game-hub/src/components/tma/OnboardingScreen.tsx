@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check, GraduationCap, Send } from "lucide-react";
-import { submitSubjectSuggestion, type StreamKey } from "../../lib/api";
-import { subjectLabel, subjectsForStream } from "../../lib/subjects";
+import { GraduationCap } from "lucide-react";
+import type { StreamKey } from "../../lib/api";
 import UniversityLogo from "./UniversityLogo";
 import UniversitySelect from "./UniversitySelect";
 
@@ -13,38 +12,13 @@ export default function OnboardingScreen({
   onComplete: (stream: Exclude<StreamKey, "general">, subjects: string[], university: string, region: string) => void;
 }) {
   const [stream, setStream] = useState<Exclude<StreamKey, "general"> | null>(null);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const [otherSubject, setOtherSubject] = useState("");
-  const [otherReason, setOtherReason] = useState("");
-  const [submittingOther, setSubmittingOther] = useState(false);
-  const [otherError, setOtherError] = useState("");
   const [university, setUniversity] = useState("");
   const [region, setRegion] = useState("");
-  const availableSubjects = stream ? subjectsForStream(stream) : [];
-  const ready = stream !== null && (selectedSubjects.length > 0 || otherSubject.trim().length > 0) && university.trim() && region.trim();
-
-  const submitOtherSubject = async () => {
-    if (!stream || !otherSubject.trim() || submittingOther) return;
-    setSubmittingOther(true);
-    setOtherError("");
-    try {
-      await submitSubjectSuggestion({
-        stream,
-        subject_name: otherSubject.trim(),
-        reason: otherReason.trim() || undefined,
-      });
-      setOtherSubject("");
-      setOtherReason("");
-    } catch (error) {
-      setOtherError(error instanceof Error ? error.message : "Unable to submit subject suggestion");
-    } finally {
-      setSubmittingOther(false);
-    }
-  };
+  const ready = stream !== null && university.trim().length > 0 && region.trim().length > 0;
 
   const complete = () => {
     if (!ready || !stream) return;
-    onComplete(stream, selectedSubjects, university.trim(), region.trim());
+    onComplete(stream, [], university.trim(), region.trim());
   };
 
   return (
@@ -86,10 +60,7 @@ export default function OnboardingScreen({
           {(["natural", "social"] as const).map((department) => (
             <button
               key={department}
-              onClick={() => {
-                setStream(department);
-                setSelectedSubjects([]);
-              }}
+              onClick={() => setStream(department)}
               className={`py-3 rounded-xl text-sm font-semibold border transition-colors ${
                 stream === department
                   ? "bg-[#1D70F5] text-white border-[#1D70F5]"
@@ -101,59 +72,6 @@ export default function OnboardingScreen({
           ))}
         </div>
       </div>
-
-      {stream && (
-        <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-4">
-          <h3 className="text-sm font-bold text-slate-900 mb-3">Choose your subjects</h3>
-          <p className="text-xs text-slate-500 mb-3">You can update these choices later.</p>
-          <div className="grid grid-cols-1 gap-2">
-            {availableSubjects.map((subject) => {
-              const selected = selectedSubjects.includes(subject.key);
-              return (
-                <button
-                  key={subject.key}
-                  type="button"
-                  onClick={() => setSelectedSubjects((current) => selected ? current.filter((key) => key !== subject.key) : [...current, subject.key])}
-                  className={`flex items-center justify-between rounded-xl border px-3 py-3 text-left text-sm font-semibold transition-colors ${selected ? "border-[#1D70F5] bg-blue-50 text-[#1D70F5]" : "border-slate-100 bg-slate-50 text-slate-700"}`}
-                >
-                  <span>{subjectLabel(subject.key)}</span>
-                  {selected && <Check className="h-4 w-4" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {stream && (
-        <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-6">
-          <h3 className="text-sm font-bold text-slate-900 mb-2">Suggest another subject</h3>
-          <p className="text-xs text-slate-500 mb-3">Your suggestion will be reviewed by an administrator.</p>
-          <input
-            value={otherSubject}
-            onChange={(event) => setOtherSubject(event.target.value)}
-            placeholder="Subject name"
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5] mb-2"
-          />
-          <textarea
-            value={otherReason}
-            onChange={(event) => setOtherReason(event.target.value)}
-            placeholder="Optional reason"
-            rows={2}
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5] mb-3 resize-none"
-          />
-          <button
-            type="button"
-            onClick={submitOtherSubject}
-            disabled={!otherSubject.trim() || submittingOther}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            <Send className="h-4 w-4" />
-            {submittingOther ? "Submitting..." : "Send to Admin"}
-          </button>
-          {otherError && <p className="mt-2 text-xs text-red-600">{otherError}</p>}
-        </div>
-      )}
 
       <button
         onClick={complete}

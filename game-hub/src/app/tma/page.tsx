@@ -330,7 +330,14 @@ export default function TMAPage() {
           <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </>
       )}
-      {showPremiumDialog && <PremiumDialog onClose={() => setShowPremiumDialog(false)} />}
+      {showPremiumDialog && (
+        <PremiumDialog
+          fullName={fullName}
+          university={university}
+          stream={streamLabel(stream)}
+          onClose={() => setShowPremiumDialog(false)}
+        />
+      )}
       {streakPrompt && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-5 backdrop-blur-sm"

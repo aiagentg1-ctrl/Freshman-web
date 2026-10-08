@@ -5,7 +5,6 @@ import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, Clipboard
 import { ExamMeta, ExamReviewQuestion, getInProgressExam, getRecentExamAttempts, getUserProgress, getUserStats, RecentExamAttempt, StreamKey, UserProgress, UserStats } from "../../lib/api";
 import { streamLabel, subjectLabel } from "../../lib/subjects";
 import { TelegramUser } from "../../lib/telegram";
-import FlashCards from "./FlashCards";
 import MathContent from "./MathContent";
 import PremiumBanner from "./PremiumBanner";
 
@@ -262,8 +261,6 @@ export default function HomeScreen({
             </div>
           </section>
         )}
-
-        <FlashCards />
 
         {/* Legacy average score fallback */}
         {grade <= 10 && progress?.average_score && (

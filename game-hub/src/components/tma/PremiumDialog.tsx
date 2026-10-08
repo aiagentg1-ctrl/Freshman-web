@@ -12,7 +12,19 @@ const PLAN = [
   "Semester video updates and study sessions",
 ];
 
-export default function PremiumDialog({ onClose }: { onClose: () => void }) {
+export default function PremiumDialog({
+  fullName,
+  university,
+  stream,
+  onClose,
+}: {
+  fullName: string;
+  university: string;
+  stream: string;
+  onClose: () => void;
+}) {
+  const telegramSupportUrl = `https://t.me/Mirkuz_support?start=Hi%20Mirkuz%20Support%2C%20I%20want%20to%20activate%20Fresho%20Premium.%20Name%3A%20${encodeURIComponent(fullName)}.%20University%3A%20${encodeURIComponent(university)}.%20Stream%3A%20${encodeURIComponent(stream)}.`;
+
   return (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
@@ -66,7 +78,7 @@ export default function PremiumDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           <a
-            href="https://t.me/Mirkuz_support"
+            href={telegramSupportUrl}
             target="_blank"
             rel="noreferrer"
             className="mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-[#1D70F5] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 active:scale-[0.98]"
