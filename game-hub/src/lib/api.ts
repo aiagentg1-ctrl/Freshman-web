@@ -39,6 +39,14 @@ export interface Note extends NoteMeta {
   html_content: string;
 }
 
+export interface FlashCard {
+  id: number;
+  title: string;
+  html_content: string;
+  is_published: boolean;
+  created_at: string;
+}
+
 export interface ChapterExamMeta {
   id: number;
   note_id: number | null;
@@ -366,6 +374,10 @@ export async function getNote(id: number): Promise<Note> {
   return request<Note>(`/api/notes/${id}`);
 }
 
+export async function getFlashCards(): Promise<FlashCard[]> {
+  return request<FlashCard[]>("/api/flash-cards");
+}
+
 export async function getChapterExam(id: number): Promise<ChapterExam> {
   return request<ChapterExam>(`/api/chapter-exams/${id}`);
 }
@@ -613,6 +625,35 @@ export async function adminGetExams(): Promise<AdminExamMeta[]> {
 
 export async function adminGetNotes(): Promise<NoteMeta[]> {
   return request<NoteMeta[]>("/api/admin/notes", {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminGetFlashCards(): Promise<FlashCard[]> {
+  return request<FlashCard[]>("/api/admin/flash-cards", {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminCreateFlashCard(flashCard: Omit<FlashCard, "id" | "created_at">): Promise<FlashCard> {
+  return request<FlashCard>("/api/admin/flash-cards", {
+    method: "POST",
+    headers: getAdminHeaders(),
+    body: JSON.stringify(flashCard),
+  });
+}
+
+export async function adminUpdateFlashCard(id: number, flashCard: Omit<FlashCard, "id" | "created_at">): Promise<FlashCard> {
+  return request<FlashCard>(`/api/admin/flash-cards/${id}`, {
+    method: "PUT",
+    headers: getAdminHeaders(),
+    body: JSON.stringify(flashCard),
+  });
+}
+
+export async function adminDeleteFlashCard(id: number): Promise<void> {
+  await request(`/api/admin/flash-cards/${id}`, {
+    method: "DELETE",
     headers: getAdminHeaders(),
   });
 }

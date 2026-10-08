@@ -8,6 +8,7 @@ import NotesScreen from "../../components/tma/NotesScreen";
 import OnboardingScreen from "../../components/tma/OnboardingScreen";
 import PracticeScreen from "../../components/tma/PracticeScreen";
 import ProfileScreen from "../../components/tma/ProfileScreen";
+import GameScreen from "../../components/tma/GameScreen";
 import { DevUserSetup } from "../../components/DevUserSetup";
 import { dailyCheckIn, DailyCheckIn, ExamMeta, getUser, releaseDeviceSession, startDeviceSession, StreamKey, updateUser } from "../../lib/api";
 import { expandTelegramApp, getTelegramInitData, getTelegramUser, TelegramUser } from "../../lib/telegram";
@@ -305,6 +306,9 @@ export default function TMAPage() {
               onGoToPractice={() => setActiveTab("practice")}
               onGetPremium={() => setShowPremiumDialog(true)}
             />
+          )}
+          {activeTab === "game" && (
+            <GameScreen stream={profile.stream} university={profile.university} />
           )}
           {activeTab === "profile" && (
             <ProfileScreen

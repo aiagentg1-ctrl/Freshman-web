@@ -2691,6 +2691,61 @@ async def admin_get_exams(admin_verified: bool = Depends(verify_admin_secret)):
         return exam_data
 
 
+@app.get("/api/flash-cards")
+async def get_flash_cards():
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(FlashCard).where(FlashCard.is_published.is_(True)).order_by(FlashCard.created_at.desc())
+        )
+        return [serialize_flash_card(flash_card) for flash_card in result.scalars().all()]
+
+
+@app.get("/api/admin/flash-cards")
+async def admin_get_flash_cards(admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(FlashCard).order_by(FlashCard.created_at.desc())
+        )
+        return [serialize_flash_card(flash_card) for flash_card in result.scalars().all()]
+
+
+@app.post("/api/admin/flash-cards")
+async def admin_create_flash_card(payload: FlashCardCreate, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        flash_card = FlashCard(**payload.dict())
+        session.add(flash_card)
+        await session.commit()
+        await session.refresh(flash_card)
+        return serialize_flash_card(flash_card)
+
+
+@app.put("/api/admin/flash-cards/{flash_card_id}")
+async def admin_update_flash_card(flash_card_id: int, payload: FlashCardCreate, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(FlashCard).where(FlashCard.id == flash_card_id))
+        flash_card = result.scalar_one_or_none()
+        if not flash_card:
+            raise HTTPException(status_code=404, detail="Flash card not found")
+        flash_card.title = payload.title
+        flash_card.html_content = payload.html_content
+        flash_card.is_published = payload.is_published
+        await session.commit()
+        await session.refresh(flash_card)
+        return serialize_flash_card(flash_card)
+
+
+@app.delete("/api/admin/flash-cards/{flash_card_id}")
+async def admin_delete_flash_card(flash_card_id: int, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(FlashCard).where(FlashCard.id == flash_card_id))
+        flash_card = result.scalar_one_or_none()
+        if not flash_card:
+            raise HTTPException(status_code=404, detail="Flash card not found")
+        await session.delete(flash_card)
+        await session.commit()
+        return {"deleted": True, "id": flash_card_id}
+
+
 @app.get("/api/admin/notes")
 async def admin_get_notes(admin_verified: bool = Depends(verify_admin_secret)):
     async with AsyncSessionLocal() as session:

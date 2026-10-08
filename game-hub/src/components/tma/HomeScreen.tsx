@@ -6,7 +6,6 @@ import { ExamMeta, ExamReviewQuestion, getInProgressExam, getRecentExamAttempts,
 import { streamLabel, subjectLabel } from "../../lib/subjects";
 import { TelegramUser } from "../../lib/telegram";
 import FlashCards from "./FlashCards";
-import Leaderboard from "./Leaderboard";
 import MathContent from "./MathContent";
 import PremiumBanner from "./PremiumBanner";
 
@@ -396,9 +395,6 @@ export default function HomeScreen({
             </>
           )}
         </div>
-
-        {/* Leaderboard */}
-        <Leaderboard stream={stream} university={university} />
       </div>
     </div>
   );

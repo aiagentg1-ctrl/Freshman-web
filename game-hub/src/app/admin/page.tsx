@@ -38,6 +38,7 @@ import {
   type UniversityLogo,
 } from "@/lib/api";
 import { inlineHtmlImageAssets } from "@/lib/htmlAssets";
+import FlashCardManager from "@/components/tma/FlashCardManager";
 
 const SUBJECTS = [
   { value: "physics", label: "Physics" },
@@ -61,7 +62,7 @@ const STREAMS = [
 
 const ADMIN_KEY_STORAGE = "mirkuzAdminKey";
 
-type TabType = "exams" | "notes" | "upload" | "logos" | "analytics" | "suggestions";
+type TabType = "exams" | "notes" | "upload" | "logos" | "flash-cards" | "analytics" | "suggestions";
 
 function handleUnauthorized(): void {
   sessionStorage.removeItem(ADMIN_KEY_STORAGE);
@@ -192,6 +193,7 @@ export default function AdminDashboard() {
             { id: "notes" as TabType, label: "📚 Manage Notes" },
             { id: "upload" as TabType, label: "➕ Upload Content" },
             { id: "logos" as TabType, label: "🖼️ University Logos" },
+            { id: "flash-cards" as TabType, label: "🎮 Game Flash Cards" },
             { id: "analytics" as TabType, label: "📊 Analytics" },
             { id: "suggestions" as TabType, label: "📥 Subject Suggestions" },
           ].map((tab) => (
@@ -211,6 +213,7 @@ export default function AdminDashboard() {
         {activeTab === "notes" && <NotesManager />}
         {activeTab === "upload" && <ContentUploader />}
         {activeTab === "logos" && <UniversityLogoManager />}
+        {activeTab === "flash-cards" && <FlashCardManager />}
         {activeTab === "analytics" && <AnalyticsView />}
         {activeTab === "suggestions" && <SubjectSuggestionsManager />}
       </div>

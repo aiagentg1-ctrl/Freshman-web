@@ -65,13 +65,14 @@ export default function PremiumDialog({ onClose }: { onClose: () => void }) {
             AAU students receive a special preparation space with online AAU final and mid-exam resources that are not available elsewhere.
           </div>
 
-          <button
-            type="button"
-            className="mt-5 min-h-12 w-full rounded-xl bg-[#1D70F5] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 active:scale-[0.98]"
-            onClick={onClose}
+          <a
+            href="https://t.me/Mirkuz_support"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-[#1D70F5] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 active:scale-[0.98]"
           >
             Continue with Premium
-          </button>
+          </a>
           <p className="mt-3 text-center text-[11px] text-slate-400">You can be promoted randomly while using the app or downloading study material.</p>
         </div>
       </section>
