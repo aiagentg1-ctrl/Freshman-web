@@ -289,6 +289,7 @@ export default function TMAPage() {
               fullName={profile.custom_name || profile.full_name}
               grade={profile.grade}
               stream={profile.stream}
+              selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}
               onContinueExam={handleContinueExam}
               onGoToPractice={() => setActiveTab("practice")}

@@ -87,6 +87,18 @@ export interface UserProfile {
   is_premium?: boolean;
 }
 
+export interface SubjectSuggestion {
+  id: number;
+  user_id: number;
+  stream: string;
+  subject_name: string;
+  reason?: string | null;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+}
+
 export interface UserStats {
   exams_taken: number;
   average_score: number | null;
@@ -450,6 +462,34 @@ export async function getUser(userId: number): Promise<UserProfile | null> {
   } catch {
     return null;
   }
+}
+
+export async function submitSubjectSuggestion(payload: {
+  stream: StreamKey;
+  subject_name: string;
+  reason?: string;
+}): Promise<SubjectSuggestion> {
+  return request<SubjectSuggestion>("/api/subject-suggestions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminGetSubjectSuggestions(): Promise<SubjectSuggestion[]> {
+  return request<SubjectSuggestion[]>("/api/admin/subject-suggestions", {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminReviewSubjectSuggestion(
+  suggestionId: number,
+  status: "approved" | "rejected"
+): Promise<SubjectSuggestion> {
+  return request<SubjectSuggestion>(`/api/admin/subject-suggestions/${suggestionId}`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+    body: JSON.stringify({ status }),
+  });
 }
 
 export async function updateUser(

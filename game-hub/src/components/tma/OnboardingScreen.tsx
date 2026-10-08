@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check, GraduationCap } from "lucide-react";
-import type { StreamKey } from "../../lib/api";
+import { Check, GraduationCap, Send } from "lucide-react";
+import { submitSubjectSuggestion, type StreamKey } from "../../lib/api";
 import { subjectLabel, subjectsForStream } from "../../lib/subjects";
 
 export default function OnboardingScreen({
@@ -12,10 +12,33 @@ export default function OnboardingScreen({
 }) {
   const [stream, setStream] = useState<Exclude<StreamKey, "general"> | null>(null);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [otherSubject, setOtherSubject] = useState("");
+  const [otherReason, setOtherReason] = useState("");
+  const [submittingOther, setSubmittingOther] = useState(false);
+  const [otherError, setOtherError] = useState("");
   const [university, setUniversity] = useState("");
   const [region, setRegion] = useState("");
   const availableSubjects = stream ? subjectsForStream(stream) : [];
-  const ready = stream !== null && selectedSubjects.length > 0 && university.trim() && region.trim();
+  const ready = stream !== null && (selectedSubjects.length > 0 || otherSubject.trim().length > 0) && university.trim() && region.trim();
+
+  const submitOtherSubject = async () => {
+    if (!stream || !otherSubject.trim() || submittingOther) return;
+    setSubmittingOther(true);
+    setOtherError("");
+    try {
+      await submitSubjectSuggestion({
+        stream,
+        subject_name: otherSubject.trim(),
+        reason: otherReason.trim() || undefined,
+      });
+      setOtherSubject("");
+      setOtherReason("");
+    } catch (error) {
+      setOtherError(error instanceof Error ? error.message : "Unable to submit subject suggestion");
+    } finally {
+      setSubmittingOther(false);
+    }
+  };
 
   const complete = () => {
     if (!ready || !stream) return;
@@ -76,7 +99,7 @@ export default function OnboardingScreen({
       </div>
 
       {stream && (
-        <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-6">
+        <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-4">
           <h3 className="text-sm font-bold text-slate-900 mb-3">Choose your subjects</h3>
           <p className="text-xs text-slate-500 mb-3">You can update these choices later.</p>
           <div className="grid grid-cols-1 gap-2">
@@ -95,6 +118,36 @@ export default function OnboardingScreen({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {stream && (
+        <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-6">
+          <h3 className="text-sm font-bold text-slate-900 mb-2">Suggest another subject</h3>
+          <p className="text-xs text-slate-500 mb-3">Your suggestion will be reviewed by an administrator.</p>
+          <input
+            value={otherSubject}
+            onChange={(event) => setOtherSubject(event.target.value)}
+            placeholder="Subject name"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5] mb-2"
+          />
+          <textarea
+            value={otherReason}
+            onChange={(event) => setOtherReason(event.target.value)}
+            placeholder="Optional reason"
+            rows={2}
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5] mb-3 resize-none"
+          />
+          <button
+            type="button"
+            onClick={submitOtherSubject}
+            disabled={!otherSubject.trim() || submittingOther}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+          >
+            <Send className="h-4 w-4" />
+            {submittingOther ? "Submitting..." : "Send to Admin"}
+          </button>
+          {otherError && <p className="mt-2 text-xs text-red-600">{otherError}</p>}
         </div>
       )}
 

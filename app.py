@@ -25,7 +25,7 @@ from database import AsyncSessionLocal, init_db
 from models import (
     User, EueeExam, EueeExamAttempt, Note, SubjectEnum, StreamEnum,
     NoteCompletion, UserBadge, XpReward, ChapterExam, ChapterExamAttempt,
-    ActiveDeviceSession,
+    ActiveDeviceSession, SubjectSuggestion,
 )
 
 VALID_SUBJECTS = [s.value for s in SubjectEnum]
@@ -838,6 +838,25 @@ class UserUpdate(BaseModel):
         return v.upper()  # returned value is a StreamEnum member name
 
 
+class SubjectSuggestionCreate(BaseModel):
+    stream: str
+    subject_name: str
+    reason: Optional[str] = None
+
+    @validator('stream')
+    def validate_stream(cls, v):
+        if v.upper() not in VALID_STREAMS:
+            raise ValueError('Stream must be GENERAL, NATURAL or SOCIAL')
+        return v.upper()
+
+    @validator('subject_name')
+    def validate_subject_name(cls, v):
+        v = v.strip()
+        if len(v) < 2 or len(v) > 120:
+            raise ValueError('Subject name must be between 2 and 120 characters')
+        return v
+
+
 class UserProfileUpsert(BaseModel):
     telegram_id: int
     first_name: Optional[str] = None
@@ -1062,6 +1081,98 @@ async def update_user(user_id: int, update: UserUpdate):
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
             "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
+        }
+
+
+@app.post("/api/subject-suggestions")
+async def create_subject_suggestion(
+    suggestion: SubjectSuggestionCreate,
+    x_fresho_user_id: Optional[int] = Header(None),
+    x_fresho_device_id: Optional[str] = Header(None),
+    x_fresho_session_token: Optional[str] = Header(None),
+):
+    async with AsyncSessionLocal() as session:
+        user_id = await require_active_device_session(
+            session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
+        )
+        item = SubjectSuggestion(
+            user_id=user_id,
+            stream=StreamEnum[suggestion.stream],
+            subject_name=suggestion.subject_name,
+            reason=suggestion.reason.strip() if suggestion.reason else None,
+            status="pending",
+        )
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
+        return {
+            "id": item.id,
+            "stream": item.stream.value,
+            "subject_name": item.subject_name,
+            "reason": item.reason,
+            "status": item.status,
+            "created_at": item.created_at.isoformat(),
+        }
+
+
+@app.get("/api/admin/subject-suggestions")
+async def admin_get_subject_suggestions(admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(SubjectSuggestion).order_by(SubjectSuggestion.created_at.desc())
+        )
+        return [
+            {
+                "id": suggestion.id,
+                "user_id": suggestion.user_id,
+                "stream": suggestion.stream.value,
+                "subject_name": suggestion.subject_name,
+                "reason": suggestion.reason,
+                "status": suggestion.status,
+                "created_at": suggestion.created_at.isoformat(),
+                "reviewed_at": suggestion.reviewed_at.isoformat() if suggestion.reviewed_at else None,
+                "reviewed_by": suggestion.reviewed_by,
+            }
+            for suggestion in result.scalars().all()
+        ]
+
+
+@app.patch("/api/admin/subject-suggestions/{suggestion_id}")
+async def admin_review_subject_suggestion(
+    suggestion_id: int,
+    body: dict,
+    admin_verified: bool = Depends(verify_admin_secret),
+):
+    status = body.get("status")
+    if status not in {"approved", "rejected"}:
+        raise HTTPException(status_code=422, detail="Status must be approved or rejected")
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(SubjectSuggestion).where(SubjectSuggestion.id == suggestion_id)
+        )
+        suggestion = result.scalar_one_or_none()
+        if not suggestion:
+            raise HTTPException(status_code=404, detail="Subject suggestion not found")
+        suggestion.status = status
+        suggestion.reviewed_at = datetime.utcnow()
+        suggestion.reviewed_by = "admin"
+        if status == "approved":
+            result = await session.execute(
+                select(User).where(User.user_id == suggestion.user_id)
+            )
+            user = result.scalar_one_or_none()
+            if user:
+                selected = json.loads(user.selected_subjects or "[]")
+                if suggestion.subject_name not in selected:
+                    selected.append(suggestion.subject_name)
+                    user.selected_subjects = json.dumps(selected)
+        await session.commit()
+        await session.refresh(suggestion)
+        return {
+            "id": suggestion.id,
+            "stream": suggestion.stream.value,
+            "subject_name": suggestion.subject_name,
+            "status": suggestion.status,
         }
 
 

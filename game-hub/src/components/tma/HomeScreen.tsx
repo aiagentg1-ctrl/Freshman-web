@@ -15,6 +15,7 @@ export default function HomeScreen({
   fullName,
   grade,
   stream,
+  selectedSubjects,
   isPremium,
   onContinueExam,
   onGoToPractice,
@@ -24,6 +25,7 @@ export default function HomeScreen({
   fullName: string;
   grade: number;
   stream: StreamKey;
+  selectedSubjects: string[];
   isPremium: boolean;
   onContinueExam: (exam: ExamMeta) => void;
   onGoToPractice: () => void;
@@ -140,6 +142,27 @@ export default function HomeScreen({
 
       <div className="flex-1 px-4 py-5 space-y-5">
         {!isPremium && <PremiumBanner onGetPremium={onGetPremium} />}
+
+        <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Your subjects</p>
+              <h2 className="text-lg font-bold text-slate-900">Selected courses</h2>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#1D70F5]">{selectedSubjects.length}</span>
+          </div>
+          {selectedSubjects.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2">
+              {selectedSubjects.map((subject) => (
+                <div key={subject} className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-sm font-semibold text-slate-700">
+                  {subjectLabel(subject)}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Select subjects during onboarding or suggest one using “Other”.</p>
+          )}
+        </section>
 
         {/* XP, Level, and Streak Card */}
         {progress ? (

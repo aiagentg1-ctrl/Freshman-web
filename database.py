@@ -51,6 +51,19 @@ async def init_db():
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS natural_matrik_breakdown TEXT"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS social_matrik_breakdown TEXT"))
             await conn.execute(text("ALTER TABLE chapter_exams ALTER COLUMN note_id DROP NOT NULL"))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS subject_suggestions (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL REFERENCES users(user_id),
+                    stream VARCHAR NOT NULL,
+                    subject_name VARCHAR NOT NULL,
+                    reason VARCHAR,
+                    status VARCHAR NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMP,
+                    reviewed_by VARCHAR
+                )
+            """))
 
             # Update existing users to have default values
             await conn.execute(text("""

@@ -31,33 +31,17 @@ export const SUBJECTS: Record<string, SubjectConfig> = {
     iconText: "text-cyan-600",
     cardBorder: "border-cyan-100",
   },
-  chemistry: {
-    key: "chemistry",
-    label: "Chemistry",
-    icon: FlaskConical,
-    iconBg: "bg-pink-50",
-    iconText: "text-pink-600",
-    cardBorder: "border-pink-100",
-  },
   mathematics: {
     key: "mathematics",
-    label: "Mathematics",
+    label: "Freshman Mathematics",
     icon: Sigma,
     iconBg: "bg-emerald-50",
     iconText: "text-emerald-600",
     cardBorder: "border-emerald-100",
   },
-  biology: {
-    key: "biology",
-    label: "Biology",
-    icon: Dna,
-    iconBg: "bg-green-50",
-    iconText: "text-green-600",
-    cardBorder: "border-green-100",
-  },
   english: {
     key: "english",
-    label: "English",
+    label: "Communicative English I",
     icon: BookOpen,
     iconBg: "bg-violet-50",
     iconText: "text-violet-600",
@@ -86,6 +70,14 @@ export const SUBJECTS: Record<string, SubjectConfig> = {
     iconBg: "bg-fuchsia-50",
     iconText: "text-fuchsia-600",
     cardBorder: "border-fuchsia-100",
+  },
+  history_of_ethiopia_and_horn: {
+    key: "history_of_ethiopia_and_horn",
+    label: "History of Ethiopia & Horn",
+    icon: ScrollText,
+    iconBg: "bg-amber-50",
+    iconText: "text-amber-600",
+    cardBorder: "border-amber-100",
   },
   communicative_english: {
     key: "communicative_english",
@@ -153,7 +145,7 @@ export const SUBJECTS: Record<string, SubjectConfig> = {
   },
   civics: {
     key: "civics",
-    label: "Civics",
+    label: "Civics & Moral Education",
     icon: Landmark,
     iconBg: "bg-slate-100",
     iconText: "text-slate-600",
@@ -161,34 +153,16 @@ export const SUBJECTS: Record<string, SubjectConfig> = {
   },
 };
 
-export const COMMON_SUBJECTS = [
-  "physics",
-  "chemistry",
-  "biology",
-  "mathematics",
-  "english",
-  "geography",
-  "history",
-  "civics",
-  "aptitude",
-  "economics",
-] as const;
-
 export const NATURAL_SUBJECTS = [
   "logic",
   "psychology",
-  "physics",
-  "chemistry",
-  "biology",
-  "mathematics",
-  "english",
   "geography",
-  "history",
-  "civics",
-  "aptitude",
-  "economics",
+  "communicative_english",
+  "mathematics",
+  "physics",
   "emerging_technology",
   "anthropology",
+  "history_of_ethiopia_and_horn",
 ] as const;
 
 export const SOCIAL_SUBJECTS = [
@@ -201,17 +175,11 @@ export const SOCIAL_SUBJECTS = [
   "communicative_english",
   "emerging_technology",
   "mathematics",
-  "english",
-  "history",
-  "physics",
-  "chemistry",
-  "biology",
-  "aptitude",
 ] as const;
 
 export function subjectsForStream(stream: StreamKey): SubjectConfig[] {
   const keys = stream === "general"
-    ? COMMON_SUBJECTS
+    ? []
     : stream === "natural"
       ? NATURAL_SUBJECTS
       : SOCIAL_SUBJECTS;

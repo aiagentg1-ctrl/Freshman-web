@@ -154,6 +154,20 @@ class UserBadge(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class SubjectSuggestion(Base):
+    """A subject proposed by a student and awaiting admin approval."""
+    __tablename__ = 'subject_suggestions'
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey('users.user_id'), nullable=False, index=True)
+    stream = Column(Enum(StreamEnum), nullable=False, index=True)
+    subject_name = Column(String, nullable=False)
+    reason = Column(String, nullable=True)
+    status = Column(String, nullable=False, default='pending', index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
+    reviewed_by = Column(String, nullable=True)
+
+
 class XpReward(Base):
     """Idempotency records for one-time milestone XP awards."""
     __tablename__ = 'xp_rewards'

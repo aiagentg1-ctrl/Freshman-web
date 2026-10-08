@@ -6,6 +6,8 @@ import {
   adminGetExams,
   adminGetNotes,
   adminGetAnalytics,
+  adminGetSubjectSuggestions,
+  adminReviewSubjectSuggestion,
   getExam,
   getNote,
   getChapterExam,
@@ -25,6 +27,7 @@ import {
   type AdminExamMeta,
   type NoteMeta,
   type AdminAnalytics,
+  type SubjectSuggestion,
   type ChapterExamMeta,
   type Exam,
   type Note,
@@ -55,7 +58,7 @@ const STREAMS = [
 
 const ADMIN_KEY_STORAGE = "mirkuzAdminKey";
 
-type TabType = "exams" | "notes" | "upload" | "analytics";
+type TabType = "exams" | "notes" | "upload" | "analytics" | "suggestions";
 
 function handleUnauthorized(): void {
   sessionStorage.removeItem(ADMIN_KEY_STORAGE);
@@ -186,6 +189,7 @@ export default function AdminDashboard() {
             { id: "notes" as TabType, label: "📚 Manage Notes" },
             { id: "upload" as TabType, label: "➕ Upload Content" },
             { id: "analytics" as TabType, label: "📊 Analytics" },
+            { id: "suggestions" as TabType, label: "📥 Subject Suggestions" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -203,6 +207,7 @@ export default function AdminDashboard() {
         {activeTab === "notes" && <NotesManager />}
         {activeTab === "upload" && <ContentUploader />}
         {activeTab === "analytics" && <AnalyticsView />}
+        {activeTab === "suggestions" && <SubjectSuggestionsManager />}
       </div>
     </div>
   );
@@ -1152,6 +1157,98 @@ function ChapterExamEditorModal({
           </div>
         </form>
       </section>
+    </div>
+  );
+}
+
+function SubjectSuggestionsManager() {
+  const [suggestions, setSuggestions] = useState<SubjectSuggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
+
+  const loadSuggestions = async () => {
+    try {
+      setSuggestions(await adminGetSubjectSuggestions());
+    } catch (error) {
+      console.error("Error loading subject suggestions:", error);
+      setMessage("Failed to load subject suggestions.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSuggestions();
+  }, []);
+
+  const reviewSuggestion = async (suggestionId: number, status: "approved" | "rejected") => {
+    if (reviewingId !== null) return;
+    setReviewingId(suggestionId);
+    setMessage(null);
+    try {
+      await adminReviewSubjectSuggestion(suggestionId, status);
+      setSuggestions((current) => current.map((item) => item.id === suggestionId ? { ...item, status, reviewed_at: new Date().toISOString(), reviewed_by: "admin" } : item));
+      setMessage(`Suggestion ${status}.`);
+    } catch (error) {
+      console.error("Error reviewing subject suggestion:", error);
+      setMessage("Failed to review the suggestion.");
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="bg-white rounded-xl p-6 shadow-sm text-center">Loading suggestions...</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {message && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          {message}
+        </div>
+      )}
+      {suggestions.length === 0 ? (
+        <div className="bg-white rounded-xl p-6 text-center shadow-sm text-gray-500">No subject suggestions are awaiting review.</div>
+      ) : suggestions.map((suggestion) => (
+        <article key={suggestion.id} className="bg-white rounded-xl p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-600">{suggestion.stream}</span>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${suggestion.status === "pending" ? "bg-amber-50 text-amber-700" : suggestion.status === "approved" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                  {suggestion.status}
+                </span>
+              </div>
+              <h3 className="mt-3 text-lg font-bold text-slate-900">{suggestion.subject_name}</h3>
+              <p className="mt-1 text-sm text-slate-500">Requested by user {suggestion.user_id}</p>
+              {suggestion.reason && <p className="mt-3 text-sm text-slate-600">Reason: {suggestion.reason}</p>}
+              <p className="mt-2 text-xs text-slate-400">{new Date(suggestion.created_at).toLocaleString()}</p>
+            </div>
+            {suggestion.status === "pending" && (
+              <div className="flex gap-2 sm:flex-col">
+                <button
+                  type="button"
+                  onClick={() => reviewSuggestion(suggestion.id, "approved")}
+                  disabled={reviewingId !== null}
+                  className="min-h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => reviewSuggestion(suggestion.id, "rejected")}
+                  disabled={reviewingId !== null}
+                  className="min-h-10 rounded-lg border border-rose-300 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+        </article>
+      ))}
     </div>
   );
 }
