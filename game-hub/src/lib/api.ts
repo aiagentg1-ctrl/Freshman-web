@@ -84,6 +84,7 @@ export interface UserProfile {
   stream: string;
   selected_subjects: string[];
   premium_expires_at?: string | null;
+  is_premium?: boolean;
 }
 
 export interface UserStats {

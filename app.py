@@ -181,13 +181,13 @@ async def require_active_device_session(
     return user_id
 
 
-async def require_premium_membership(session, user_id: int) -> None:
+async def get_premium_membership_status(session, user_id: int) -> tuple[bool, str | None]:
     user_result = await session.execute(select(User.stream).where(User.user_id == user_id))
     stream = user_result.scalar_one_or_none()
     if stream not in (StreamEnum.NATURAL, StreamEnum.SOCIAL):
-        raise HTTPException(status_code=403, detail="Premium content is only available to Natural or Social Science members")
+        return False, None
     if not BOT_TOKEN:
-        raise HTTPException(status_code=503, detail="Premium membership verification is not configured")
+        return False, "Premium membership verification is not configured"
 
     stream_name = stream.name
     channel_id = PREMIUM_CHANNEL_IDS[stream_name]
@@ -199,16 +199,26 @@ async def require_premium_membership(session, user_id: int) -> None:
                 payload = await response.json(content_type=None)
     except (aiohttp.ClientError, asyncio.TimeoutError) as error:
         print(f"Premium membership check failed for stream {stream_name}: {error}")
-        raise HTTPException(status_code=503, detail="Could not verify premium membership right now") from error
+        return False, "Could not verify premium membership right now"
 
     if not payload.get("ok"):
         print(f"Telegram getChatMember failed for stream {stream_name}: {payload.get('description', 'unknown error')}")
-        raise HTTPException(status_code=503, detail="Could not verify premium membership right now")
+        return False, "Could not verify premium membership right now"
 
     member = payload.get("result", {})
     is_member = member.get("status") in {"member", "administrator", "creator"}
     is_restricted_member = member.get("status") == "restricted" and member.get("is_member") is True
-    if not (is_member or is_restricted_member):
+    return is_member or is_restricted_member, None
+
+
+async def require_premium_membership(session, user_id: int) -> None:
+    is_member, error = await get_premium_membership_status(session, user_id)
+    if error:
+        raise HTTPException(status_code=503, detail=error)
+    if not is_member:
+        user_result = await session.execute(select(User.stream).where(User.user_id == user_id))
+        stream = user_result.scalar_one_or_none()
+        stream_name = stream.name if stream else "unknown"
         raise HTTPException(
             status_code=403,
             detail={
@@ -969,6 +979,7 @@ async def get_user(user_id: int):
         user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
+        is_premium, _ = await get_premium_membership_status(session, user_id)
         return {
             "user_id": user.user_id,
             "first_name": user.first_name,
@@ -982,6 +993,7 @@ async def get_user(user_id: int):
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
             "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
+            "is_premium": is_premium,
         }
 
 

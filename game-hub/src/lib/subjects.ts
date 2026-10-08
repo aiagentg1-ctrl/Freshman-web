@@ -161,17 +161,35 @@ export const SUBJECTS: Record<string, SubjectConfig> = {
   },
 };
 
+export const COMMON_SUBJECTS = [
+  "physics",
+  "chemistry",
+  "biology",
+  "mathematics",
+  "english",
+  "geography",
+  "history",
+  "civics",
+  "aptitude",
+  "economics",
+] as const;
+
 export const NATURAL_SUBJECTS = [
   "logic",
   "psychology",
-  "geography",
-  "communicative_english",
-  "mathematics",
   "physics",
+  "chemistry",
+  "biology",
+  "mathematics",
+  "english",
+  "geography",
+  "history",
+  "civics",
+  "aptitude",
+  "economics",
   "emerging_technology",
   "anthropology",
-  "history",
-];
+] as const;
 
 export const SOCIAL_SUBJECTS = [
   "civics",
@@ -183,29 +201,19 @@ export const SOCIAL_SUBJECTS = [
   "communicative_english",
   "emerging_technology",
   "mathematics",
-];
-
-// Grades 9-10 share the common Ethiopian curriculum — no stream split.
-export const GENERAL_SUBJECTS = [
+  "english",
+  "history",
   "physics",
   "chemistry",
   "biology",
-  "mathematics",
-  "english",
-  "geography",
-  "history",
-  "civics",
   "aptitude",
-  "economics",
-];
+] as const;
 
 export function subjectsForStream(stream: StreamKey): SubjectConfig[] {
-  const keys =
-    stream === "social"
-      ? SOCIAL_SUBJECTS
-      : stream === "natural"
-      ? NATURAL_SUBJECTS
-      : GENERAL_SUBJECTS;
+  const keys = stream === "general"
+    ? COMMON_SUBJECTS
+    : Array.from(new Set([...NATURAL_SUBJECTS, ...COMMON_SUBJECTS]))
+      .filter((key) => stream === "natural" ? key !== "global_trends" && key !== "entrepreneurship" : true);
   return keys.map((key) => SUBJECTS[key]);
 }
 

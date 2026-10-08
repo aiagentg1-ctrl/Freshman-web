@@ -189,7 +189,7 @@ export default function TMAPage() {
       try {
         await updateUser(telegramUser.id, {
           first_name: telegramUser.first_name,
-          full_name,
+          full_name: fullName,
           university,
           region,
           grade: 12,
