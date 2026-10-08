@@ -212,8 +212,9 @@ export const SOCIAL_SUBJECTS = [
 export function subjectsForStream(stream: StreamKey): SubjectConfig[] {
   const keys = stream === "general"
     ? COMMON_SUBJECTS
-    : Array.from(new Set([...NATURAL_SUBJECTS, ...COMMON_SUBJECTS]))
-      .filter((key) => stream === "natural" ? key !== "global_trends" && key !== "entrepreneurship" : true);
+    : stream === "natural"
+      ? NATURAL_SUBJECTS
+      : SOCIAL_SUBJECTS;
   return keys.map((key) => SUBJECTS[key]);
 }
 
