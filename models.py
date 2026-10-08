@@ -36,6 +36,7 @@ class SubjectEnum(enum.Enum):
     HISTORY = "history"
     GEOGRAPHY = "geography"
     ECONOMICS = "economics"
+    E_SHE = "e_she"
 
 
 class SubscriptionConfig(Base):

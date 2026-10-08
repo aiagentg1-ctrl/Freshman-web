@@ -40,6 +40,21 @@ async def migrate_database():
                     print(f"[WARN] Error adding column {column_name}: {e}")
 
             await conn.execute(text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_enum
+                        WHERE enumtypid = 'subject_enum'::regtype
+                          AND enumlabel = 'e_she'
+                    ) THEN
+                        ALTER TYPE subject_enum ADD VALUE 'e_she';
+                    END IF;
+                END $$
+            """))
+            print("[OK] Added e_she to subject_enum")
+
+            await conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS university_logos (
                     id SERIAL PRIMARY KEY,
                     university VARCHAR NOT NULL UNIQUE,

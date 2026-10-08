@@ -95,6 +95,14 @@ export const SUBJECTS: Record<string, SubjectConfig> = {
     iconText: "text-sky-600",
     cardBorder: "border-sky-100",
   },
+  e_she: {
+    key: "e_she",
+    label: "e-SHE",
+    icon: BookOpen,
+    iconBg: "bg-indigo-50",
+    iconText: "text-indigo-600",
+    cardBorder: "border-indigo-100",
+  },
   anthropology: {
     key: "anthropology",
     label: "Anthropology",
@@ -163,6 +171,7 @@ export const NATURAL_SUBJECTS = [
   "emerging_technology",
   "anthropology",
   "history_of_ethiopia_and_horn",
+  "e_she",
 ] as const;
 
 export const SOCIAL_SUBJECTS = [
@@ -175,6 +184,7 @@ export const SOCIAL_SUBJECTS = [
   "communicative_english",
   "emerging_technology",
   "mathematics",
+  "e_she",
 ] as const;
 
 export function subjectsForStream(stream: StreamKey): SubjectConfig[] {

@@ -30,6 +30,7 @@ import {
   type SubscriptionConfig,
   type UniversityLogo,
 } from "@/lib/api";
+import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
 
 type Tab = "overview" | "exams" | "notes" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing";
 type ErrorState = string;
@@ -63,9 +64,9 @@ const examPayload = {
 };
 
 const notePayload = {
-  subject: "",
+  subject: "mathematics",
   grade: 12,
-  stream: "",
+  stream: "natural",
   chapter_number: 1,
   title: "",
   html_content: "<p>Note content</p>",
@@ -73,6 +74,10 @@ const notePayload = {
   is_premium: false,
   is_published: false,
 };
+
+function subjectOptions(stream: string): string[] {
+  return stream === "social" ? [...SOCIAL_SUBJECTS] : [...NATURAL_SUBJECTS];
+}
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "The admin API returned an unknown error.";
@@ -174,8 +179,14 @@ function NotesManager() {
   const [form, setForm] = useState(notePayload);
   const load = () => { setLoading(true); setError(""); adminGetNotes().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
+  function changeStream(stream: "natural" | "social") {
+    setForm({ ...form, stream, subject: subjectOptions(stream)[0] });
+  }
+  function changeChapter(chapterNumber: number) {
+    setForm({ ...form, chapter_number: chapterNumber, is_premium: chapterNumber === 1 && form.is_premium });
+  }
   async function save(event: FormEvent) { event.preventDefault(); try { await adminCreateNote({ ...form }); setForm({ ...notePayload }); load(); } catch (value) { setError(message(value)); } }
-  return <ResourcePanel title="Notes management" subtitle="Publish clear freshman study notes." loading={loading} error={error} items={items.map((item) => ({ id: item.id, name: `${item.title} · Grade ${item.grade}`, status: item.is_published ? "Published" : "Draft" }))} onDelete={(id) => adminDeleteNote(id).then(load).catch((value) => setError(message(value)))} form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2"><Field label="Subject" value={form.subject} onChange={(value) => setForm({ ...form, subject: value })} /><Field label="Grade" type="number" value={form.grade} onChange={(value) => setForm({ ...form, grade: Number(value) })} /><Field label="Stream" value={form.stream} onChange={(value) => setForm({ ...form, stream: value })} /><Field label="Chapter" type="number" value={form.chapter_number} onChange={(value) => setForm({ ...form, chapter_number: Number(value) })} /><Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" /><textarea className="min-h-32 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.html_content} onChange={(event) => setForm({ ...form, html_content: event.target.value })} /><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /> Premium only</label><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">Save note</button></form>} />;
+  return <ResourcePanel title="Notes management" subtitle="Publish clear freshman study notes." loading={loading} error={error} items={items.map((item) => ({ id: item.id, name: `${item.title} · Grade ${item.grade}`, status: item.is_published ? "Published" : "Draft" }))} onDelete={(id) => adminDeleteNote(id).then(load).catch((value) => setError(message(value)))} form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2"><label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Stream</span><select className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.stream} onChange={(event) => changeStream(event.target.value as "natural" | "social")}><option value="natural">Natural Science</option><option value="social">Social Science</option></select></label><label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Subject</span><select className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}>{subjectOptions(form.stream).map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}</select></label><Field label="Grade" type="number" value={form.grade} onChange={(value) => setForm({ ...form, grade: Number(value) })} /><Field label="Chapter" type="number" value={form.chapter_number} onChange={(value) => changeChapter(Number(value))} /><Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" /><textarea className="min-h-32 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.html_content} onChange={(event) => setForm({ ...form, html_content: event.target.value })} /><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.chapter_number === 1 && form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} disabled={form.chapter_number !== 1} /> Chapter 1 premium access</label><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">Save note</button></form>} />;
 }
 
 function FlashCardsManager() {
