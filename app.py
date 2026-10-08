@@ -94,27 +94,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-class NoCacheMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: StarletteRequest, call_next):
-        response = await call_next(request)
-        if request.method == "GET":
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
-        return response
-
-
-app.add_middleware(NoCacheMiddleware)
-
 ADMIN_SECRET = (
     os.getenv("ADMIN_SECRET")
     or os.getenv("ADMIN_KEY")
@@ -128,6 +107,80 @@ PREMIUM_CHANNEL_IDS = {
     "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "-1004479037964"),
     "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "-1004342138729"),
 }
+
+
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        if request.method == "GET":
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
+class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        path = request.url.path
+        # Let CORS middleware handle OPTIONS requests - return immediately with CORS headers
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        if not path.startswith("/api/") or path.startswith("/api/auth/device-session"):
+            return await call_next(request)
+
+        if (
+            BROWSER_DEMO_MODE
+            and request.headers.get("x-fresho-demo-mode") == "true"
+            and request.headers.get("x-fresho-user-id") == str(BROWSER_DEMO_USER_ID)
+        ):
+            return await call_next(request)
+
+        supplied_admin_secret = (
+            request.headers.get("x-admin-secret")
+            or request.headers.get("x-admin-key")
+            or request.headers.get("x-admin-password")
+        )
+        if supplied_admin_secret and hmac.compare_digest(supplied_admin_secret, ADMIN_SECRET):
+            return await call_next(request)
+
+        try:
+            user_id = int(request.headers.get("x-fresho-user-id", ""))
+        except ValueError:
+            return JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
+
+        device_id = request.headers.get("x-fresho-device-id")
+        token = request.headers.get("x-fresho-session-token")
+        if not device_id or not token:
+            return JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
+
+        user_path = path.removeprefix("/api/user/").split("/", 1)[0]
+        if user_path.isdigit() and int(user_path) != user_id:
+            return JSONResponse({"detail": "Fresho session user does not match the requested account"}, status_code=403)
+
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(ActiveDeviceSession).where(ActiveDeviceSession.user_id == user_id)
+            )
+            active = result.scalar_one_or_none()
+            if (
+                active is None
+                or active.device_id != device_id
+                or not hmac.compare_digest(active.token_hash, hash_device_session(token))
+            ):
+                return JSONResponse({"detail": "Fresho session is active on another device or has ended"}, status_code=409)
+
+        return await call_next(request)
+
+
+app.add_middleware(SingleDeviceSessionMiddleware)
+app.add_middleware(NoCacheMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def telegram_user_from_init_data(init_data: str) -> int:
@@ -176,7 +229,7 @@ async def require_active_device_session(
     if (
         active is None
         or active.device_id != device_id
-        or not hmac.compare_digest(active.token_hash, hash_session_token(session_token))
+        or not hmac.compare_digest(active.token_hash, hash_device_session(session_token))
     ):
         raise HTTPException(status_code=409, detail="Fresho session is active on another device or has ended")
     return user_id
@@ -228,56 +281,6 @@ async def require_premium_membership(session, user_id: int) -> None:
                 "message": f"Join the {stream_name.title()} Science channel to unlock this premium material.",
             },
         )
-
-
-@app.middleware("http")
-async def enforce_single_device_session(request: Request, call_next):
-    path = request.url.path
-    if request.method == "OPTIONS" or not path.startswith("/api/") or path.startswith("/api/auth/device-session"):
-        return await call_next(request)
-
-    if (
-        BROWSER_DEMO_MODE
-        and request.headers.get("x-fresho-demo-mode") == "true"
-        and request.headers.get("x-fresho-user-id") == str(BROWSER_DEMO_USER_ID)
-    ):
-        return await call_next(request)
-
-    supplied_admin_secret = (
-        request.headers.get("x-admin-secret")
-        or request.headers.get("x-admin-key")
-        or request.headers.get("x-admin-password")
-    )
-    if supplied_admin_secret and hmac.compare_digest(supplied_admin_secret, ADMIN_SECRET):
-        return await call_next(request)
-
-    try:
-        user_id = int(request.headers.get("x-fresho-user-id", ""))
-    except ValueError:
-        return JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
-
-    device_id = request.headers.get("x-fresho-device-id")
-    token = request.headers.get("x-fresho-session-token")
-    if not device_id or not token:
-        return JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
-
-    user_path = path.removeprefix("/api/user/").split("/", 1)[0]
-    if user_path.isdigit() and int(user_path) != user_id:
-        return JSONResponse({"detail": "Fresho session user does not match the requested account"}, status_code=403)
-
-    async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(ActiveDeviceSession).where(ActiveDeviceSession.user_id == user_id)
-        )
-        active = result.scalar_one_or_none()
-        if (
-            active is None
-            or active.device_id != device_id
-            or not hmac.compare_digest(active.token_hash, hash_session_token(token))
-        ):
-            return JSONResponse({"detail": "Fresho session is active on another device or has ended"}, status_code=409)
-
-    return await call_next(request)
 
 
 class DeviceSessionRequest(BaseModel):
