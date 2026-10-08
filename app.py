@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI):
         print(f"Failed to remove webhook: {e}")
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, title="Mirkuz EUEE High School API")
 
 ADMIN_SECRET = (
     os.getenv("ADMIN_SECRET")
