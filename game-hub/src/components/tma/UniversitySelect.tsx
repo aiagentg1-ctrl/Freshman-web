@@ -10,6 +10,7 @@ interface UniversitySelectProps {
   placeholder?: string;
   className?: string;
   compact?: boolean;
+  allowCustom?: boolean;
 }
 
 const normalize = (value: string) =>
@@ -24,6 +25,7 @@ export default function UniversitySelect({
   onChange,
   placeholder = "Search your university",
   className = "",
+  allowCustom = true,
 }: UniversitySelectProps) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
@@ -56,7 +58,7 @@ export default function UniversitySelect({
             const nextQuery = event.target.value;
             setQuery(nextQuery);
             setOpen(true);
-            onChange(nextQuery);
+            if (allowCustom) onChange(nextQuery);
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => window.setTimeout(() => setOpen(false), 100)}
