@@ -185,6 +185,7 @@ export interface SavedExamProgress {
 
 const RECENT_EXAM_ATTEMPTS_KEY = "mirkuzRecentExamAttempts";
 const IN_PROGRESS_EXAM_KEY = "mirkuzInProgressExam";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export function getRecentExamAttempts(): RecentExamAttempt[] {
   try {
@@ -234,9 +235,7 @@ export function clearExamProgress(examId: number): void {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  // Use Next.js rewrites instead of direct backend calls
-  // This allows the API routes we created to handle the requests
-  const fullPath = path;
+  const fullPath = `${BACKEND_URL}${path}`;
 
   console.log(`📡 API Request: ${fullPath}`, options?.method || "GET");
 
@@ -663,6 +662,12 @@ export interface AdminAnalytics {
   total_attempts: number;
   avg_score: number;
   active_students_7d: number;
+  active_subscribers: number;
+  monthly_revenue: number;
+  monthly_operating_cost: number;
+  estimated_profit: number;
+  monthly_growth: number;
+  new_subscriptions_this_month: number;
   grade_distribution: Array<{ grade: number; students: number }>;
   stream_distribution: Array<{ stream: string; students: number }>;
   subject_performance: Array<{ subject: string; attempts: number; average_score: number }>;
@@ -677,6 +682,28 @@ export interface AdminAnalytics {
     completed_at: string | null;
     created_at: string;
   }>;
+}
+
+export interface SubscriptionConfig {
+  price: number;
+  currency: string;
+  monthly_operating_cost: number;
+}
+
+export async function adminGetSubscriptionConfig(): Promise<SubscriptionConfig> {
+  return request<SubscriptionConfig>("/api/admin/subscription-config", {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminUpdateSubscriptionConfig(
+  config: SubscriptionConfig
+): Promise<SubscriptionConfig> {
+  return request<SubscriptionConfig>("/api/admin/subscription-config", {
+    method: "PUT",
+    headers: getAdminHeaders(),
+    body: JSON.stringify(config),
+  });
 }
 
 export async function adminGetAnalytics(): Promise<AdminAnalytics> {

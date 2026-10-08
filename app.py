@@ -26,6 +26,7 @@ from models import (
     User, EueeExam, EueeExamAttempt, Note, SubjectEnum, StreamEnum,
     NoteCompletion, UserBadge, XpReward, ChapterExam, ChapterExamAttempt,
     ActiveDeviceSession, SubjectSuggestion, UniversityLogo, FlashCard,
+    SubscriptionConfig, Subscription,
 )
 
 VALID_SUBJECTS = [s.value for s in SubjectEnum]
@@ -1001,6 +1002,25 @@ class FlashCardCreate(BaseModel):
         v = v.strip()
         if len(v) < 2 or len(v) > 160:
             raise ValueError('Title must be between 2 and 160 characters')
+        return v
+
+
+class SubscriptionConfigUpdate(BaseModel):
+    price: int
+    currency: str = 'USD'
+    monthly_operating_cost: int = 0
+
+    @validator('price', 'monthly_operating_cost')
+    def validate_non_negative(cls, v):
+        if v < 0:
+            raise ValueError('Price and operating cost cannot be negative')
+        return v
+
+    @validator('currency')
+    def validate_currency(cls, v):
+        v = v.strip().upper()
+        if len(v) > 8:
+            raise ValueError('Currency must be a valid three-letter code')
         return v
 
 
@@ -2755,6 +2775,48 @@ async def admin_get_notes(admin_verified: bool = Depends(verify_admin_secret)):
         return [serialize_note(note, include_content=False) for note in result.scalars().all()]
 
 
+@app.get("/api/admin/subscription-config")
+async def admin_get_subscription_config(admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(SubscriptionConfig).order_by(SubscriptionConfig.id).limit(1)
+        )
+        config = result.scalar_one_or_none()
+        if config is None:
+            config = SubscriptionConfig(price=0, currency="USD", monthly_operating_cost=0)
+        return {
+            "price": config.price,
+            "currency": config.currency,
+            "monthly_operating_cost": config.monthly_operating_cost,
+        }
+
+
+@app.put("/api/admin/subscription-config")
+async def admin_update_subscription_config(
+    payload: SubscriptionConfigUpdate,
+    admin_verified: bool = Depends(verify_admin_secret),
+):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(SubscriptionConfig).order_by(SubscriptionConfig.id).limit(1)
+        )
+        config = result.scalar_one_or_none()
+        if config is None:
+            config = SubscriptionConfig()
+        config.price = payload.price
+        config.currency = payload.currency
+        config.monthly_operating_cost = payload.monthly_operating_cost
+        config.updated_at = datetime.utcnow()
+        session.add(config)
+        await session.commit()
+        await session.refresh(config)
+        return {
+            "price": config.price,
+            "currency": config.currency,
+            "monthly_operating_cost": config.monthly_operating_cost,
+        }
+
+
 @app.get("/api/admin/analytics")
 async def admin_get_analytics(admin_verified: bool = Depends(verify_admin_secret)):
     async with AsyncSessionLocal() as session:
@@ -2840,11 +2902,59 @@ async def admin_get_analytics(admin_verified: bool = Depends(verify_admin_secret
                 "created_at": attempt.created_at.isoformat(),
             })
 
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        previous_month_start = month_start - timedelta(days=1)
+        previous_month_start = previous_month_start.replace(day=1)
+        config_result = await session.execute(
+            select(SubscriptionConfig).order_by(SubscriptionConfig.id).limit(1)
+        )
+        config = config_result.scalar_one_or_none()
+        price = config.price if config else 0
+        operating_cost = config.monthly_operating_cost if config else 0
+        active_subscriptions = await session.execute(
+            select(Subscription).where(
+                Subscription.status == "active",
+                Subscription.expires_at > now,
+            )
+        )
+        active_subscription_rows = active_subscriptions.scalars().all()
+        active_subscribers = len({row.user_id for row in active_subscription_rows})
+        monthly_revenue = sum(row.amount for row in active_subscription_rows)
+        monthly_revenue = monthly_revenue or active_subscribers * price
+
+        current_month_subscriptions = await session.execute(
+            select(Subscription).where(
+                Subscription.status == "active",
+                Subscription.started_at >= month_start,
+            )
+        )
+        previous_month_subscriptions = await session.execute(
+            select(Subscription).where(
+                Subscription.status == "active",
+                Subscription.started_at >= previous_month_start,
+                Subscription.started_at < month_start,
+            )
+        )
+        current_month_count = len(current_month_subscriptions.scalars().all())
+        previous_month_count = len(previous_month_subscriptions.scalars().all())
+        monthly_growth = (
+            (current_month_count - previous_month_count) / previous_month_count * 100
+            if previous_month_count
+            else (100 if current_month_count else 0)
+        )
+
         return {
             "total_students": total_students,
             "total_attempts": total_attempts,
             "avg_score": average_score,
             "active_students_7d": active_students_7d,
+            "active_subscribers": active_subscribers,
+            "monthly_revenue": monthly_revenue,
+            "monthly_operating_cost": operating_cost,
+            "estimated_profit": monthly_revenue - operating_cost,
+            "monthly_growth": round(monthly_growth, 1),
+            "new_subscriptions_this_month": current_month_count,
             "grade_distribution": grade_distribution,
             "stream_distribution": stream_distribution,
             "subject_performance": subject_performance,

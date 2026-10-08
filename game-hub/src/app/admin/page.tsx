@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { BarChart3, BookOpen, FileText, GraduationCap, Image, Layers, Lock, LogOut, Sparkles, User } from "lucide-react";
+import { BarChart3, BookOpen, CircleDollarSign, FileText, GraduationCap, Image, Layers, Lock, LogOut, Settings, Sparkles, TrendingUp, User } from "lucide-react";
 import UniversitySelect from "@/components/tma/UniversitySelect";
 import {
   adminGetAnalytics,
@@ -20,15 +20,18 @@ import {
   adminDeleteFlashCard,
   adminPutUniversityLogo,
   adminReviewSubjectSuggestion,
+  adminGetSubscriptionConfig,
+  adminUpdateSubscriptionConfig,
   type AdminAnalytics,
   type AdminExamMeta,
   type FlashCard,
   type NoteMeta,
   type SubjectSuggestion,
+  type SubscriptionConfig,
   type UniversityLogo,
 } from "@/lib/api";
 
-type Tab = "overview" | "exams" | "notes" | "flash-cards" | "logos" | "suggestions" | "analytics";
+type Tab = "overview" | "exams" | "notes" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing";
 type ErrorState = string;
 
 const ADMIN_KEY_STORAGE = "mirkuzAdminKey";
@@ -40,6 +43,7 @@ const tabs: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
   { id: "logos", label: "Logos", icon: Image },
   { id: "suggestions", label: "Suggestions", icon: User },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "pricing", label: "Pricing", icon: CircleDollarSign },
 ];
 
 const examPayload = {
@@ -137,14 +141,16 @@ export default function AdminDashboard() {
     return <main className="min-h-screen bg-slate-950 px-4 py-16 text-white"><section className="mx-auto max-w-md rounded-3xl bg-white p-7 text-slate-900 shadow-2xl"><div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600"><Lock className="h-7 w-7 text-white" /></div><h1 className="text-2xl font-black">Freshman Admin</h1><p className="mt-2 text-sm leading-6 text-slate-500">Manage the study experience for new Fresho students.</p><form onSubmit={unlock} className="mt-6 space-y-3"><input type="password" value={key} onChange={(event) => setKey(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100" placeholder="Admin key" autoFocus />{authError && <p className="text-sm font-semibold text-red-600">{authError}</p>}<button disabled={authenticating} className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:opacity-50">{authenticating ? "Verifying..." : "Open Dashboard"}</button></form></section></main>;
   }
 
-  return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b bg-white px-4 py-5 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Fresho Control Center</p><h1 className="text-2xl font-black">Freshman Learning Dashboard</h1></div><button onClick={signOut} className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"><LogOut className="h-4 w-4" /> Sign out</button></div></header><div className="mx-auto max-w-7xl px-4 py-6 sm:px-8"><nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex min-w-max items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${activeTab === tab.id ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" />{tab.label}</button>; })}</nav>{activeTab === "overview" && <Overview />}{activeTab === "exams" && <ExamsManager />}{activeTab === "notes" && <NotesManager />}{activeTab === "flash-cards" && <FlashCardsManager />}{activeTab === "logos" && <LogosManager />}{activeTab === "suggestions" && <SuggestionsManager />}{activeTab === "analytics" && <AnalyticsManager />}</div></main>;
+  return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b bg-white px-4 py-5 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Fresho Control Center</p><h1 className="text-2xl font-black">Freshman Learning Dashboard</h1></div><button onClick={signOut} className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"><LogOut className="h-4 w-4" /> Sign out</button></div></header><div className="mx-auto max-w-7xl px-4 py-6 sm:px-8"><nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex min-w-max items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${activeTab === tab.id ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" />{tab.label}</button>; })}</nav>{activeTab === "overview" && <Overview />}{activeTab === "exams" && <ExamsManager />}{activeTab === "notes" && <NotesManager />}{activeTab === "flash-cards" && <FlashCardsManager />}{activeTab === "logos" && <LogosManager />}{activeTab === "suggestions" && <SuggestionsManager />}{activeTab === "analytics" && <AnalyticsManager />}{activeTab === "pricing" && <PricingManager />}</div></main>;
 }
 
 function Overview() {
   const [data, setData] = useState<AdminAnalytics | null>(null);
   const [error, setError] = useState("");
   useEffect(() => { adminGetAnalytics().then(setData).catch((value) => setError(message(value))); }, []);
-  return <div className="space-y-6">{error && <ErrorBanner error={error} />}<div className="grid gap-4 md:grid-cols-3"><Metric label="Students" value={data?.total_students ?? 0} /><Metric label="Exam attempts" value={data?.total_attempts ?? 0} /><Metric label="Average score" value={data?.avg_score ? `${data.avg_score.toFixed(1)}%` : "—"} /></div><section className="rounded-2xl bg-white p-6 shadow-sm"><h2 className="text-xl font-black">Freshman study resources</h2><p className="mt-2 text-sm text-slate-500">Review exams, notes, flash cards, university logos, and student suggestions from one workspace.</p></section></div>;
+  const profit = data ? data.monthly_revenue - data.monthly_operating_cost : 0;
+  const margin = data && data.monthly_revenue ? (profit / data.monthly_revenue) * 100 : 0;
+  return <div className="space-y-6">{error && <ErrorBanner error={error} />}<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"><Metric label="Students" value={data?.total_students ?? 0} /><Metric label="Active subscribers" value={data?.active_subscribers ?? 0} /><Metric label="Monthly revenue" value={data ? new Intl.NumberFormat().format(data.monthly_revenue) : "—"} /><Metric label="Estimated profit" value={data ? new Intl.NumberFormat().format(profit) : "—"} /></div><div className="grid gap-6 lg:grid-cols-[1fr_1fr]"><section className="rounded-2xl bg-white p-6 shadow-sm"><h2 className="text-xl font-black">Freshman study resources</h2><p className="mt-2 text-sm text-slate-500">Review exams, notes, flash cards, university logos, and student suggestions from one workspace.</p></section><section className="rounded-2xl bg-blue-600 p-6 text-white shadow-sm"><div className="flex items-center gap-2"><TrendingUp className="h-5 w-5" /><h2 className="text-xl font-black">Business health</h2></div><p className="mt-4 text-3xl font-black">{margin.toFixed(1)}%</p><p className="mt-1 text-sm text-blue-100">Estimated monthly profit margin</p></section></div></div>;
 }
 
 function ExamsManager() {
@@ -212,7 +218,21 @@ function AnalyticsManager() {
   const [error, setError] = useState("");
   useEffect(() => { adminGetAnalytics().then((value) => { setData(value); setLoading(false); }).catch((value) => { setError(message(value)); setLoading(false); }); }, []);
   if (loading) return <p className="rounded-2xl bg-white p-8 text-slate-500">Loading analytics...</p>;
-  return <div className="space-y-6">{error && <ErrorBanner error={error} />}<div className="grid gap-4 md:grid-cols-3"><Metric label="Students" value={data?.total_students ?? 0} /><Metric label="Attempts" value={data?.total_attempts ?? 0} /><Metric label="Average score" value={data?.avg_score ? `${data.avg_score.toFixed(1)}%` : "—"} /></div><section className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="font-black">Stream distribution</h2><div className="mt-4 space-y-3">{data?.stream_distribution.map((item) => <div key={item.stream}><div className="flex justify-between text-sm"><span className="capitalize">{item.stream}</span><span>{item.students}</span></div><div className="mt-1 h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(4, (item.students / Math.max(1, data.total_students)) * 100)}%` }} /></div></div>)}</div></section></div>;
+  const revenue = data?.monthly_revenue ?? 0;
+  const cost = data?.monthly_operating_cost ?? 0;
+  const profit = revenue - cost;
+  return <div className="space-y-6">{error && <ErrorBanner error={error} />}<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"><Metric label="Students" value={data?.total_students ?? 0} /><Metric label="Exam attempts" value={data?.total_attempts ?? 0} /><Metric label="Active subscribers" value={data?.active_subscribers ?? 0} /><Metric label="New this month" value={data?.new_subscriptions_this_month ?? 0} /></div><div className="grid gap-4 md:grid-cols-3"><Metric label="Monthly revenue" value={new Intl.NumberFormat().format(revenue)} /><Metric label="Operating cost" value={new Intl.NumberFormat().format(cost)} /><Metric label="Estimated profit" value={new Intl.NumberFormat().format(profit)} /></div><div className="grid gap-6 lg:grid-cols-2"><section className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="font-black">Stream distribution</h2><div className="mt-4 space-y-3">{data?.stream_distribution.map((item) => <div key={item.stream}><div className="flex justify-between text-sm"><span className="capitalize">{item.stream}</span><span>{item.students}</span></div><div className="mt-1 h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(4, (item.students / Math.max(1, data.total_students)) * 100)}%` }} /></div></div>)}</div></section><section className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="font-black">Subject performance</h2><div className="mt-4 space-y-3">{data?.subject_performance.map((item) => <div key={item.subject}><div className="flex justify-between text-sm"><span>{item.subject}</span><span>{item.average_score.toFixed(1)}%</span></div><div className="mt-1 h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.max(4, item.average_score)}%` }} /></div><p className="mt-1 text-xs text-slate-400">{item.attempts} attempts</p></div>)}</div></section></div><section className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="font-black">Growth and profitability</h2><div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-emerald-50 p-4"><p className="text-xs font-bold text-emerald-700">Monthly growth</p><p className="mt-2 text-2xl font-black text-emerald-700">{data?.monthly_growth.toFixed(1) ?? "0.0"}%</p></div><div className="rounded-xl bg-blue-50 p-4"><p className="text-xs font-bold text-blue-700">Profit margin</p><p className="mt-2 text-2xl font-black text-blue-700">{revenue ? ((profit / revenue) * 100).toFixed(1) : "0.0"}%</p></div><div className="rounded-xl bg-amber-50 p-4"><p className="text-xs font-bold text-amber-700">Monthly cost</p><p className="mt-2 text-2xl font-black text-amber-700">{new Intl.NumberFormat().format(cost)}</p></div></div></section></div>;
+}
+
+function PricingManager() {
+  const [config, setConfig] = useState<SubscriptionConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { adminGetSubscriptionConfig().then((value) => { setConfig(value); setLoading(false); }).catch((value) => { setError(message(value)); setLoading(false); }); }, []);
+  async function save(event: FormEvent) { event.preventDefault(); if (!config) return; setSaving(true); setError(""); try { const saved = await adminUpdateSubscriptionConfig(config); setConfig(saved); } catch (value) { setError(message(value)); } finally { setSaving(false); } }
+  if (loading) return <p className="rounded-2xl bg-white p-8 text-slate-500">Loading pricing...</p>;
+  return <div className="grid gap-6 lg:grid-cols-[1fr_1fr]"><section className="rounded-2xl bg-white p-6 shadow-sm"><div className="flex items-center gap-2"><Settings className="h-5 w-5 text-blue-600" /><h2 className="text-xl font-black">Subscription pricing</h2></div><p className="mt-2 text-sm text-slate-500">Set the customer price and monthly operating cost used in the business report.</p>{error && <div className="mt-4"><ErrorBanner error={error} /></div>}<form onSubmit={save} className="mt-6 space-y-4"><Field label="Price per month" type="number" value={config?.price ?? 0} onChange={(value) => setConfig({ ...config!, price: Number(value) })} /><Field label="Currency" value={config?.currency ?? "USD"} onChange={(value) => setConfig({ ...config!, currency: value })} /><Field label="Monthly operating cost" type="number" value={config?.monthly_operating_cost ?? 0} onChange={(value) => setConfig({ ...config!, monthly_operating_cost: Number(value) })} /><button disabled={saving} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50">{saving ? "Saving..." : "Save pricing"}</button></form></section><section className="rounded-2xl bg-blue-600 p-6 text-white shadow-sm"><CircleDollarSign className="h-8 w-8" /><h2 className="mt-4 text-2xl font-black">Profit snapshot</h2><p className="mt-3 text-4xl font-black">{new Intl.NumberFormat().format((config?.price ?? 0) - (config?.monthly_operating_cost ?? 0))}</p><p className="mt-1 text-sm text-blue-100">Estimated monthly profit per active subscriber</p><div className="mt-6 rounded-xl bg-white/10 p-4 text-sm"><p className="font-bold">Pricing formula</p><p className="mt-2">Revenue − operating cost = estimated profit</p></div></section></div>;
 }
 
 function ResourcePanel({ title, subtitle, loading, error, items, onDelete, form }: { title: string; subtitle: string; loading: boolean; error: string; items: { id: number; name: string; status: string }[]; onDelete?: (id: number) => void; form: ReactNode }) {

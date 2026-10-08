@@ -38,6 +38,29 @@ class SubjectEnum(enum.Enum):
     ECONOMICS = "economics"
 
 
+class SubscriptionConfig(Base):
+    """Single-row admin-controlled pricing and business settings."""
+    __tablename__ = 'subscription_configs'
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    price = Column(Integer, nullable=False, default=0)
+    currency = Column(String, nullable=False, default='USD')
+    monthly_operating_cost = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Subscription(Base):
+    """Revenue ledger entry for each premium subscription activation."""
+    __tablename__ = 'subscriptions'
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey('users.user_id'), nullable=False, index=True)
+    amount = Column(Integer, nullable=False)
+    currency = Column(String, nullable=False, default='USD')
+    started_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    status = Column(String, nullable=False, default='active', index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class User(Base):
     __tablename__ = 'users'
     user_id = Column(BigInteger, primary_key=True, index=True)

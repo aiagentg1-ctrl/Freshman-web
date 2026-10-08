@@ -83,6 +83,30 @@ async def init_db():
                     reviewed_by VARCHAR
                 )
             """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS subscription_configs (
+                    id SERIAL PRIMARY KEY,
+                    price INTEGER NOT NULL DEFAULT 0,
+                    currency VARCHAR NOT NULL DEFAULT 'USD',
+                    monthly_operating_cost INTEGER NOT NULL DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            await conn.execute(text("""
+                INSERT INTO subscription_configs (price, currency, monthly_operating_cost)
+                SELECT 0, 'USD', 0
+                WHERE NOT EXISTS (SELECT 1 FROM subscription_configs)
+            """))
+            await conn.execute(text("""
+                INSERT INTO subscriptions (user_id, amount, currency, started_at, expires_at, status)
+                SELECT user_id, 0, 'USD', COALESCE(premium_expires_at - INTERVAL '30 days', created_at), premium_expires_at, 'active'
+                FROM users
+                WHERE premium_expires_at IS NOT NULL
+                  AND premium_expires_at > CURRENT_TIMESTAMP
+                  AND NOT EXISTS (
+                      SELECT 1 FROM subscriptions WHERE subscriptions.user_id = users.user_id
+                  )
+            """))
 
             # Update existing users to have default values
             await conn.execute(text("""
