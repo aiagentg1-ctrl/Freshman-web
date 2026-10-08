@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { BarChart3, BookOpen, FileText, GraduationCap, Image, Layers, Lock, LogOut, Sparkles, UserRound } from "lucide-react";
+import { BarChart3, BookOpen, FileText, GraduationCap, Image, Layers, Lock, LogOut, Sparkles, User } from "lucide-react";
 import UniversitySelect from "@/components/tma/UniversitySelect";
 import {
   adminGetAnalytics,
@@ -38,7 +38,7 @@ const tabs: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
   { id: "notes", label: "Notes", icon: BookOpen },
   { id: "flash-cards", label: "Flash Cards", icon: Layers },
   { id: "logos", label: "Logos", icon: Image },
-  { id: "suggestions", label: "Suggestions", icon: UserRound },
+  { id: "suggestions", label: "Suggestions", icon: User },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
 ];
 
