@@ -172,8 +172,6 @@ class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-app.add_middleware(SingleDeviceSessionMiddleware)
-app.add_middleware(NoCacheMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -181,6 +179,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SingleDeviceSessionMiddleware)
+app.add_middleware(NoCacheMiddleware)
 
 
 def telegram_user_from_init_data(init_data: str) -> int:
