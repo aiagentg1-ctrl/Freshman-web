@@ -44,11 +44,15 @@ class User(Base):
     first_name = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
     custom_name = Column(String, nullable=True, default=None)  # User's preferred display name
+    university = Column(String, nullable=True, default="")
+    region = Column(String, nullable=True, default="")
+    # Legacy school/city columns are retained for compatibility with existing profiles.
     school = Column(String, nullable=True, default="")
     city = Column(String, nullable=True, default="")
     grade = Column(Integer, nullable=False)
     stream = Column(Enum(StreamEnum), nullable=False)
     selected_subjects = Column(Text, nullable=False, default="[]", server_default="[]")
+    premium_expires_at = Column(DateTime, nullable=True)
     # Legacy columns kept nullable so inserts still succeed on databases
     # created before the high-school-only pivot.
     referred_by = Column(BigInteger, nullable=True)

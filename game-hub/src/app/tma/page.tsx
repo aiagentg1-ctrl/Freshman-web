@@ -11,15 +11,19 @@ import ProfileScreen from "../../components/tma/ProfileScreen";
 import { DevUserSetup } from "../../components/DevUserSetup";
 import { dailyCheckIn, DailyCheckIn, ExamMeta, getUser, releaseDeviceSession, startDeviceSession, StreamKey, updateUser } from "../../lib/api";
 import { expandTelegramApp, getTelegramInitData, getTelegramUser, TelegramUser } from "../../lib/telegram";
+import PremiumDialog from "../../components/tma/PremiumDialog";
 
 interface LocalProfile {
   full_name: string;
   custom_name?: string;
+  university?: string;
+  region?: string;
   school?: string;
   city?: string;
   grade: number;
   stream: StreamKey;
   selected_subjects: string[];
+  premium_expires_at?: string | null;
 }
 
 const VALID_STREAMS: StreamKey[] = ["general", "natural", "social"];
@@ -48,6 +52,7 @@ export default function TMAPage() {
   const [deviceStatus, setDeviceStatus] = useState<"checking" | "active" | "locked" | "auth_required" | "signed_out" | "error">("checking");
   const [deviceError, setDeviceError] = useState("");
   const [sessionRetry, setSessionRetry] = useState(0);
+  const [showPremiumDialog, setShowPremiumDialog] = useState(false);
 
   useEffect(() => {
     expandTelegramApp();
@@ -100,11 +105,14 @@ export default function TMAPage() {
           setProfile({
             full_name: remote.full_name,
             custom_name: remote.custom_name || undefined,
+            university: remote.university || "",
+            region: remote.region || "",
             school: remote.school || "",
             city: remote.city || "",
             grade: remote.grade,
             stream: remote.stream.toLowerCase() as StreamKey,
             selected_subjects: remote.selected_subjects || [],
+            premium_expires_at: remote.premium_expires_at || null,
           });
         } else {
           try {
@@ -160,15 +168,34 @@ export default function TMAPage() {
     };
   }, [telegramUser?.id, profile]);
 
-  const handleOnboardingComplete = async (stream: Exclude<StreamKey, "general">, selected_subjects: string[]) => {
+  const handleOnboardingComplete = async (stream: Exclude<StreamKey, "general">, selected_subjects: string[], university: string, region: string) => {
     const fullName = telegramUser
       ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ")
       : "";
-    const next = { full_name: fullName, custom_name: undefined, school: "", city: "", grade: 12, stream, selected_subjects };
+    const next: LocalProfile = {
+      full_name: fullName,
+      custom_name: undefined,
+      university,
+      region,
+      school: "",
+      city: "",
+      grade: 12,
+      stream,
+      selected_subjects,
+      premium_expires_at: null,
+    };
     localStorage.setItem("mirkuzProfile", JSON.stringify(next));
     if (telegramUser) {
       try {
-        await updateUser(telegramUser.id, { first_name: telegramUser.first_name, full_name: fullName, grade: 12, stream, selected_subjects });
+        await updateUser(telegramUser.id, {
+          first_name: telegramUser.first_name,
+          full_name,
+          university,
+          region,
+          grade: 12,
+          stream,
+          selected_subjects,
+        });
       } catch (error) {
         console.error("Failed to save onboarding profile:", error);
       }
@@ -196,6 +223,12 @@ export default function TMAPage() {
     setResumeExam(exam);
     setActiveTab("practice");
   };
+
+  const isPremium = (() => {
+    if (!profile?.premium_expires_at) return false;
+    const expiry = new Date(profile.premium_expires_at).getTime();
+    return Number.isFinite(expiry) && expiry > Date.now();
+  })();
 
   return (
     <div className="min-h-screen max-w-md mx-auto bg-[#F8FAFC] shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900">
@@ -235,12 +268,20 @@ export default function TMAPage() {
               telegramUserId={telegramUser?.id}
               telegramFirstName={telegramUser?.first_name}
               resumeExam={resumeExam}
+              isPremium={isPremium}
               onResumeHandled={() => setResumeExam(null)}
               onGoHome={() => setActiveTab("home")}
+              onGetPremium={() => setShowPremiumDialog(true)}
             />
           )}
           {activeTab === "notes" && (
-            <NotesScreen stream={profile.stream} grade={profile.grade} telegramUserId={telegramUser?.id} />
+            <NotesScreen
+              stream={profile.stream}
+              grade={profile.grade}
+              telegramUserId={telegramUser?.id}
+              isPremium={isPremium}
+              onGetPremium={() => setShowPremiumDialog(true)}
+            />
           )}
           {activeTab === "home" && (
             <HomeScreen
@@ -248,8 +289,10 @@ export default function TMAPage() {
               fullName={profile.custom_name || profile.full_name}
               grade={profile.grade}
               stream={profile.stream}
+              isPremium={isPremium}
               onContinueExam={handleContinueExam}
               onGoToPractice={() => setActiveTab("practice")}
+              onGetPremium={() => setShowPremiumDialog(true)}
             />
           )}
           {activeTab === "profile" && (
@@ -257,6 +300,8 @@ export default function TMAPage() {
               telegramUser={telegramUser}
               fullName={profile.full_name}
               customName={profile.custom_name}
+              initialUniversity={profile.university}
+              initialRegion={profile.region}
               initialSchool={profile.school}
               initialCity={profile.city}
               grade={profile.grade}
@@ -269,6 +314,7 @@ export default function TMAPage() {
           <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </>
       )}
+      {showPremiumDialog && <PremiumDialog onClose={() => setShowPremiumDialog(false)} />}
       {streakPrompt && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-5 backdrop-blur-sm"

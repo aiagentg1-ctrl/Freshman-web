@@ -7,6 +7,7 @@ import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects
 import NotesReader from "./NotesReader";
 import { EmptyState } from "./PracticeScreen";
 import ExamRunner from "./ExamRunner";
+import PremiumBanner from "./PremiumBanner";
 
 const GRADES = [9, 10, 11, 12];
 
@@ -21,10 +22,14 @@ export default function NotesScreen({
   stream,
   grade,
   telegramUserId,
+  isPremium,
+  onGetPremium,
 }: {
   stream: StreamKey;
   grade: number;
   telegramUserId?: number;
+  isPremium: boolean;
+  onGetPremium: () => void;
 }) {
   const [view, setView] = useState<View>({ kind: "subjects" });
   const [chapters, setChapters] = useState<NoteMeta[]>([]);
@@ -262,6 +267,7 @@ export default function NotesScreen({
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-3">
+        {!isPremium && <PremiumBanner onGetPremium={onGetPremium} />}
         {subjects.map((subject) => {
           const Icon = subject.icon;
           return (

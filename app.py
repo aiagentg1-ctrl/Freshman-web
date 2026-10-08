@@ -808,6 +808,8 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     full_name: Optional[str] = None
     custom_name: Optional[str] = None
+    university: Optional[str] = None
+    region: Optional[str] = None
     school: Optional[str] = None
     city: Optional[str] = None
     grade: int
@@ -831,11 +833,14 @@ class UserProfileUpsert(BaseModel):
     first_name: Optional[str] = None
     full_name: Optional[str] = None
     custom_name: Optional[str] = None
+    university: Optional[str] = None
+    region: Optional[str] = None
     school: Optional[str] = None
     city: Optional[str] = None
     grade: Optional[int] = None
     stream: Optional[str] = None
     selected_subjects: Optional[List[str]] = None
+    premium_expires_at: Optional[datetime] = None
 
     @validator('grade')
     def validate_optional_grade(cls, v):
@@ -969,11 +974,14 @@ async def get_user(user_id: int):
             "first_name": user.first_name,
             "full_name": user.full_name,
             "custom_name": user.custom_name,
+            "university": user.university,
+            "region": user.region,
             "school": user.school,
             "city": user.city,
             "grade": user.grade,
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
+            "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
         }
 
 
@@ -990,6 +998,8 @@ async def update_user(user_id: int, update: UserUpdate):
                 first_name=(update.first_name or update.full_name or "Student").strip(),
                 full_name=(update.full_name or update.first_name or "Student").strip(),
                 custom_name=update.custom_name.strip() if update.custom_name else None,
+                university=update.university.strip() if update.university else "",
+                region=update.region.strip() if update.region else "",
                 school=update.school.strip() if update.school else "",
                 city=update.city.strip() if update.city else "",
                 grade=update.grade,
@@ -1008,6 +1018,10 @@ async def update_user(user_id: int, update: UserUpdate):
                 user.full_name = update.full_name.strip()
             if "custom_name" in update.__fields_set__:
                 user.custom_name = update.custom_name.strip() or None if update.custom_name else None
+            if update.university is not None:
+                user.university = update.university.strip()
+            if update.region is not None:
+                user.region = update.region.strip()
             if update.school is not None:
                 user.school = update.school.strip()
             if update.city is not None:
@@ -1028,11 +1042,14 @@ async def update_user(user_id: int, update: UserUpdate):
             "first_name": user.first_name,
             "full_name": user.full_name,
             "custom_name": user.custom_name,
+            "university": user.university,
+            "region": user.region,
             "school": user.school,
             "city": user.city,
             "grade": user.grade,
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
+            "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
         }
 
 
@@ -1048,6 +1065,8 @@ async def upsert_user_profile(update: UserProfileUpsert):
                 first_name=(update.first_name or display_name).strip(),
                 full_name=display_name or "Student",
                 custom_name=update.custom_name.strip() if update.custom_name else None,
+                university=update.university.strip() if update.university else "",
+                region=update.region.strip() if update.region else "",
                 school=update.school.strip() if update.school else "",
                 city=update.city.strip() if update.city else "",
                 grade=update.grade or 9,
@@ -1061,6 +1080,10 @@ async def upsert_user_profile(update: UserProfileUpsert):
                 user.full_name = update.full_name.strip()
             if "custom_name" in update.__fields_set__:
                 user.custom_name = update.custom_name.strip() if update.custom_name else None
+            if update.university is not None:
+                user.university = update.university.strip()
+            if update.region is not None:
+                user.region = update.region.strip()
             if update.school is not None:
                 user.school = update.school.strip()
             if update.city is not None:
@@ -1079,11 +1102,14 @@ async def upsert_user_profile(update: UserProfileUpsert):
             "first_name": user.first_name,
             "full_name": user.full_name,
             "custom_name": user.custom_name,
+            "university": user.university,
+            "region": user.region,
             "school": user.school,
             "city": user.city,
             "grade": user.grade,
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
+            "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
         }
 
 

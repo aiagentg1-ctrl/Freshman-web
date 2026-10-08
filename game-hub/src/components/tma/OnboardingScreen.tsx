@@ -8,16 +8,18 @@ import { subjectLabel, subjectsForStream } from "../../lib/subjects";
 export default function OnboardingScreen({
   onComplete,
 }: {
-  onComplete: (stream: Exclude<StreamKey, "general">, subjects: string[]) => void;
+  onComplete: (stream: Exclude<StreamKey, "general">, subjects: string[], university: string, region: string) => void;
 }) {
   const [stream, setStream] = useState<Exclude<StreamKey, "general"> | null>(null);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [university, setUniversity] = useState("");
+  const [region, setRegion] = useState("");
   const availableSubjects = stream ? subjectsForStream(stream) : [];
-  const ready = stream !== null && selectedSubjects.length > 0;
+  const ready = stream !== null && selectedSubjects.length > 0 && university.trim() && region.trim();
 
   const complete = () => {
     if (!ready || !stream) return;
-    onComplete(stream, selectedSubjects);
+    onComplete(stream, selectedSubjects, university.trim(), region.trim());
   };
 
   return (
@@ -29,6 +31,27 @@ export default function OnboardingScreen({
       <p className="text-sm text-slate-500 text-center mt-1 mb-8">
         Freshman courses for university students
       </p>
+
+      <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 mb-2">University</h3>
+          <input
+            value={university}
+            onChange={(event) => setUniversity(event.target.value)}
+            placeholder="e.g. Addis Ababa University"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5]"
+          />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 mb-2">Region</h3>
+          <input
+            value={region}
+            onChange={(event) => setRegion(event.target.value)}
+            placeholder="e.g. Addis Ababa Region"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5]"
+          />
+        </div>
+      </div>
 
       <div className="w-full bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-4">
         <h3 className="text-sm font-bold text-slate-900 mb-3">Choose your department</h3>

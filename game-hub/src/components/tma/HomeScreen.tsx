@@ -7,21 +7,26 @@ import { streamLabel, subjectLabel } from "../../lib/subjects";
 import { TelegramUser } from "../../lib/telegram";
 import Leaderboard from "./Leaderboard";
 import MathContent from "./MathContent";
+import PremiumBanner from "./PremiumBanner";
 
 export default function HomeScreen({
   telegramUser,
   fullName,
   grade,
   stream,
+  isPremium,
   onContinueExam,
   onGoToPractice,
+  onGetPremium,
 }: {
   telegramUser: TelegramUser | null;
   fullName: string;
   grade: number;
   stream: StreamKey;
+  isPremium: boolean;
   onContinueExam: (exam: ExamMeta) => void;
   onGoToPractice: () => void;
+  onGetPremium: () => void;
 }) {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
@@ -126,6 +131,8 @@ export default function HomeScreen({
       </div>
 
       <div className="flex-1 px-4 py-5 space-y-5">
+        {!isPremium && <PremiumBanner onGetPremium={onGetPremium} />}
+
         {/* XP, Level, and Streak Card */}
         {progress ? (
           <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, HelpCircle, LogOut, Pencil, User, School, MapPin, TrendingUp, Target, BookOpen, Award } from "lucide-react";
+import { Check, HelpCircle, LogOut, Pencil, User, GraduationCap, MapPin, TrendingUp, Target, BookOpen, Award, Crown } from "lucide-react";
 import { StreamKey, updateUser, getUserProgress, UserProgress } from "../../lib/api";
 import { streamLabel } from "../../lib/subjects";
 import { getTelegramUser, TelegramUser } from "../../lib/telegram";
@@ -13,25 +13,33 @@ export default function ProfileScreen({
   telegramUser,
   fullName,
   customName: savedCustomName,
+  initialUniversity,
+  initialRegion,
   initialSchool,
   initialCity,
   grade,
   stream,
   selectedSubjects,
+  isPremium,
   onProfileChange,
   onSignOut,
 }: {
   telegramUser: TelegramUser | null;
   fullName: string;
   customName?: string | null;
+  initialUniversity?: string;
+  initialRegion?: string;
   initialSchool?: string;
   initialCity?: string;
   grade: number;
   stream: StreamKey;
   selectedSubjects: string[];
+  isPremium: boolean;
   onProfileChange: (profile: {
     full_name: string;
     custom_name?: string;
+    university: string;
+    region: string;
     school: string;
     city: string;
     grade: number;
@@ -41,6 +49,8 @@ export default function ProfileScreen({
   onSignOut: () => Promise<void>;
 }) {
   const [customName, setCustomName] = useState(savedCustomName || fullName || "");
+  const [university, setUniversity] = useState(initialUniversity || "");
+  const [region, setRegion] = useState(initialRegion || "");
   const [school, setSchool] = useState(initialSchool || "");
   const [city, setCity] = useState(initialCity || "");
   const [saving, setSaving] = useState(false);
@@ -85,6 +95,8 @@ export default function ProfileScreen({
     const profile = {
       full_name: name,
       custom_name: name || undefined,
+      university: university.trim(),
+      region: region.trim(),
       school: school.trim(),
       city: city.trim(),
       grade,
@@ -108,6 +120,8 @@ export default function ProfileScreen({
           ...profile,
           full_name: result.full_name,
           custom_name: result.custom_name || undefined,
+          university: result.university,
+          region: result.region,
           school: result.school,
           city: result.city,
         };
@@ -242,35 +256,73 @@ export default function ProfileScreen({
 
           <div>
             <label className="text-xs font-semibold text-slate-500 mb-1.5 block flex items-center gap-1.5">
-              <School className="w-3.5 h-3.5" /> School / Preparatory
+              <GraduationCap className="w-3.5 h-3.5" /> University
             </label>
             <input
               type="text"
-              value={school}
+              value={university}
               onChange={(e) => {
-                setSchool(e.target.value);
+                setUniversity(e.target.value);
                 setHasEdits(true);
               }}
-              placeholder="e.g. Bole Secondary"
+              placeholder="e.g. Addis Ababa University"
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5] focus:border-transparent"
             />
           </div>
 
           <div>
             <label className="text-xs font-semibold text-slate-500 mb-1.5 block flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5" /> City / Region
+              <MapPin className="w-3.5 h-3.5" /> Region
             </label>
             <input
               type="text"
-              value={city}
+              value={region}
               onChange={(e) => {
-                setCity(e.target.value);
+                setRegion(e.target.value);
                 setHasEdits(true);
               }}
-              placeholder="e.g. Addis Ababa"
+              placeholder="e.g. Addis Ababa Region"
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5] focus:border-transparent"
             />
           </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Legacy school</label>
+              <input
+                type="text"
+                value={school}
+                onChange={(e) => { setSchool(e.target.value); setHasEdits(true); }}
+                placeholder="Optional"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Legacy city</label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => { setCity(e.target.value); setHasEdits(true); }}
+                placeholder="Optional"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#1D70F5]"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className={`rounded-2xl p-5 text-white shadow-sm ${isPremium ? "bg-gradient-to-br from-emerald-500 to-teal-600" : "bg-gradient-to-br from-amber-500 to-orange-600"}`}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+              <Crown className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/75">Fresho Premium</p>
+              <h3 className="text-lg font-black">{isPremium ? "Premium Active" : "Get Premium"}</h3>
+            </div>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-white/85">
+            {isPremium ? "Your subscription is active. Premium materials are unlocked." : "199 ETB for 5 months. Includes daily plans, detailed notes, exams, AAU resources, and videos."}
+          </p>
         </div>
 
         {/* Grade & Stream Info (read-only) */}

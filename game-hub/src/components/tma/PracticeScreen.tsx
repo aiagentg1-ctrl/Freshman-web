@@ -16,6 +16,7 @@ import {
 import { ChapterExam, ChapterExamMeta, Exam, ExamMeta, getChapterExam, getChapterExams, getExam, getExams, StreamKey } from "../../lib/api";
 import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects";
 import ExamRunner, { PdfExamView, HtmlExamView } from "./ExamRunner";
+import PremiumBanner from "./PremiumBanner";
 
 type View =
   | { kind: "subjectList" }
@@ -41,16 +42,20 @@ export default function PracticeScreen({
   telegramUserId,
   telegramFirstName,
   resumeExam,
+  isPremium,
   onResumeHandled,
   onGoHome,
+  onGetPremium,
 }: {
   stream: StreamKey;
   grade: number;
   telegramUserId?: number;
   telegramFirstName?: string;
   resumeExam?: ExamMeta | null;
+  isPremium: boolean;
   onResumeHandled?: () => void;
   onGoHome?: () => void;
+  onGetPremium: () => void;
 }) {
   const [view, setView] = useState<View>({ kind: "subjectList" });
   const [mode, setMode] = useState<"subject" | "year" | "chapter">("subject");
@@ -393,6 +398,8 @@ export default function PracticeScreen({
             <p className="text-xs text-slate-500">Practice real entrance exams</p>
           </div>
         </div>
+
+        {!isPremium && <div className="mt-4"><PremiumBanner onGetPremium={onGetPremium} /></div>}
 
         {/* Segmented hub toggle */}
         <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 mt-4">

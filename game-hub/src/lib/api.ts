@@ -76,11 +76,14 @@ export interface UserProfile {
   first_name: string;
   full_name: string;
   custom_name: string | null;
-  school: string;
-  city: string;
+  university: string;
+  region: string;
+  school?: string;
+  city?: string;
   grade: number;
   stream: string;
   selected_subjects: string[];
+  premium_expires_at?: string | null;
 }
 
 export interface UserStats {
@@ -95,10 +98,13 @@ export interface UserProgress {
   first_name?: string;
   full_name: string;
   custom_name: string | null;
+  university?: string | null;
+  region?: string | null;
   school?: string | null;
   city?: string | null;
   grade: number;
   stream: string;
+  premium_expires_at?: string | null;
   xp: number;
   level: number;
   rank: { name: string; min_xp: number; emoji: string };
@@ -451,11 +457,14 @@ export async function updateUser(
     first_name?: string;
     full_name?: string;
     custom_name?: string;
+    university?: string;
+    region?: string;
     school?: string;
     city?: string;
     grade: number;
     stream: string;
     selected_subjects: string[];
+    premium_expires_at?: string | null;
   }
 ): Promise<UserProfile> {
   return request<UserProfile>("/api/user/profile", {

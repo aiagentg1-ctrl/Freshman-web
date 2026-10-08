@@ -33,6 +33,9 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         if engine.dialect.name == "postgresql":
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_name VARCHAR"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS university VARCHAR"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS region VARCHAR"))
+            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMP"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_subjects TEXT NOT NULL DEFAULT '[]'"))
             await conn.execute(text("ALTER TABLE euee_exams ADD COLUMN IF NOT EXISTS semester VARCHAR NOT NULL DEFAULT 'all'"))
             await conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS semester VARCHAR NOT NULL DEFAULT 'all'"))
