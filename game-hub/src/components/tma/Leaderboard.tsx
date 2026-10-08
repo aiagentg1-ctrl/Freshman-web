@@ -49,7 +49,14 @@ export default function Leaderboard({ stream }: { stream: StreamKey }) {
     };
   }, [leaderboardType, period, refreshKey, stream, userId]);
 
-  const getRankBadge = (rank: number) => {
+  const getRankBadge = (rank: number, isPremium = false) => {
+    if (isPremium) {
+      return (
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 flex items-center justify-center shadow-lg shadow-amber-200">
+          <Crown className="w-4 h-4 text-white" />
+        </div>
+      );
+    }
     if (rank === 1) {
       return (
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-yellow-200">
@@ -148,17 +155,20 @@ export default function Leaderboard({ stream }: { stream: StreamKey }) {
               key={entry.user_id}
               className={`flex items-center gap-3 rounded-xl border p-3 ${entry.is_current_user ? "border-[#1D70F5] bg-blue-50" : "border-slate-100 bg-slate-50"}`}
             >
-              {getRankBadge(entry.rank)}
+              {getRankBadge(entry.rank, entry.is_premium)}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h4 className="truncate text-sm font-semibold text-slate-900">{entry.display_name}</h4>
+                  {entry.is_premium && (
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-700">Premium</span>
+                  )}
                   {entry.is_current_user && <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-bold text-[#1D70F5]">You</span>}
                 </div>
-                {(entry.school || entry.city) && (
+                {(entry.university || entry.region) && (
                   <p className="text-xs text-slate-500 truncate">
-                    {entry.school && entry.city
-                      ? `${entry.school} • ${entry.city}`
-                      : entry.school || entry.city}
+                    {entry.university && entry.region
+                      ? `${entry.university} • ${entry.region}`
+                      : entry.university || entry.region}
                   </p>
                 )}
               </div>

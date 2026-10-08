@@ -7,7 +7,7 @@ import { streamLabel } from "../../lib/subjects";
 import { getTelegramUser, TelegramUser } from "../../lib/telegram";
 
 const GRADES = [9, 10, 11, 12];
-const SUPPORT_URL = "https://t.me/AAU101";
+const SUPPORT_URL = "https://t.me/Mirkuz_support";
 
 export default function ProfileScreen({
   telegramUser,
@@ -383,8 +383,8 @@ export default function ProfileScreen({
             <HelpCircle className="w-5 h-5 text-sky-600" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Telegram Support</h3>
-            <p className="text-xs text-slate-500">Get help in our community channel</p>
+            <h3 className="text-sm font-semibold text-slate-900">Mirkuz Support</h3>
+            <p className="text-xs text-slate-500">Register or contact support on Telegram</p>
           </div>
         </a>
       </div>

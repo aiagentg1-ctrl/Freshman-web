@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ClipboardList, GraduationCap, Sparkles, Target, TrendingUp, XCircle, Award, Flame, Zap, Shield } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ClipboardList, GraduationCap, Sparkles, Target, TrendingUp, XCircle, Award, Flame, Zap, Shield, Crown } from "lucide-react";
 import { ExamMeta, ExamReviewQuestion, getInProgressExam, getRecentExamAttempts, getUserProgress, getUserStats, RecentExamAttempt, StreamKey, UserProgress, UserStats } from "../../lib/api";
 import { streamLabel, subjectLabel } from "../../lib/subjects";
 import { TelegramUser } from "../../lib/telegram";
+import FlashCards from "./FlashCards";
 import Leaderboard from "./Leaderboard";
 import MathContent from "./MathContent";
 import PremiumBanner from "./PremiumBanner";
@@ -124,9 +125,16 @@ export default function HomeScreen({
             <h1 className="text-xl font-bold">{firstName} 👋</h1>
           </div>
         </div>
-        <div className="mt-4 inline-flex items-center gap-1.5 bg-white/15 rounded-full px-3 py-1.5 text-xs font-semibold">
-          <Sparkles className="w-3.5 h-3.5" />
-          Freshman {streamLabel(stream)}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 bg-white/15 rounded-full px-3 py-1.5 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5" />
+            Freshman {streamLabel(stream)}
+          </span>
+          {isPremium && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-300 px-3 py-1.5 text-xs font-black text-amber-950 shadow-lg shadow-amber-900/10">
+              <Crown className="w-3.5 h-3.5" /> Premium Active
+            </span>
+          )}
         </div>
       </div>
 
@@ -230,6 +238,8 @@ export default function HomeScreen({
             </div>
           </section>
         )}
+
+        <FlashCards />
 
         {/* Legacy average score fallback */}
         {grade <= 10 && progress?.average_score && (

@@ -496,14 +496,15 @@ export interface LeaderboardEntry {
   rank: number;
   user_id: number;
   display_name: string;
-  school: string | null;
-  city: string | null;
+  university: string | null;
+  region: string | null;
   attempt_count?: number;
   avg_score?: number;
   best_score?: number | null;
   xp?: number;
   level?: number;
   rank_info?: { name: string; min_xp: number; emoji: string };
+  is_premium?: boolean;
   is_current_user?: boolean;
 }
 

@@ -2,7 +2,6 @@ import asyncio
 import os
 from aiogram import Bot, Dispatcher
 from aiogram.types import (
-    CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     MenuButtonWebApp,
@@ -21,45 +20,10 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "8939756135:AAF0ELtBCbJmn-W1yrFATdnj3fXhQRmPS
 ADMIN_ID = int(os.getenv("ADMIN_ID", "1439864634"))
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://freshman-web.onrender.com/tma")
 ADMIN_URL = os.getenv("ADMIN_URL", "https://freshman-web.onrender.com/admin")
-
-# Users must be members of BOTH channels before the Mini App is unlocked.
-# Override any of these via environment variables in production.
-REQUIRED_CHANNELS = [
-    {
-        "id": os.getenv("CHANNEL_1_ID", "-1002656898914"),
-        "url": os.getenv("CHANNEL_1_URL", "https://t.me/AAU101"),
-        "name": os.getenv("CHANNEL_1_NAME", "AAU101"),
-    },
-    {
-        "id": os.getenv("CHANNEL_2_ID", "-1002435524867"),
-        "url": os.getenv("CHANNEL_2_URL", "https://t.me/NextGen_12"),
-        "name": os.getenv("CHANNEL_2_NAME", "NextGen 12"),
-    },
-]
+SUPPORT_URL = "https://t.me/Mirkuz_support"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-
-
-async def get_missing_channels(user_id: int) -> list:
-    missing = []
-    for channel in REQUIRED_CHANNELS:
-        try:
-            member = await bot.get_chat_member(chat_id=int(channel["id"]), user_id=user_id)
-            if member.status not in ["member", "administrator", "creator"]:
-                missing.append(channel)
-        except Exception:
-            missing.append(channel)
-    return missing
-
-
-def get_join_keyboard():
-    buttons = [
-        [InlineKeyboardButton(text=f"📢 Join {channel['name']}", url=channel["url"])]
-        for channel in REQUIRED_CHANNELS
-    ]
-    buttons.append([InlineKeyboardButton(text="✅ Verify & Continue", callback_data="verify_membership")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def get_app_button(is_admin: bool = False):
@@ -80,38 +44,12 @@ def get_admin_menu():
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
-    # No profile questions in chat — setup lives entirely inside the Mini App.
-    missing = await get_missing_channels(message.from_user.id)
-    if missing:
-        await message.answer(
-            "👋 Welcome to Mirkuz!\n\n"
-            "Before you can open the app, please join BOTH of our channels:",
-            reply_markup=get_join_keyboard(),
-        )
-        return
-
     await message.answer(
-        "🎓 Welcome to Mirkuz — your final and mid exam study companion!\n\n"
-        "Study with real past exams and read chapter notes for Grades 9–12, "
-        "all inside the app. Tap below to begin:",
+        "👋 Welcome to Mirkuz!\n\n"
+        "Register or get support by contacting our Telegram support account:\n"
+        f"{SUPPORT_URL}\n\n"
+        "Then open the Freshman study app below.",
         reply_markup=get_app_button(message.from_user.id == ADMIN_ID),
-    )
-
-
-@dp.callback_query(lambda c: c.data == "verify_membership")
-async def verify_membership(callback: CallbackQuery):
-    missing = await get_missing_channels(callback.from_user.id)
-    if missing:
-        names = " and ".join(f"@{ch['url'].rstrip('/').split('/')[-1]}" for ch in missing)
-        await callback.answer(f"You still need to join {names}!", show_alert=True)
-        return
-
-    await callback.answer("✅ Verified!")
-    await callback.message.edit_text(
-        "✅ Membership verified!\n\n"
-        "🎓 Mirkuz — EUEE exam prep for Grades 9–12.\n"
-        "Tap below to open the app and start practicing:",
-        reply_markup=get_app_button(callback.from_user.id == ADMIN_ID),
     )
 
 

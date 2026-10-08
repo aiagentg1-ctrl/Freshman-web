@@ -1455,11 +1455,12 @@ async def get_leaderboard(
                         User.first_name,
                         User.full_name,
                         User.custom_name,
-                        User.school,
-                        User.city,
+                        User.university,
+                        User.region,
                         User.xp,
                         User.level,
                         User.daily_streak,
+                        User.premium_expires_at,
                     )
                     .where(User.xp > 0)
                 )
@@ -1480,12 +1481,13 @@ async def get_leaderboard(
                         "rank": current_rank if row.user_id == user_id and current_rank else i + 1,
                         "user_id": row.user_id,
                         "display_name": row.custom_name or row.first_name or "Anonymous Student",
-                        "school": row.school or None,
-                        "city": row.city or None,
+                        "university": row.university or None,
+                        "region": row.region or None,
                         "xp": row.xp if row.xp is not None else 0,
                         "level": row.level if row.level is not None else 1,
                         "rank_info": get_rank(row.xp if row.xp is not None else 0),
                         "streak": row.daily_streak if row.daily_streak is not None else 0,
+                        "is_premium": bool(row.premium_expires_at and row.premium_expires_at > datetime.utcnow()),
                         "is_current_user": row.user_id == user_id,
                     }
                     for i, row in enumerate(leaderboard)

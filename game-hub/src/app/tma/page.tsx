@@ -307,6 +307,7 @@ export default function TMAPage() {
               grade={profile.grade}
               stream={profile.stream}
               selectedSubjects={profile.selected_subjects}
+              isPremium={isPremium}
               onProfileChange={handleProfileChange}
               onSignOut={handleDeviceSignOut}
             />
