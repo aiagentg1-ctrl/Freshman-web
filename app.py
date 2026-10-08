@@ -1,8 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request as StarletteRequest
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
 from sqlalchemy import delete as sqlalchemy_delete, func, or_
@@ -31,7 +29,6 @@ from models import (
 
 VALID_SUBJECTS = [s.value for s in SubjectEnum]
 VALID_STREAMS = [s.name for s in StreamEnum]
-VALID_GRADES = [9, 10, 11, 12]
 
 
 @asynccontextmanager
@@ -97,6 +94,16 @@ app = FastAPI(
     title="Mirkuz EUEE High School API"
 )
 
+# Configure CORS FIRST - this must be before any other middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 ADMIN_SECRET = (
     os.getenv("ADMIN_SECRET")
     or os.getenv("ADMIN_KEY")
@@ -110,97 +117,6 @@ PREMIUM_CHANNEL_IDS = {
     "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "-1004479037964"),
     "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "-1004342138729"),
 }
-
-
-class NoCacheMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: StarletteRequest, call_next):
-        response = await call_next(request)
-        if request.method == "GET":
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
-        return response
-
-
-class SingleDeviceSessionMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: StarletteRequest, call_next):
-        path = request.url.path
-        # Skip device session check for admin routes and auth routes
-        if not path.startswith("/api/") or path.startswith("/api/auth/device-session") or path.startswith("/api/admin/"):
-            return await call_next(request)
-
-        if (
-            BROWSER_DEMO_MODE
-            and request.headers.get("x-fresho-demo-mode") == "true"
-            and request.headers.get("x-fresho-user-id") == str(BROWSER_DEMO_USER_ID)
-        ):
-            return await call_next(request)
-
-        supplied_admin_secret = (
-            request.headers.get("x-admin-secret")
-            or request.headers.get("x-admin-key")
-            or request.headers.get("x-admin-password")
-        )
-        if supplied_admin_secret and hmac.compare_digest(supplied_admin_secret, ADMIN_SECRET):
-            return await call_next(request)
-
-        try:
-            user_id = int(request.headers.get("x-fresho-user-id", ""))
-        except ValueError:
-            response = JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            response.headers["Access-Control-Allow-Methods"] = "*"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            return response
-
-        device_id = request.headers.get("x-fresho-device-id")
-        token = request.headers.get("x-fresho-session-token")
-        if not device_id or not token:
-            response = JSONResponse({"detail": "An active Fresho device session is required"}, status_code=401)
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            response.headers["Access-Control-Allow-Methods"] = "*"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            return response
-
-        user_path = path.removeprefix("/api/user/").split("/", 1)[0]
-        if user_path.isdigit() and int(user_path) != user_id:
-            response = JSONResponse({"detail": "Fresho session user does not match the requested account"}, status_code=403)
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            response.headers["Access-Control-Allow-Methods"] = "*"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            return response
-
-        async with AsyncSessionLocal() as session:
-            result = await session.execute(
-                select(ActiveDeviceSession).where(ActiveDeviceSession.user_id == user_id)
-            )
-            active = result.scalar_one_or_none()
-            if (
-                active is None
-                or active.device_id != device_id
-                or not hmac.compare_digest(active.token_hash, hash_device_session(token))
-            ):
-                response = JSONResponse({"detail": "Fresho session is active on another device or has ended"}, status_code=409)
-                response.headers["Access-Control-Allow-Origin"] = "*"
-                response.headers["Access-Control-Allow-Methods"] = "*"
-                response.headers["Access-Control-Allow-Headers"] = "*"
-                return response
-
-        return await call_next(request)
-
-
-app.add_middleware(SingleDeviceSessionMiddleware)
-app.add_middleware(NoCacheMiddleware)
-
-# Add CORS middleware LAST so it executes FIRST on requests (to handle OPTIONS preflight)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
 
 
 def telegram_user_from_init_data(init_data: str) -> int:
@@ -232,6 +148,8 @@ def telegram_user_from_init_data(init_data: str) -> int:
 
 def hash_device_session(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
 async def require_active_device_session(
     session,
     user_id: Optional[int],
@@ -252,6 +170,55 @@ async def require_active_device_session(
         or not hmac.compare_digest(active.token_hash, hash_device_session(session_token))
     ):
         raise HTTPException(status_code=409, detail="Fresho session is active on another device or has ended")
+    return user_id
+
+
+async def verify_device_session(
+    x_fresho_user_id: Optional[str] = Header(None),
+    x_fresho_device_id: Optional[str] = Header(None),
+    x_fresho_session_token: Optional[str] = Header(None),
+    x_admin_secret: Optional[str] = Header(None),
+    x_admin_key: Optional[str] = Header(None),
+    x_admin_password: Optional[str] = Header(None),
+):
+    """Dependency to verify device session for protected routes"""
+    # Allow admin secret to bypass device session check
+    supplied_admin_secret = x_admin_secret or x_admin_key or x_admin_password
+    if supplied_admin_secret and hmac.compare_digest(supplied_admin_secret, ADMIN_SECRET):
+        return None  # Admin authenticated, no user_id needed
+
+    # Check for browser demo mode
+    if BROWSER_DEMO_MODE:
+        try:
+            demo_user_id = int(x_fresho_user_id or "")
+            if demo_user_id == BROWSER_DEMO_USER_ID:
+                return demo_user_id
+        except ValueError:
+            pass
+
+    # Require device session
+    try:
+        user_id = int(x_fresho_user_id or "")
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="An active Fresho device session is required")
+
+    device_id = x_fresho_device_id
+    token = x_fresho_session_token
+    if not device_id or not token:
+        raise HTTPException(status_code=401, detail="An active Fresho device session is required")
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(ActiveDeviceSession).where(ActiveDeviceSession.user_id == user_id)
+        )
+        active = result.scalar_one_or_none()
+        if (
+            active is None
+            or active.device_id != device_id
+            or not hmac.compare_digest(active.token_hash, hash_device_session(token))
+        ):
+            raise HTTPException(status_code=409, detail="Fresho session is active on another device or has ended")
+
     return user_id
 
 
@@ -417,12 +384,6 @@ async def telegram_webhook(request: Request):
 @app.get("/")
 async def read_root():
     return {"status": "ok", "message": "Mirkuz EUEE High School API"}
-
-
-@app.options("/{path:path}")
-async def options_handler(path: str):
-    """Handle OPTIONS requests for CORS preflight"""
-    return {"status": "ok"}
 
 
 # ---------- XP and Leveling System ----------
@@ -1110,7 +1071,7 @@ class NoteCreate(BaseModel):
 # ---------- User endpoints ----------
 
 @app.get("/api/user/{user_id}")
-async def get_user(user_id: int):
+async def get_user(user_id: int, authenticated_user_id: int = Depends(verify_device_session)):
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(User).where(User.user_id == user_id))
         user = result.scalar_one_or_none()
