@@ -410,10 +410,12 @@ export default function ExamRunner({
       subject: exam.subject,
       year: exam.year,
       title: exam.title,
+      university: exam.university,
       custom_tag: exam.custom_tag,
       question_count: exam.question_count,
       duration_minutes: exam.duration_minutes,
       content_type: exam.content_type,
+      exam_type: exam.exam_type,
       is_premium: exam.is_premium,
       is_published: exam.is_published,
     };
