@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { BarChart3, BookOpen, CircleDollarSign, FileText, GraduationCap, Image, Layers, Lock, LogOut, Settings, Sparkles, TrendingUp, User, Crown } from "lucide-react";
+import { BarChart3, BookOpen, CircleDollarSign, ClipboardList, FileText, GraduationCap, Image, Layers, Lock, LogOut, Settings, Sparkles, TrendingUp, User, Crown } from "lucide-react";
 import UniversitySelect from "@/components/tma/UniversitySelect";
 import {
   adminGetAnalytics,
