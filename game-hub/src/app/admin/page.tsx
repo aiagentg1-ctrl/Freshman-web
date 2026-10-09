@@ -203,7 +203,7 @@ function ExamsManager() {
     try {
       const exam = await adminGetExam(id);
       setEditing(items.find((item) => item.id === id) || null);
-      setForm(exam);
+      setForm({ ...exam, semester: exam.semester ?? "all" });
       setUploadedFile(null);
     } catch (value) { setError(message(value)); }
   }
