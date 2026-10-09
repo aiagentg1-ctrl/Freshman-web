@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        mirkuz: {
+        fresho: {
           blue: "#1D70F5",
           background: "#F8FAFC",
         },

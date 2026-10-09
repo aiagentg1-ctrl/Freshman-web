@@ -183,8 +183,8 @@ export interface SavedExamProgress {
   elapsed: number;
 }
 
-const RECENT_EXAM_ATTEMPTS_KEY = "mirkuzRecentExamAttempts";
-const IN_PROGRESS_EXAM_KEY = "mirkuzInProgressExam";
+const RECENT_EXAM_ATTEMPTS_KEY = "freshoRecentExamAttempts";
+const IN_PROGRESS_EXAM_KEY = "freshoInProgressExam";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export function getRecentExamAttempts(): RecentExamAttempt[] {
@@ -205,7 +205,7 @@ export function saveRecentExamAttempt(attempt: RecentExamAttempt): void {
   const attempts = getRecentExamAttempts().filter((item) => item.id !== attempt.id);
   attempts.unshift(attempt);
   localStorage.setItem(RECENT_EXAM_ATTEMPTS_KEY, JSON.stringify(attempts.slice(0, 5)));
-  window.dispatchEvent(new Event("mirkuz:exam-history-updated"));
+  window.dispatchEvent(new Event("fresho:exam-history-updated"));
 }
 
 export function getSavedExamProgress(examId?: number): SavedExamProgress | null {
@@ -224,13 +224,13 @@ export function getInProgressExam(): ExamMeta | null {
 
 export function saveExamProgress(progress: SavedExamProgress): void {
   localStorage.setItem(IN_PROGRESS_EXAM_KEY, JSON.stringify(progress));
-  window.dispatchEvent(new Event("mirkuz:exam-progress-updated"));
+  window.dispatchEvent(new Event("fresho:exam-progress-updated"));
 }
 
 export function clearExamProgress(examId: number): void {
   if (getSavedExamProgress(examId)) {
     localStorage.removeItem(IN_PROGRESS_EXAM_KEY);
-    window.dispatchEvent(new Event("mirkuz:exam-progress-updated"));
+    window.dispatchEvent(new Event("fresho:exam-progress-updated"));
   }
 }
 
@@ -308,8 +308,8 @@ export async function releaseDeviceSession(payload: {
 }
 
 function getAdminHeaders(): HeadersInit {
-  const storedKey = typeof window !== 'undefined' ? sessionStorage.getItem("mirkuzAdminKey") : "";
-  const adminSecret = (storedKey ?? "").trim() || "mirkuz123";
+  const storedKey = typeof window !== "undefined" ? sessionStorage.getItem("freshoAdminKey") : "";
+  const adminSecret = (storedKey ?? "").trim();
   return {
     "Content-Type": "application/json",
     "X-Admin-Secret": adminSecret,

@@ -31,11 +31,12 @@ import {
   type UniversityLogo,
 } from "@/lib/api";
 import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
+import { migrateLegacyStorage } from "@/lib/legacyStorage";
 
 type Tab = "overview" | "exams" | "notes" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing";
 type ErrorState = string;
 
-const ADMIN_KEY_STORAGE = "mirkuzAdminKey";
+const ADMIN_KEY_STORAGE = "freshoAdminKey";
 const tabs: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
   { id: "overview", label: "Overview", icon: Sparkles },
   { id: "exams", label: "Exams", icon: FileText },
@@ -103,6 +104,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   useEffect(() => {
+    migrateLegacyStorage();
     const stored = sessionStorage.getItem(ADMIN_KEY_STORAGE);
     if (!stored) return;
     verifyKey(stored).then((ok) => {

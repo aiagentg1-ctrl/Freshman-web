@@ -23,7 +23,7 @@ export default function PremiumDialog({
   stream: string;
   onClose: () => void;
 }) {
-  const telegramSupportUrl = `https://t.me/Mirkuz_support?start=Hi%20Mirkuz%20Support%2C%20I%20want%20to%20activate%20Fresho%20Premium.%20Name%3A%20${encodeURIComponent(fullName)}.%20University%3A%20${encodeURIComponent(university)}.%20Stream%3A%20${encodeURIComponent(stream)}.`;
+  const telegramSupportUrl = `https://t.me/Mirkuz_support?start=Hi%20Fresho%20Support%2C%20I%20want%20to%20activate%20Fresho%20Premium.%20Name%3A%20${encodeURIComponent(fullName)}.%20University%3A%20${encodeURIComponent(university)}.%20Stream%3A%20${encodeURIComponent(stream)}.`;
 
   return (
     <div

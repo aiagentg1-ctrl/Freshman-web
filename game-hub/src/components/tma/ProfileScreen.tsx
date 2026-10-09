@@ -66,7 +66,7 @@ export default function ProfileScreen({
   useEffect(() => {
     let active = true;
     const loadProgress = async () => {
-      const storedId = Number(localStorage.getItem("mirkuzTelegramUserId"));
+      const storedId = Number(localStorage.getItem("freshoTelegramUserId"));
       const userId = telegramUser?.id || getTelegramUser()?.id || (Number.isSafeInteger(storedId) && storedId > 0 ? storedId : undefined);
       if (userId) {
         try {
@@ -79,12 +79,12 @@ export default function ProfileScreen({
     };
     const refreshProgress = () => void loadProgress();
     refreshProgress();
-    window.addEventListener("mirkuz:progress-updated", refreshProgress);
-    window.addEventListener("mirkuz:exam-attempt-saved", refreshProgress);
+    window.addEventListener("fresho:progress-updated", refreshProgress);
+    window.addEventListener("fresho:exam-attempt-saved", refreshProgress);
     return () => {
       active = false;
-      window.removeEventListener("mirkuz:progress-updated", refreshProgress);
-      window.removeEventListener("mirkuz:exam-attempt-saved", refreshProgress);
+      window.removeEventListener("fresho:progress-updated", refreshProgress);
+      window.removeEventListener("fresho:exam-attempt-saved", refreshProgress);
     };
   }, [telegramUser]);
 
@@ -119,11 +119,11 @@ export default function ProfileScreen({
       stream,
       selected_subjects: selectedSubjects,
     };
-    localStorage.setItem("mirkuzProfile", JSON.stringify(profile));
+    localStorage.setItem("freshoProfile", JSON.stringify(profile));
     onProfileChange(profile);
-    window.dispatchEvent(new Event("mirkuz:profile-updated"));
+    window.dispatchEvent(new Event("fresho:profile-updated"));
 
-    const storedId = Number(localStorage.getItem("mirkuzTelegramUserId"));
+    const storedId = Number(localStorage.getItem("freshoTelegramUserId"));
     const userId = telegramUser?.id || getTelegramUser()?.id || (Number.isSafeInteger(storedId) && storedId > 0 ? storedId : undefined);
     if (userId) {
       try {
@@ -141,9 +141,9 @@ export default function ProfileScreen({
           school: result.school || "",
           city: result.city || "",
         };
-        localStorage.setItem("mirkuzProfile", JSON.stringify(savedProfile));
+        localStorage.setItem("freshoProfile", JSON.stringify(savedProfile));
         onProfileChange(savedProfile);
-        window.dispatchEvent(new Event("mirkuz:profile-updated"));
+        window.dispatchEvent(new Event("fresho:profile-updated"));
       } catch (error) {
         console.error("Failed to save profile:", error);
         setSaveError("Could not save your profile to the server. Your changes are saved on this device; please retry.");
@@ -397,7 +397,7 @@ export default function ProfileScreen({
             <HelpCircle className="w-5 h-5 text-sky-600" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Mirkuz Support</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Fresho Support</h3>
             <p className="text-xs text-slate-500">Register or contact support on Telegram</p>
           </div>
         </a>

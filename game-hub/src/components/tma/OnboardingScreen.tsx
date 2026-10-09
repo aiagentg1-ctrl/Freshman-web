@@ -26,7 +26,7 @@ export default function OnboardingScreen({
       <div className="w-16 h-16 rounded-3xl bg-[#1D70F5] flex items-center justify-center shadow-lg shadow-blue-200 mb-4">
         <GraduationCap className="w-8 h-8 text-white" />
       </div>
-      <h1 className="text-2xl font-bold text-slate-900 text-center">Welcome to Mirkuz</h1>
+      <h1 className="text-2xl font-bold text-slate-900 text-center">Welcome to Fresho</h1>
       <p className="text-sm text-slate-500 text-center mt-1 mb-8">
         Freshman courses for university students
       </p>

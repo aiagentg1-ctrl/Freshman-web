@@ -15,7 +15,7 @@ export default function Leaderboard({ stream, university }: { stream: StreamKey;
   const [userId, setUserId] = useState<number | undefined>();
 
   useEffect(() => {
-    const savedUserId = Number(localStorage.getItem("mirkuzTelegramUserId"));
+    const savedUserId = Number(localStorage.getItem("freshoTelegramUserId"));
     if (Number.isSafeInteger(savedUserId) && savedUserId > 0) setUserId(savedUserId);
   }, []);
 
@@ -38,15 +38,15 @@ export default function Leaderboard({ stream, university }: { stream: StreamKey;
 
     refresh();
     window.addEventListener("focus", refresh);
-    window.addEventListener("mirkuz:exam-attempt-saved", refresh);
-    window.addEventListener("mirkuz:profile-updated", refresh);
-    window.addEventListener("mirkuz:progress-updated", refresh);
+    window.addEventListener("fresho:exam-attempt-saved", refresh);
+    window.addEventListener("fresho:profile-updated", refresh);
+    window.addEventListener("fresho:progress-updated", refresh);
     return () => {
       active = false;
       window.removeEventListener("focus", refresh);
-      window.removeEventListener("mirkuz:exam-attempt-saved", refresh);
-      window.removeEventListener("mirkuz:profile-updated", refresh);
-      window.removeEventListener("mirkuz:progress-updated", refresh);
+      window.removeEventListener("fresho:exam-attempt-saved", refresh);
+      window.removeEventListener("fresho:profile-updated", refresh);
+      window.removeEventListener("fresho:progress-updated", refresh);
     };
   }, [leaderboardType, period, refreshKey, stream, university, userId]);
 

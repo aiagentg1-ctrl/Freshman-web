@@ -19,7 +19,7 @@ export default function FlashCards() {
 
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem("mirkuzVocabularyProgress") || "[]") as string[];
+      const saved = JSON.parse(localStorage.getItem("freshoVocabularyProgress") || "[]") as string[];
       setKnown(saved);
     } catch {
       setKnown([]);
@@ -32,7 +32,7 @@ export default function FlashCards() {
   const saveKnown = (word: string) => {
     const next = Array.from(new Set([...known, word]));
     setKnown(next);
-    localStorage.setItem("mirkuzVocabularyProgress", JSON.stringify(next));
+    localStorage.setItem("freshoVocabularyProgress", JSON.stringify(next));
   };
 
   const changeCard = (direction: number) => {

@@ -43,7 +43,7 @@ export default function NotesScreen({
     if (telegramUserId) {
       const completed = new Set<number>();
       chapters.forEach(chapter => {
-        if (localStorage.getItem(`mirkuzNoteComplete:${telegramUserId}:${chapter.id}`) === "1") {
+        if (localStorage.getItem(`freshoNoteComplete:${telegramUserId}:${chapter.id}`) === "1") {
           completed.add(chapter.id);
         }
       });
@@ -75,7 +75,7 @@ export default function NotesScreen({
         getChapterExams({ note_id: noteId }).catch(() => []),
       ]);
       localStorage.setItem(
-        "mirkuzLastNote",
+        "freshoLastNote",
         JSON.stringify({ id: note.id, title: note.title, subject: note.subject, grade: note.grade })
       );
       setView({ kind: "reader", note, chapterExams });

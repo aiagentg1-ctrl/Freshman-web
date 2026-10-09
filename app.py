@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Mirkuz EUEE High School API"
+    title="Fresho API"
 )
 
 # Configure CORS FIRST - this must be before any other middleware
@@ -109,7 +109,7 @@ ADMIN_SECRET = (
     os.getenv("ADMIN_SECRET")
     or os.getenv("ADMIN_KEY")
     or os.getenv("ADMIN_PASSWORD")
-    or "mirkuz123"
+    or ""
 )
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 BROWSER_DEMO_MODE = os.getenv("BROWSER_DEMO_MODE", "false").lower() == "true"
@@ -362,8 +362,10 @@ async def verify_admin_secret(
     x_admin_key: Optional[str] = Header(None),
     x_admin_password: Optional[str] = Header(None),
 ):
+    if not ADMIN_SECRET:
+        raise HTTPException(status_code=503, detail="Admin authentication is not configured")
     admin_key = x_admin_secret or x_admin_key or x_admin_password
-    if admin_key != ADMIN_SECRET:
+    if not admin_key or not hmac.compare_digest(admin_key, ADMIN_SECRET):
         raise HTTPException(status_code=403, detail="Invalid admin secret")
     return True
 
@@ -384,7 +386,7 @@ async def telegram_webhook(request: Request):
 
 @app.get("/")
 async def read_root():
-    return {"status": "ok", "message": "Mirkuz EUEE High School API"}
+    return {"status": "ok", "message": "Fresho API"}
 
 
 # ---------- XP and Leveling System ----------

@@ -12,6 +12,7 @@ import GameScreen from "../../components/tma/GameScreen";
 import { DevUserSetup } from "../../components/DevUserSetup";
 import { dailyCheckIn, DailyCheckIn, ExamMeta, getUser, releaseDeviceSession, startDeviceSession, StreamKey, updateUser } from "../../lib/api";
 import { expandTelegramApp, getTelegramInitData, getTelegramUser, TelegramUser } from "../../lib/telegram";
+import { migrateLegacyStorage } from "../../lib/legacyStorage";
 import PremiumDialog from "../../components/tma/PremiumDialog";
 
 interface LocalProfile {
@@ -63,6 +64,7 @@ export default function TMAPage() {
   const [showPremiumDialog, setShowPremiumDialog] = useState(false);
 
   useEffect(() => {
+    migrateLegacyStorage();
     expandTelegramApp();
     const tgUser = getTelegramUser();
     const demoUser = browserDemoMode
@@ -160,10 +162,10 @@ export default function TMAPage() {
     dailyCheckIn(userId)
       .then((checkIn) => {
         if (cancelled) return;
-        window.dispatchEvent(new Event("mirkuz:progress-updated"));
+        window.dispatchEvent(new Event("fresho:progress-updated"));
         if (!checkIn.is_new_day) return;
 
-        const popupKey = `mirkuzStreakPopup:${userId}:${checkIn.checked_in_date}`;
+        const popupKey = `freshoStreakPopup:${userId}:${checkIn.checked_in_date}`;
         if (sessionStorage.getItem(popupKey) !== "1") {
           sessionStorage.setItem(popupKey, "1");
           setStreakPrompt(checkIn);
@@ -192,7 +194,7 @@ export default function TMAPage() {
       selected_subjects,
       premium_expires_at: null,
     };
-    localStorage.setItem("mirkuzProfile", JSON.stringify(next));
+    localStorage.setItem("freshoProfile", JSON.stringify(next));
     if (telegramUser) {
       try {
         await updateUser(telegramUser.id, {

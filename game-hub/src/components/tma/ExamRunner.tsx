@@ -155,9 +155,9 @@ const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 function resolveTelegramUserId(fallbackId?: number): number | undefined {
   const liveId = getTelegramUser()?.id;
-  const storedId = Number(localStorage.getItem("mirkuzTelegramUserId"));
+  const storedId = Number(localStorage.getItem("freshoTelegramUserId"));
   // For development/testing: allow setting a test user ID via localStorage
-  const testUserId = Number(localStorage.getItem("mirkuzTestUserId"));
+  const testUserId = Number(localStorage.getItem("freshoTestUserId"));
   // Try URL parameter as last resort (for testing)
   const urlId = typeof window !== "undefined" ? Number(new URLSearchParams(window.location.search).get("user_id")) : undefined;
   const urlIdValid = urlId !== undefined && Number.isSafeInteger(urlId) && urlId > 0;
@@ -357,8 +357,8 @@ export default function ExamRunner({
         });
       }
       setSubmissionStatus("saved");
-      window.dispatchEvent(new Event("mirkuz:exam-attempt-saved"));
-      window.dispatchEvent(new Event("mirkuz:progress-updated"));
+      window.dispatchEvent(new Event("fresho:exam-attempt-saved"));
+      window.dispatchEvent(new Event("fresho:progress-updated"));
     } catch (error) {
       console.error("Failed to save exam attempt:", error);
       setSubmissionError(error instanceof Error ? error.message : "The server could not save this attempt.");
@@ -483,7 +483,7 @@ export default function ExamRunner({
             answers: [],
           });
 
-          localStorage.setItem("mirkuzLastResult", JSON.stringify({
+          localStorage.setItem("freshoLastResult", JSON.stringify({
             examId: exam.id,
             subject: exam.subject,
             year: exam.year,
@@ -492,7 +492,7 @@ export default function ExamRunner({
             totalQuestions: total,
             timeSpent: 0,
           }));
-          localStorage.setItem("mirkuzLastExam", JSON.stringify({
+          localStorage.setItem("freshoLastExam", JSON.stringify({
             id: exam.id,
             title: exam.title,
             subject: exam.subject,
@@ -574,7 +574,7 @@ export default function ExamRunner({
     };
     if (chapterExamId === undefined) {
       saveRecentExamAttempt(reviewAttempt);
-      localStorage.setItem("mirkuzWeaknesses", JSON.stringify(wrongQuestions));
+      localStorage.setItem("freshoWeaknesses", JSON.stringify(wrongQuestions));
     }
 
     // Standardized score bridge → Home "Recent Exam Performance" card.
@@ -590,11 +590,11 @@ export default function ExamRunner({
         totalQuestions,
         timeSpent,
       };
-      localStorage.setItem("mirkuzLastResult", JSON.stringify(payload));
+      localStorage.setItem("freshoLastResult", JSON.stringify(payload));
     }
     if (chapterExamId === undefined) {
       localStorage.setItem(
-        "mirkuzLastExam",
+        "freshoLastExam",
         JSON.stringify({
           id: exam.id,
           title: exam.title,

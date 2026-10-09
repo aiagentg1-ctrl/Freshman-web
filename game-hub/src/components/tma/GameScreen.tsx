@@ -27,7 +27,7 @@ export default function GameScreen({
       .catch(() => active && setCards([]))
       .finally(() => active && setLoading(false));
     try {
-      setKnown(JSON.parse(localStorage.getItem("mirkuzGameKnownCards") || "[]") as string[]);
+      setKnown(JSON.parse(localStorage.getItem("freshoGameKnownCards") || "[]") as string[]);
     } catch {
       setKnown([]);
     }
@@ -46,7 +46,7 @@ export default function GameScreen({
     if (!card) return;
     const next = Array.from(new Set([...known, String(card.id)]));
     setKnown(next);
-    localStorage.setItem("mirkuzGameKnownCards", JSON.stringify(next));
+    localStorage.setItem("freshoGameKnownCards", JSON.stringify(next));
   };
 
   if (showLeaderboard) {

@@ -15,7 +15,7 @@ export function DevUserSetup() {
   useEffect(() => {
     // Only run on client side
     if (typeof window !== "undefined") {
-      setCurrentTestId(localStorage.getItem("mirkuzTestUserId"));
+      setCurrentTestId(localStorage.getItem("freshoTestUserId"));
       setIsVisible(window.location.search.includes("debug=true"));
     }
   }, []);
@@ -23,7 +23,7 @@ export function DevUserSetup() {
   const handleSave = () => {
     const id = Number(userId);
     if (id > 0) {
-      localStorage.setItem("mirkuzTestUserId", String(id));
+      localStorage.setItem("freshoTestUserId", String(id));
       setCurrentTestId(String(id));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -32,7 +32,7 @@ export function DevUserSetup() {
   };
 
   const handleClear = () => {
-    localStorage.removeItem("mirkuzTestUserId");
+    localStorage.removeItem("freshoTestUserId");
     setUserId("");
     setCurrentTestId(null);
     setSaved(true);

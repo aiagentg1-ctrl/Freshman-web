@@ -63,15 +63,15 @@ export default function HomeScreen({
       if (telegramUser) getUserStats(telegramUser.id).then(setStats);
     };
     refreshAll();
-    window.addEventListener("mirkuz:exam-history-updated", refreshRecentAttempts);
-    window.addEventListener("mirkuz:exam-progress-updated", refreshInProgressExam);
-    window.addEventListener("mirkuz:progress-updated", refreshProgress);
-    window.addEventListener("mirkuz:exam-attempt-saved", refreshAll);
+    window.addEventListener("fresho:exam-history-updated", refreshRecentAttempts);
+    window.addEventListener("fresho:exam-progress-updated", refreshInProgressExam);
+    window.addEventListener("fresho:progress-updated", refreshProgress);
+    window.addEventListener("fresho:exam-attempt-saved", refreshAll);
     return () => {
-      window.removeEventListener("mirkuz:exam-history-updated", refreshRecentAttempts);
-      window.removeEventListener("mirkuz:exam-progress-updated", refreshInProgressExam);
-      window.removeEventListener("mirkuz:progress-updated", refreshProgress);
-      window.removeEventListener("mirkuz:exam-attempt-saved", refreshAll);
+      window.removeEventListener("fresho:exam-history-updated", refreshRecentAttempts);
+      window.removeEventListener("fresho:exam-progress-updated", refreshInProgressExam);
+      window.removeEventListener("fresho:progress-updated", refreshProgress);
+      window.removeEventListener("fresho:exam-attempt-saved", refreshAll);
     };
   }, [telegramUser]);
 
@@ -81,7 +81,7 @@ export default function HomeScreen({
     stats?.last_exam ??
     (() => {
       try {
-        return JSON.parse(localStorage.getItem("mirkuzLastExam") || "null") as ExamMeta | null;
+        return JSON.parse(localStorage.getItem("freshoLastExam") || "null") as ExamMeta | null;
       } catch {
         return null;
       }
@@ -94,7 +94,7 @@ export default function HomeScreen({
   const lastResult =
     (() => {
       try {
-        return JSON.parse(localStorage.getItem("mirkuzLastResult") || "null") as {
+        return JSON.parse(localStorage.getItem("freshoLastResult") || "null") as {
           examId: number;
           subject: string;
           year: string;

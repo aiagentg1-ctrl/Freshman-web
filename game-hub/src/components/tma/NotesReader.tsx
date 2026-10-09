@@ -28,7 +28,7 @@ export default function NotesReader({
 
   useEffect(() => {
     if (telegramUserId) {
-      setCompleted(localStorage.getItem(`mirkuzNoteComplete:${telegramUserId}:${note.id}`) === "1");
+      setCompleted(localStorage.getItem(`freshoNoteComplete:${telegramUserId}:${note.id}`) === "1");
     }
   }, [note.id, telegramUserId]);
 
@@ -37,10 +37,10 @@ export default function NotesReader({
     setCompleting(true);
     try {
       const result = await completeNote(telegramUserId, note.id);
-      localStorage.setItem(`mirkuzNoteComplete:${telegramUserId}:${note.id}`, "1");
+      localStorage.setItem(`freshoNoteComplete:${telegramUserId}:${note.id}`, "1");
       setCompleted(true);
       setCompletionMessage(result.xp_awarded > 0 ? `Chapter completed. +${result.xp_awarded} XP` : "Chapter already completed.");
-      window.dispatchEvent(new Event("mirkuz:progress-updated"));
+      window.dispatchEvent(new Event("fresho:progress-updated"));
       onNoteCompleted?.();
     } catch (error) {
       console.error("Failed to complete note:", error);

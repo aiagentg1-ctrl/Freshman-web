@@ -45,7 +45,7 @@ def get_admin_menu():
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
     await message.answer(
-        "👋 Welcome to Mirkuz!\n\n"
+        "👋 Welcome to Fresho!\n\n"
         "Register or get support by contacting our Telegram support account:\n"
         f"{SUPPORT_URL}\n\n"
         "Then open the Freshman study app below.",
@@ -87,7 +87,7 @@ async def health_check(request):
 
 
 async def root_handler(request):
-    return web.json_response({"status": "ok", "service": "mirkuz-telegram-bot"})
+    return web.json_response({"status": "ok", "service": "fresho"})
 
 
 async def start_http_server():
