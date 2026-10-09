@@ -77,7 +77,12 @@ export default function FlashCardManager() {
     setSaving(true);
     setError("");
     try {
-      const payload = { title: title.trim(), html_content: content.trim(), is_published: published };
+      const payload = {
+        title: title.trim(),
+        html_content: content.trim(),
+        is_premium: editing?.is_premium ?? false,
+        is_published: published,
+      };
       if (editing) await adminUpdateFlashCard(editing.id, payload);
       else await adminCreateFlashCard(payload);
       setMessage(editing ? "Flash card updated." : "Flash card published.");
