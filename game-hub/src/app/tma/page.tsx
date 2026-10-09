@@ -73,6 +73,27 @@ export default function TMAPage() {
     const effectiveUser = tgUser || demoUser;
     setTelegramUser(effectiveUser);
     const initData = getTelegramInitData();
+
+    console.log("=== TMA Page Init ===");
+    console.log("Browser Demo Mode:", browserDemoMode);
+    console.log("Telegram User:", tgUser);
+    console.log("Init Data present:", !!initData);
+    console.log("Init Data length:", initData?.length);
+    console.log("Demo User:", demoUser);
+    console.log("Effective User:", effectiveUser);
+
+    // TEMPORARY: Allow testing without Telegram auth for debugging
+    if (!tgUser?.id && !browserDemoMode) {
+      console.log("WARNING: No Telegram user - using fallback for testing");
+      const testUserId = localStorage.getItem("freshoTelegramUserId");
+      if (testUserId) {
+        setTelegramUser({ id: Number(testUserId), first_name: "Test User" });
+        setDeviceStatus("active");
+        setBooting(false);
+        return;
+      }
+    }
+
     if (browserDemoMode && !initData) {
       localStorage.setItem("freshoTelegramUserId", String(browserDemoUserId));
       setDeviceStatus("active");
@@ -80,6 +101,7 @@ export default function TMAPage() {
       return;
     }
     if (!tgUser?.id || !initData) {
+      console.log("Auth required - missing user or init data");
       setDeviceStatus("auth_required");
       setDeviceError("Open the app using the Study for Final/mid exam button in the Telegram bot.");
       setBooting(false);
@@ -100,11 +122,18 @@ export default function TMAPage() {
           localStorage.setItem("freshoDeviceId", deviceId);
         }
 
+        console.log("=== Starting Device Session ===");
+        console.log("Init Data (first 100 chars):", initData.substring(0, 100));
+        console.log("Device ID:", deviceId);
+        console.log("Session Token:", localStorage.getItem("freshoDeviceSessionToken") ? "Present" : "None");
+
         const session = await startDeviceSession({
           init_data: initData,
           device_id: deviceId,
           session_token: localStorage.getItem("freshoDeviceSessionToken") || undefined,
         });
+
+        console.log("Session response:", session);
         if (cancelled) return;
         localStorage.setItem("freshoDeviceSessionToken", session.session_token);
         localStorage.setItem("freshoTelegramUserId", String(session.user_id));

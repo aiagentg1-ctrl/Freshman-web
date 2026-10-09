@@ -131,10 +131,15 @@ def telegram_user_from_init_data(init_data: str) -> int:
     print(f"BOT_TOKEN length: {len(BOT_TOKEN)}")
 
     fields = dict(parse_qsl(init_data, keep_blank_values=True))
-    received_hash = fields.pop("hash", None)
+
+    # Handle both 'hash' (standard WebApp) and 'signature' (some auth methods)
+    received_hash = fields.pop("hash", None) or fields.pop("signature", None)
     if not received_hash:
-        print("ERROR: No hash in init_data")
+        print("ERROR: No hash or signature in init_data")
         raise HTTPException(status_code=401, detail="Telegram authentication data is missing")
+
+    # Remove query_id from fields if present (it's not part of the hash calculation)
+    fields.pop("query_id", None)
 
     data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
     secret_key = hmac.new(BOT_TOKEN.encode(), b"WebAppData", hashlib.sha256).digest()
