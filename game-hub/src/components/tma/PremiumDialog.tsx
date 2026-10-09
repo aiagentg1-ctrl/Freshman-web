@@ -23,7 +23,13 @@ export default function PremiumDialog({
   stream: string;
   onClose: () => void;
 }) {
-  const telegramSupportUrl = `https://t.me/Mirkuz_support?start=Hi%20Fresho%20Support%2C%20I%20want%20to%20activate%20Fresho%20Premium.%20Name%3A%20${encodeURIComponent(fullName)}.%20University%3A%20${encodeURIComponent(university)}.%20Stream%3A%20${encodeURIComponent(stream)}.`;
+  const streamName = stream.toLowerCase() === "natural"
+    ? "Natural Science"
+    : stream.toLowerCase() === "social"
+      ? "Social Science"
+      : stream;
+  const registrationMessage = `Hello there! My name is ${fullName}. I am a freshman ${streamName} student at ${university}. I would like to register for Fresho Premium. Please help me get started.`;
+  const telegramSupportUrl = `https://t.me/Mirkuz_support?text=${encodeURIComponent(registrationMessage)}`;
 
   return (
     <div
