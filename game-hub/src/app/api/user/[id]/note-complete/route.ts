@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/backend";
 import { freshoSessionHeaders } from "@/lib/serverSession";
-
-const BACKEND_URL = process.env.BACKEND_URL || process.env.API_BASE_URL || "http://localhost:8000";
 
 export async function POST(
   request: NextRequest,

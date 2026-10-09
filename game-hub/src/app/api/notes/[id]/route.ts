@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/backend";
 import { freshoSessionHeaders } from "@/lib/serverSession";
-
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8000";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/notes/${params.id}`, {
+    const response = await fetch(`${BACKEND_URL}/api/notes/${params.id}`, {
       headers: {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",

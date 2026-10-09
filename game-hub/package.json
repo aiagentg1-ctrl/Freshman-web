@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:backend": "BACKEND_URL=http://localhost:8000 next dev",
-    "dev:render": "BACKEND_URL=https://mirkuz-telegram-bot.onrender.com next dev",
+    "dev:render": "BACKEND_URL=https://freshman-backend.onrender.com next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/backend";
 import { freshoSessionHeaders } from "@/lib/serverSession";
-
-const BACKEND_URL = process.env.BACKEND_URL || process.env.API_BASE_URL || "https://mirkuz-telegram-bot.onrender.com";
 
 export async function GET(request: NextRequest) {
   const search = new URL(request.url).search;

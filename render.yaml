@@ -1,11 +1,12 @@
 services:
   # Python Telegram Bot with HTTP server for Render health checks
   - type: web
-    name: mirkuz-telegram-bot
+    name: freshman-backend
     runtime: python
     buildCommand: pip install -r requirements.txt
     # Bot runs in background; uvicorn serves the FastAPI app on the
-    # public port. Point Vercel API_BASE_URL at this service's URL.
+    # public port. Point Vercel BACKEND_URL, API_BASE_URL, and
+    # NEXT_PUBLIC_BACKEND_URL at this service's URL.
     startCommand: python bot.py & exec uvicorn app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
@@ -26,4 +27,3 @@ services:
         value: 3.11.0
       - key: WEBHOOK_URL
         sync: false
-
