@@ -319,18 +319,19 @@ export default function ProfileScreen({
           </div>
         </div>
 
-        <div className={`rounded-2xl p-5 text-white shadow-sm ${isPremium ? "bg-gradient-to-br from-emerald-500 to-teal-600" : "bg-gradient-to-br from-amber-500 to-orange-600"}`}>
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+        <div className={`relative overflow-hidden rounded-2xl border p-5 text-white shadow-lg ${isPremium ? "border-amber-300 bg-gradient-to-br from-[#21133f] via-[#48246f] to-[#b7791f] shadow-amber-950/20" : "border-orange-400 bg-gradient-to-br from-amber-500 to-orange-600 shadow-orange-200"}`}>
+          {isPremium && <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-amber-200/20 blur-2xl" />}
+          <div className="relative flex items-center gap-3">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isPremium ? "border border-amber-100/40 bg-gradient-to-br from-amber-200 to-amber-500 text-amber-950 shadow-lg" : "bg-white/15"}`}>
               <Crown className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/75">Fresho Premium</p>
-              <h3 className="text-lg font-black">{isPremium ? "Premium Active" : "Get Premium"}</h3>
+              <p className={`text-xs font-bold uppercase tracking-[0.14em] ${isPremium ? "text-amber-200" : "text-white/75"}`}>Fresho Premium</p>
+              <h3 className="text-lg font-black">{isPremium ? "Premium Member" : "Get Premium"}</h3>
             </div>
           </div>
-          <p className="mt-3 text-xs leading-5 text-white/85">
-            {isPremium ? "Your subscription is active. Premium materials are unlocked." : "199 ETB for 5 months. Includes daily plans, detailed notes, exams, AAU resources, and videos."}
+          <p className="relative mt-3 text-xs leading-5 text-white/85">
+            {isPremium ? "Your all-access pass is active. Premium exams, notes, chapter questions, and flashcards are unlocked." : "199 ETB for 5 months. Includes daily plans, detailed notes, exams, AAU resources, and videos."}
           </p>
         </div>
 

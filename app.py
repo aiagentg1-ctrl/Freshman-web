@@ -2472,6 +2472,18 @@ async def admin_toggle_chapter_exam_premium(exam_id: int, admin_verified: bool =
         return {"id": exam_id, "is_premium": exam.is_premium}
 
 
+@app.patch("/api/admin/chapter-exams/{exam_id}/toggle-publish")
+async def admin_toggle_chapter_exam_publish(exam_id: int, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(ChapterExam).where(ChapterExam.id == exam_id))
+        exam = result.scalar_one_or_none()
+        if not exam:
+            raise HTTPException(status_code=404, detail="Chapter exam not found")
+        exam.is_published = not exam.is_published
+        await session.commit()
+        return {"id": exam_id, "is_published": exam.is_published}
+
+
 @app.post("/api/chapter-exams", status_code=201)
 async def create_chapter_exam(exam: ChapterExamCreate, admin_verified: bool = Depends(verify_admin_secret)):
     """Create a chapter-specific exam."""
@@ -2830,6 +2842,7 @@ async def admin_update_flash_card(flash_card_id: int, payload: FlashCardCreate, 
             raise HTTPException(status_code=404, detail="Flash card not found")
         flash_card.title = payload.title
         flash_card.html_content = payload.html_content
+        flash_card.is_premium = payload.is_premium
         flash_card.is_published = payload.is_published
         await session.commit()
         await session.refresh(flash_card)
@@ -2858,6 +2871,18 @@ async def admin_toggle_flash_card_premium(flash_card_id: int, admin_verified: bo
         flash_card.is_premium = not flash_card.is_premium
         await session.commit()
         return {"id": flash_card_id, "is_premium": flash_card.is_premium}
+
+
+@app.patch("/api/admin/flash-cards/{flash_card_id}/toggle-publish")
+async def admin_toggle_flash_card_publish(flash_card_id: int, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(FlashCard).where(FlashCard.id == flash_card_id))
+        flash_card = result.scalar_one_or_none()
+        if not flash_card:
+            raise HTTPException(status_code=404, detail="Flash card not found")
+        flash_card.is_published = not flash_card.is_published
+        await session.commit()
+        return {"id": flash_card_id, "is_published": flash_card.is_published}
 
 
 @app.get("/api/admin/notes")

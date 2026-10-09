@@ -346,11 +346,13 @@ export default function PracticeScreen({
   const examRow = (exam: ExamMeta, showSubject: boolean) => (
     <div
       key={exam.id}
-      className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-left"
+      className={`w-full rounded-2xl p-4 text-left shadow-sm ${exam.is_premium ? "border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-violet-50 ring-1 ring-amber-200" : "border border-slate-100 bg-white"}`}
     >
       <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-          {exam.content_type === "pdf" ? (
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${exam.is_premium ? "bg-gradient-to-br from-amber-200 to-amber-400 text-amber-950 shadow-md shadow-amber-200" : "bg-blue-50"}`}>
+          {exam.is_premium ? (
+            <Crown className="h-5 w-5" />
+          ) : exam.content_type === "pdf" ? (
             <FileText className="w-5 h-5 text-[#1D70F5]" />
           ) : (
             <GraduationCap className="w-5 h-5 text-[#1D70F5]" />
@@ -433,7 +435,7 @@ export default function PracticeScreen({
             <ChevronLeft className="w-5 h-5" /> Back
           </button>
           <h1 className="text-xl font-bold text-slate-900">{subjectLabel(subject)}</h1>
-          <p className="text-xs text-slate-500 mt-0.5">EUEE Past Exams</p>
+          <p className="text-xs text-slate-500 mt-0.5">Freshman practice exams</p>
         </div>
 
         <div className="flex-1 px-4 py-4 space-y-3">
@@ -588,21 +590,22 @@ export default function PracticeScreen({
   // ---------- Root: segmented hub ----------
   return (
     <div className="flex flex-col flex-1">
-      <div className="px-4 pt-5 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-[#1D70F5] flex items-center justify-center shadow-md shadow-blue-200">
-            <GraduationCap className="w-5 h-5 text-white" />
+      <div className="px-4 pt-3 pb-2.5 bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#1D70F5] shadow-md shadow-blue-200">
+            <GraduationCap className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">EUEE Past Exams</h1>
-            <p className="text-xs text-slate-500">Practice real entrance exams</p>
+            <h1 className="text-base font-bold leading-tight text-slate-900">Your path to a bright future</h1>
+            <p className="mt-0.5 text-[10px] leading-tight text-slate-500">Medicine · Computer Science · Software Engineering · Law · BAIS · IS</p>
+            {isPremium && <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-200 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-900"><Crown className="h-3 w-3" /> Premium access active</p>}
           </div>
         </div>
 
-        {!isPremium && <div className="mt-4"><PremiumBanner onGetPremium={onGetPremium} /></div>}
+        {!isPremium && <div className="mt-3"><PremiumBanner onGetPremium={onGetPremium} /></div>}
 
         {/* Segmented hub toggle */}
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 mt-4">
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 mt-3">
           {(
             [
               { key: "subject", label: "Subjects" },
@@ -707,7 +710,7 @@ export default function PracticeScreen({
                 chapterExamsForStream
                   .filter((chapter) => chapter.subject === view.subject)
                   .map((chapter) => (
-                    <article key={chapter.id} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <article key={chapter.id} className={`rounded-xl p-4 shadow-sm ${chapter.is_premium ? "border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-violet-50 ring-1 ring-amber-200" : "border border-slate-100 bg-white"}`}>
                       <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">
                         Chapter {chapter.chapter_number}
                       </p>
@@ -721,7 +724,7 @@ export default function PracticeScreen({
                         type="button"
                         onClick={() => openChapterExam(chapter.id)}
                         disabled={loadingExam}
-                        className="mt-3 min-h-10 w-full rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                        className={`mt-3 min-h-10 w-full rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${chapter.is_premium ? "bg-gradient-to-r from-amber-500 via-amber-600 to-violet-700 shadow-md shadow-amber-200" : "bg-violet-600"}`}
                       >
                         Practice questions
                       </button>

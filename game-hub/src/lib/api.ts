@@ -18,9 +18,21 @@ export interface ExamMeta {
   semester?: string;
 }
 
+export async function adminGetNote(id: number): Promise<Note> {
+  return request<Note>(`/api/admin/notes/${id}`, {
+    headers: getAdminHeaders(),
+  });
+}
+
 export async function adminToggleExamPremium(examId: number): Promise<{ id: number; is_premium: boolean }> {
   return request(`/api/admin/exams/${examId}/toggle-premium`, {
     method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminGetChapterExam(id: number): Promise<ChapterExam> {
+  return request<ChapterExam>(`/api/admin/chapter-exams/${id}`, {
     headers: getAdminHeaders(),
   });
 }
@@ -30,6 +42,13 @@ export class ApiRequestError extends Error {
     super(message);
     this.name = "ApiRequestError";
   }
+}
+
+export async function adminToggleChapterExamPublish(examId: number): Promise<{ id: number; is_published: boolean }> {
+  return request(`/api/admin/chapter-exams/${examId}/toggle-publish`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
 }
 
 export async function adminToggleNotePremium(noteId: number): Promise<{ id: number; is_premium: boolean }> {
@@ -45,6 +64,13 @@ export function isPremiumAccessRequired(error: unknown): boolean {
 
 export async function adminToggleFlashCardPremium(id: number): Promise<{ id: number; is_premium: boolean }> {
   return request(`/api/admin/flash-cards/${id}/toggle-premium`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminToggleFlashCardPublish(id: number): Promise<{ id: number; is_published: boolean }> {
+  return request(`/api/admin/flash-cards/${id}/toggle-publish`, {
     method: "PATCH",
     headers: getAdminHeaders(),
   });
@@ -669,6 +695,12 @@ export interface AdminExamMeta extends ExamMeta {
 
 export async function adminGetExams(): Promise<AdminExamMeta[]> {
   return request<AdminExamMeta[]>("/api/admin/exams", {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminGetExam(id: number): Promise<Exam> {
+  return request<Exam>(`/api/admin/exams/${id}`, {
     headers: getAdminHeaders(),
   });
 }

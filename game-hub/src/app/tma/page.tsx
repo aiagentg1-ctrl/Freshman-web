@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame, Lock, Moon, RefreshCw, Sun, X } from "lucide-react";
+import { Flame, Lock, RefreshCw, X } from "lucide-react";
 import BottomNav, { Tab } from "../../components/tma/BottomNav";
 import HomeScreen from "../../components/tma/HomeScreen";
 import NotesScreen from "../../components/tma/NotesScreen";
@@ -272,16 +272,8 @@ export default function TMAPage() {
   })();
 
   return (
-    <div className="min-h-screen max-w-md mx-auto bg-slate-50 shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900">
+    <div className={`min-h-screen max-w-md mx-auto bg-slate-50 shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900 ${isPremium ? "fresho-premium" : ""}`}>
       <DevUserSetup />
-      <button
-        type="button"
-        onClick={() => setDarkMode((value) => !value)}
-        aria-label={darkMode ? "Switch to day mode" : "Switch to night mode"}
-        className="fixed right-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/90 text-white shadow-lg"
-      >
-        {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-      </button>
       {booting ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1D70F5]" />
@@ -340,6 +332,8 @@ export default function TMAPage() {
               university={profile.university}
               selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}
+              darkMode={darkMode}
+              onToggleTheme={() => setDarkMode((value) => !value)}
               onContinueExam={handleContinueExam}
               onGoToPractice={() => setActiveTab("practice")}
               onGetPremium={() => setShowPremiumDialog(true)}

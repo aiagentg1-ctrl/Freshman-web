@@ -201,13 +201,17 @@ export default function NotesScreen({
                   key={chapter.id}
                   onClick={() => openChapter(chapter.id)}
                   className={`w-full rounded-2xl p-4 shadow-sm border flex items-center gap-3 text-left active:scale-[0.98] transition-transform ${
-                    isCompleted ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-100"
+                    chapter.is_premium
+                      ? "border-amber-300 bg-gradient-to-br from-amber-50 via-white to-violet-50 ring-1 ring-amber-200"
+                      : isCompleted ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-100"
                   }`}
                 >
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                    isCompleted ? "bg-emerald-100" : "bg-violet-50"
+                    chapter.is_premium ? "bg-gradient-to-br from-amber-200 to-amber-400 text-amber-950 shadow-md shadow-amber-200" : isCompleted ? "bg-emerald-100" : "bg-violet-50"
                   }`}>
-                    {isCompleted ? (
+                    {chapter.is_premium ? (
+                      <Crown className="h-5 w-5" />
+                    ) : isCompleted ? (
                       <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                     ) : (
                       <span className="text-sm font-bold text-violet-600">{chapter.chapter_number}</span>
@@ -252,6 +256,7 @@ export default function NotesScreen({
             <p className="text-xs text-slate-500">
               {streamLabel(stream)} subjects
             </p>
+            {isPremium && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 to-yellow-200 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-900"><Crown className="h-3 w-3" /> Premium pass active</span>}
           </div>
         </div>
       </div>

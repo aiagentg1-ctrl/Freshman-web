@@ -169,9 +169,13 @@ export default function GameScreen({
                 <button
                   type="button"
                   onClick={() => void revealCard()}
-                  className={`flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center ${card.is_premium ? "border-amber-200 bg-gradient-to-br from-amber-50 to-violet-50" : "border-violet-200 bg-violet-50/60"}`}
+                  className={`flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 p-5 text-center shadow-sm transition-transform active:scale-[0.99] ${card.is_premium ? "border-amber-300 bg-gradient-to-br from-amber-100 via-white to-violet-100 ring-2 ring-amber-200 shadow-amber-200/60" : "border-dashed border-violet-200 bg-violet-50/60"}`}
                 >
-                  {card.is_premium ? <Crown className="mb-2 h-5 w-5 text-amber-500" /> : <Sparkles className="mb-2 h-5 w-5 text-violet-500" />}
+                  {card.is_premium ? (
+                    <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-200 to-amber-500 text-amber-950 shadow-lg shadow-amber-300/50">
+                      <Crown className="h-6 w-6" />
+                    </span>
+                  ) : <Sparkles className="mb-2 h-5 w-5 text-violet-500" />}
                   <span className="text-sm font-black text-slate-900">{card.title}</span>
                   <span className={`mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold ${card.is_premium ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
                     {card.is_premium ? "PREMIUM" : "FREE"}

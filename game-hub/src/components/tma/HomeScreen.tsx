@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ClipboardList, GraduationCap, Sparkles, Target, TrendingUp, XCircle, Award, Flame, Zap, Shield, Crown } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ClipboardList, GraduationCap, Sparkles, Target, TrendingUp, XCircle, Award, Flame, Zap, Shield, Crown, Moon, Sun, Settings2 } from "lucide-react";
 import { ExamMeta, ExamReviewQuestion, getInProgressExam, getRecentExamAttempts, getUserProgress, getUserStats, RecentExamAttempt, StreamKey, UserProgress, UserStats } from "../../lib/api";
 import { streamLabel, subjectLabel } from "../../lib/subjects";
 import { TelegramUser } from "../../lib/telegram";
@@ -15,6 +15,8 @@ export default function HomeScreen({
   university,
   selectedSubjects,
   isPremium,
+  darkMode,
+  onToggleTheme,
   onContinueExam,
   onGoToPractice,
   onGetPremium,
@@ -25,6 +27,8 @@ export default function HomeScreen({
   university: string;
   selectedSubjects: string[];
   isPremium: boolean;
+  darkMode: boolean;
+  onToggleTheme: () => void;
   onContinueExam: (exam: ExamMeta) => void;
   onGoToPractice: () => void;
   onGetPremium: () => void;
@@ -115,7 +119,7 @@ export default function HomeScreen({
   return (
     <div className="flex flex-col flex-1">
       {/* Greeting header */}
-      <div className="px-5 pt-6 pb-5 bg-gradient-to-br from-[#1D70F5] to-[#4C8DFF] text-white rounded-b-3xl">
+      <div className={`px-5 pt-6 pb-5 text-white rounded-b-3xl ${isPremium ? "bg-gradient-to-br from-[#21133f] via-[#48246f] to-[#b7791f] shadow-xl shadow-amber-950/20" : "bg-gradient-to-br from-[#1D70F5] to-[#4C8DFF]"}`}>
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center">
             <GraduationCap className="w-6 h-6 text-white" />
@@ -131,14 +135,61 @@ export default function HomeScreen({
             Freshman {streamLabel(stream)}
           </span>
           {isPremium && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-300 px-3 py-1.5 text-xs font-black text-amber-950 shadow-lg shadow-amber-900/10">
-              <Crown className="w-3.5 h-3.5" /> Premium Active
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100/80 bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-300 px-3 py-1.5 text-xs font-black tracking-wide text-amber-950 shadow-lg shadow-amber-900/20">
+              <Crown className="w-3.5 h-3.5" /> FRESHO PREMIUM
             </span>
           )}
         </div>
       </div>
 
       <div className="flex-1 px-4 py-5 space-y-5">
+        {isPremium && (
+          <section className="relative overflow-hidden rounded-2xl border border-amber-300/70 bg-gradient-to-br from-[#21133f] via-[#382157] to-[#6b4319] p-5 text-white shadow-xl shadow-amber-950/15">
+            <div className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-amber-300/15 blur-2xl" />
+            <div className="relative flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-100/40 bg-gradient-to-br from-amber-200 to-amber-500 text-amber-950 shadow-lg shadow-amber-950/30">
+                <Crown className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">All-access member</p>
+                <h2 className="text-lg font-black">Your Premium pass is active</h2>
+              </div>
+            </div>
+            <p className="relative mt-3 text-sm leading-5 text-violet-100">
+              Premium exams, notes, chapter questions, and flashcards are ready for you.
+            </p>
+            <div className="relative mt-4 flex flex-wrap gap-2">
+              {["Exams", "Study notes", "Flashcards"].map((label) => (
+                <span key={label} className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-amber-100">
+                  <Sparkles className="mr-1 inline h-3 w-3" />{label}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${darkMode ? "bg-indigo-100 text-indigo-700" : "bg-amber-50 text-amber-600"}`}>
+              {darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+            </div>
+            <div>
+              <p className="flex items-center gap-1.5 text-sm font-bold text-slate-900"><Settings2 className="h-3.5 w-3.5 text-slate-400" /> Appearance</p>
+              <p className="mt-0.5 text-xs text-slate-500">{darkMode ? "Night mode is on" : "Day mode is on"}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={darkMode}
+            aria-label="Toggle night mode"
+            onClick={onToggleTheme}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${darkMode ? "bg-violet-600" : "bg-slate-300"}`}
+          >
+            <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform ${darkMode ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+        </section>
+
         {!isPremium && <PremiumBanner onGetPremium={onGetPremium} />}
 
         <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
@@ -296,7 +347,7 @@ export default function HomeScreen({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="font-bold text-slate-900 text-sm truncate">
-                      {subjectLabel(attempt.subject)} EUEE {attempt.year}
+                      {subjectLabel(attempt.subject)} · {attempt.year}
                     </h3>
                     <p className="text-xs text-slate-500 mt-1">
                       {new Date(attempt.completedAt).toLocaleString()}
@@ -378,7 +429,7 @@ export default function HomeScreen({
               </div>
               <h3 className="font-bold text-slate-900 mb-1">Start your first exam</h3>
               <p className="text-xs text-slate-500 mb-4">
-                Jump into a real EUEE past exam and track your progress.
+                Explore freshman practice exams and track your progress.
               </p>
               <button
                 onClick={onGoToPractice}
@@ -401,7 +452,7 @@ function AttemptReview({ attempt, onBack }: { attempt: RecentExamAttempt; onBack
         <button onClick={onBack} className="mb-2 flex min-h-10 items-center gap-1 text-sm font-medium text-slate-600">
           <ChevronLeft className="h-5 w-5" /> Recently Taken Exams
         </button>
-        <h1 className="font-bold text-slate-900">{subjectLabel(attempt.subject)} EUEE {attempt.year}</h1>
+        <h1 className="font-bold text-slate-900">{subjectLabel(attempt.subject)} · {attempt.year}</h1>
         <p className="mt-1 text-xs text-slate-500">{attempt.scorePercentage}% • {attempt.correctCount}/{attempt.totalQuestions} correct</p>
       </header>
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">

@@ -1,29 +1,38 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { BarChart3, BookOpen, CircleDollarSign, ClipboardList, FileText, GraduationCap, Image, Layers, Lock, LogOut, Settings, Sparkles, TrendingUp, User, Crown } from "lucide-react";
+import { BarChart3, BookOpen, CircleDollarSign, ClipboardList, FileText, GraduationCap, Image, Layers, Lock, LogOut, Pencil, Settings, Sparkles, TrendingUp, User, Crown } from "lucide-react";
 import UniversitySelect from "@/components/tma/UniversitySelect";
 import {
   adminGetAnalytics,
   adminGetExams,
+  adminGetExam,
   adminGetFlashCards,
   adminGetNotes,
+  adminGetNote,
   adminGetSubjectSuggestions,
   adminGetUniversityLogo,
   adminCreateExam,
   adminToggleExamPremium,
+  adminToggleExamPublish,
   adminUpdateExam,
   adminDeleteExam,
   adminCreateNote,
   adminToggleNotePremium,
+  adminToggleNotePublish,
   adminDeleteNote,
   adminCreateChapterExam,
   adminGetChapterExams,
+  adminGetChapterExam,
   adminDeleteChapterExam,
   adminToggleChapterExamPremium,
+  adminToggleChapterExamPublish,
   adminCreateFlashCard,
   adminDeleteFlashCard,
   adminToggleFlashCardPremium,
+  adminToggleFlashCardPublish,
+  adminUpdateFlashCard,
+  adminUpdateNote,
   adminPutUniversityLogo,
   adminReviewSubjectSuggestion,
   adminGetSubscriptionConfig,
@@ -189,6 +198,15 @@ function ExamsManager() {
   const load = () => { setLoading(true); setError(""); adminGetExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
   function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); }
+  async function edit(id: number) {
+    setError("");
+    try {
+      const exam = await adminGetExam(id);
+      setEditing(items.find((item) => item.id === id) || null);
+      setForm(exam);
+      setUploadedFile(null);
+    } catch (value) { setError(message(value)); }
+  }
   async function save(event: FormEvent) {
     event.preventDefault();
     if (!form.university) { setError("Select a university."); return; }
@@ -211,7 +229,7 @@ function ExamsManager() {
     }
   }
   async function remove(id: number) { if (!window.confirm("Delete this exam?")) return; try { await adminDeleteExam(id); load(); } catch (value) { setError(message(value)); } }
-  return <ResourcePanel title="Exam management" subtitle="Create and publish freshman-level past exams." loading={loading} error={error} items={items.map((item) => ({ id: item.id, name: `${item.title} · ${item.year}`, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium }))} onDelete={remove} onTogglePremium={(id) => adminToggleExamPremium(id).then(load).catch((value) => setError(message(value)))} form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2"><label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Subject</span><select required className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}><option value="">Select a subject</option>{allStudentSubjects.map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}</select></label><Field label="Year" value={form.year} onChange={(value) => setForm({ ...form, year: value })} /><Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" /><label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">University</span><UniversitySelect value={form.university} onChange={(value) => setForm({ ...form, university: value })} allowCustom={false} /></label><select className="rounded-xl border border-slate-200 px-3 py-2" value={form.exam_type} onChange={(event) => setForm({ ...form, exam_type: event.target.value as "final" | "mid" })}><option value="final">Final exam</option><option value="mid">Mid exam</option></select><Field label="Questions" type="number" value={form.question_count} onChange={(value) => setForm({ ...form, question_count: Number(value) })} /><Field label="Minutes" type="number" value={form.duration_minutes} onChange={(value) => setForm({ ...form, duration_minutes: Number(value) })} /><select className="rounded-xl border border-slate-200 px-3 py-2" value={form.content_type} onChange={(event) => setForm({ ...form, content_type: event.target.value as "html" | "pdf" })}><option value="html">HTML</option><option value="pdf">PDF</option></select><label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">Upload HTML or PDF from your device</span><input type="file" accept=".html,.htm,.pdf,text/html,application/pdf" onChange={handleFileUpload} className="block w-full rounded-xl border border-slate-200 p-3 text-sm" />{uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}</label><textarea aria-label="Exam HTML or content URL" placeholder="Or paste HTML / PDF URL" className="min-h-24 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.content_data} onChange={(event) => { setUploadedFile(null); setForm({ ...form, content_data: event.target.value }); }} /><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish immediately</label><div className="flex gap-2 md:col-span-2"><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Create exam"}</button>{editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}</div></form>} />;
+  return <ResourcePanel title="Exam management" subtitle="Create and publish freshman-level past exams." loading={loading} error={error} items={items.map((item) => ({ id: item.id, name: `${item.title} · ${item.year}`, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium, is_published: item.is_published }))} onEdit={edit} onTogglePublish={(id) => adminToggleExamPublish(id).then(load).catch((value) => setError(message(value)))} onDelete={remove} onTogglePremium={(id) => adminToggleExamPremium(id).then(load).catch((value) => setError(message(value)))} form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2"><label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Subject</span><select required className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}><option value="">Select a subject</option>{allStudentSubjects.map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}</select></label><Field label="Year" value={form.year} onChange={(value) => setForm({ ...form, year: value })} /><Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" /><label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">University</span><UniversitySelect value={form.university} onChange={(value) => setForm({ ...form, university: value })} allowCustom={false} /></label><select className="rounded-xl border border-slate-200 px-3 py-2" value={form.exam_type} onChange={(event) => setForm({ ...form, exam_type: event.target.value as "final" | "mid" })}><option value="final">Final exam</option><option value="mid">Mid exam</option></select><Field label="Questions" type="number" value={form.question_count} onChange={(value) => setForm({ ...form, question_count: Number(value) })} /><Field label="Minutes" type="number" value={form.duration_minutes} onChange={(value) => setForm({ ...form, duration_minutes: Number(value) })} /><select className="rounded-xl border border-slate-200 px-3 py-2" value={form.content_type} onChange={(event) => setForm({ ...form, content_type: event.target.value as "html" | "pdf" })}><option value="html">HTML</option><option value="pdf">PDF</option></select><label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">Upload HTML or PDF from your device</span><input type="file" accept=".html,.htm,.pdf,text/html,application/pdf" onChange={handleFileUpload} className="block w-full rounded-xl border border-slate-200 p-3 text-sm" />{uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}</label><textarea aria-label="Exam HTML or content URL" placeholder="Or paste HTML / PDF URL" className="min-h-24 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.content_data} onChange={(event) => { setUploadedFile(null); setForm({ ...form, content_data: event.target.value }); }} /><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish immediately</label><div className="flex gap-2 md:col-span-2"><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Create exam"}</button>{editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}</div></form>} />;
 }
 
 function NotesManager() {
@@ -220,8 +238,28 @@ function NotesManager() {
   const [error, setError] = useState("");
   const [form, setForm] = useState(notePayload);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [editing, setEditing] = useState<NoteMeta | null>(null);
   const load = () => { setLoading(true); setError(""); adminGetNotes().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
+  function reset() { setEditing(null); setForm({ ...notePayload }); setUploadedFile(null); }
+  async function edit(id: number) {
+    setError("");
+    try {
+      const note = await adminGetNote(id);
+      setEditing(items.find((item) => item.id === id) || null);
+      setForm({
+        subject: note.subject,
+        stream: note.stream?.toLowerCase() === "social" ? "social" : "natural",
+        chapter_number: note.chapter_number,
+        title: note.title,
+        html_content: note.html_content,
+        semester: note.semester || "all",
+        is_premium: note.is_premium,
+        is_published: note.is_published,
+      });
+      setUploadedFile(null);
+    } catch (value) { setError(message(value)); }
+  }
   function changeStream(stream: "natural" | "social") {
     setForm({ ...form, stream, subject: subjectOptions(stream)[0] });
   }
@@ -230,9 +268,10 @@ function NotesManager() {
     setError("");
     try {
       const html_content = uploadedFile ? await readLocalFile(uploadedFile, "html") : form.html_content;
-      await adminCreateNote({ ...form, html_content });
-      setForm({ ...notePayload });
-      setUploadedFile(null);
+      const payload = { ...form, html_content };
+      if (editing) await adminUpdateNote(editing.id, payload);
+      else await adminCreateNote(payload);
+      reset();
       load();
     } catch (value) { setError(message(value)); }
   }
@@ -241,7 +280,9 @@ function NotesManager() {
     subtitle="Publish freshman study notes for the selected stream."
     loading={loading}
     error={error}
-    items={items.map((item) => ({ id: item.id, name: `${item.title} · Chapter ${item.chapter_number}`, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium }))}
+    items={items.map((item) => ({ id: item.id, name: `${item.title} · Chapter ${item.chapter_number}`, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium, is_published: item.is_published }))}
+    onEdit={edit}
+    onTogglePublish={(id) => adminToggleNotePublish(id).then(load).catch((value) => setError(message(value)))}
     onDelete={(id) => adminDeleteNote(id).then(load).catch((value) => setError(message(value)))}
     onTogglePremium={(id) => adminToggleNotePremium(id).then(load).catch((value) => setError(message(value)))}
     form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2">
@@ -253,7 +294,7 @@ function NotesManager() {
       <textarea aria-label="Note HTML content" placeholder="Or paste note HTML" className="min-h-32 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.html_content} onChange={(event) => { setUploadedFile(null); setForm({ ...form, html_content: event.target.value }); }} />
       <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label>
       <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish immediately</label>
-      <button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">Save note</button>
+      <div className="flex gap-2"><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Save note"}</button>{editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}</div>
     </form>}
   />;
 }
@@ -263,6 +304,7 @@ function ChapterExamsManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [editing, setEditing] = useState<ChapterExamMeta | null>(null);
   const [form, setForm] = useState({
     subject: "mathematics",
     stream: "natural" as "natural" | "social",
@@ -276,6 +318,40 @@ function ChapterExamsManager() {
   });
   const load = () => { setLoading(true); setError(""); adminGetChapterExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
+  function reset() {
+    setEditing(null);
+    setForm({
+      subject: "mathematics",
+      stream: "natural",
+      chapter_number: 1,
+      title: "",
+      question_count: 10,
+      content_type: "html",
+      content_data: "",
+      is_premium: false,
+      is_published: false,
+    });
+    setUploadedFile(null);
+  }
+  async function edit(id: number) {
+    setError("");
+    try {
+      const exam = await adminGetChapterExam(id);
+      setEditing(items.find((item) => item.id === id) || null);
+      setForm({
+        subject: exam.subject,
+        stream: exam.stream?.toLowerCase() === "social" ? "social" : "natural",
+        chapter_number: exam.chapter_number,
+        title: exam.title,
+        question_count: exam.question_count,
+        content_type: exam.content_type,
+        content_data: exam.content_data,
+        is_premium: exam.is_premium,
+        is_published: exam.is_published,
+      });
+      setUploadedFile(null);
+    } catch (value) { setError(message(value)); }
+  }
   async function save(event: FormEvent) {
     event.preventDefault();
     setError("");
@@ -283,9 +359,10 @@ function ChapterExamsManager() {
       const content_data = uploadedFile
         ? await readLocalFile(uploadedFile, form.content_type)
         : form.content_data;
-      await adminCreateChapterExam({ ...form, content_data });
-      setForm({ ...form, title: "", content_data: "", is_published: false });
-      setUploadedFile(null);
+      const payload = { ...form, content_data };
+      if (editing) await adminUpdateChapterExam(editing.id, payload);
+      else await adminCreateChapterExam(payload);
+      reset();
       load();
     } catch (value) { setError(message(value)); }
   }
@@ -300,7 +377,9 @@ function ChapterExamsManager() {
     subtitle="Upload stream-specific freshman practice as an HTML or PDF file."
     loading={loading}
     error={error}
-    items={items.map((item) => ({ id: item.id, name: `${SUBJECTS[item.subject]?.label || item.subject} · Chapter ${item.chapter_number}: ${item.title}`, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium }))}
+    items={items.map((item) => ({ id: item.id, name: `${SUBJECTS[item.subject]?.label || item.subject} · Chapter ${item.chapter_number}: ${item.title}`, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium, is_published: item.is_published }))}
+    onEdit={edit}
+    onTogglePublish={(id) => adminToggleChapterExamPublish(id).then(load).catch((value) => setError(message(value)))}
     onDelete={(id) => adminDeleteChapterExam(id).then(load).catch((value) => setError(message(value)))}
     onTogglePremium={(id) => adminToggleChapterExamPremium(id).then(load).catch((value) => setError(message(value)))}
     form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2">
@@ -313,7 +392,7 @@ function ChapterExamsManager() {
       <textarea aria-label="Chapter question content" placeholder="Or paste HTML / PDF URL" className="min-h-32 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.content_data} onChange={(event) => { setUploadedFile(null); setForm({ ...form, content_data: event.target.value }); }} />
       <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label>
       <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish immediately</label>
-      <button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white md:col-span-2">Create question set</button>
+      <div className="flex gap-2 md:col-span-2"><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Create question set"}</button>{editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}</div>
     </form>}
   />;
 }
@@ -324,20 +403,61 @@ function FlashCardsManager() {
   const [error, setError] = useState("");
   const [form, setForm] = useState({ title: "", html_content: "", is_premium: false, is_published: false });
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [editing, setEditing] = useState<FlashCard | null>(null);
   const load = () => { setLoading(true); setError(""); adminGetFlashCards().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
+  function reset() {
+    setEditing(null);
+    setForm({ title: "", html_content: "", is_premium: false, is_published: false });
+    setUploadedFile(null);
+  }
+  function edit(id: number) {
+    const card = items.find((item) => item.id === id);
+    if (!card) {
+      setError("Flash card was not found. Refresh the list and try again.");
+      return;
+    }
+    setEditing(card);
+    setForm({
+      title: card.title,
+      html_content: card.html_content || "",
+      is_premium: card.is_premium,
+      is_published: card.is_published,
+    });
+    setUploadedFile(null);
+    setError("");
+  }
   async function save(event: FormEvent) {
     event.preventDefault();
     setError("");
     try {
       const html_content = uploadedFile ? await readLocalFile(uploadedFile, "html") : form.html_content;
-      await adminCreateFlashCard({ ...form, html_content });
-      setForm({ title: "", html_content: "", is_premium: false, is_published: false });
-      setUploadedFile(null);
+      const payload = { ...form, html_content };
+      if (editing) await adminUpdateFlashCard(editing.id, payload);
+      else await adminCreateFlashCard(payload);
+      reset();
       load();
     } catch (value) { setError(message(value)); }
   }
-  return <ResourcePanel title="Game flash cards" subtitle="Create cards used by the freshman game." loading={loading} error={error} items={items.map((item) => ({ id: item.id, name: item.title, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium }))} onDelete={(id) => adminDeleteFlashCard(id).then(load).catch((value) => setError(message(value)))} onTogglePremium={(id) => adminToggleFlashCardPremium(id).then(load).catch((value) => setError(message(value)))} form={<form onSubmit={save} className="space-y-3"><Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} /><label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Upload an HTML file from your device</span><input type="file" accept=".html,.htm,text/html" onChange={(event) => setUploadedFile(event.target.files?.[0] || null)} className="block w-full rounded-xl border border-slate-200 p-3 text-sm" />{uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}</label><textarea aria-label="Flash card HTML content" placeholder="Or paste flash card HTML" className="min-h-40 w-full rounded-xl border border-slate-200 p-3" value={form.html_content} onChange={(event) => { setUploadedFile(null); setForm({ ...form, html_content: event.target.value }); }} /><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish to the game</label><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">Create flash card</button></form>} />;
+  return <ResourcePanel
+    title="Game flash cards"
+    subtitle="Create cards used by the freshman game."
+    loading={loading}
+    error={error}
+    items={items.map((item) => ({ id: item.id, name: item.title, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium, is_published: item.is_published }))}
+    onEdit={edit}
+    onTogglePublish={(id) => adminToggleFlashCardPublish(id).then(load).catch((value) => setError(message(value)))}
+    onDelete={(id) => adminDeleteFlashCard(id).then(load).catch((value) => setError(message(value)))}
+    onTogglePremium={(id) => adminToggleFlashCardPremium(id).then(load).catch((value) => setError(message(value)))}
+    form={<form onSubmit={save} className="space-y-3">
+      <Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
+      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Upload an HTML file from your device</span><input type="file" accept=".html,.htm,text/html" onChange={(event) => setUploadedFile(event.target.files?.[0] || null)} className="block w-full rounded-xl border border-slate-200 p-3 text-sm" />{uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}</label>
+      <textarea aria-label="Flash card HTML content" placeholder="Or paste flash card HTML" className="min-h-40 w-full rounded-xl border border-slate-200 p-3" value={form.html_content} onChange={(event) => { setUploadedFile(null); setForm({ ...form, html_content: event.target.value }); }} />
+      <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label>
+      <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish to the game</label>
+      <div className="flex gap-2"><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Create flash card"}</button>{editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}</div>
+    </form>}
+  />;
 }
 
 function LogosManager() {
@@ -386,6 +506,64 @@ function PricingManager() {
   return <div className="grid gap-6 lg:grid-cols-[1fr_1fr]"><section className="rounded-2xl bg-white p-6 shadow-sm"><div className="flex items-center gap-2"><Settings className="h-5 w-5 text-blue-600" /><h2 className="text-xl font-black">Subscription pricing</h2></div><p className="mt-2 text-sm text-slate-500">Set the customer price and monthly operating cost used in the business report.</p>{error && <div className="mt-4"><ErrorBanner error={error} /></div>}<form onSubmit={save} className="mt-6 space-y-4"><Field label="Price per month" type="number" value={config?.price ?? 0} onChange={(value) => setConfig({ ...config!, price: Number(value) })} /><Field label="Currency" value={config?.currency ?? "USD"} onChange={(value) => setConfig({ ...config!, currency: value })} /><Field label="Monthly operating cost" type="number" value={config?.monthly_operating_cost ?? 0} onChange={(value) => setConfig({ ...config!, monthly_operating_cost: Number(value) })} /><button disabled={saving} className="w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50">{saving ? "Saving..." : "Save pricing"}</button></form></section><section className="rounded-2xl bg-blue-600 p-6 text-white shadow-sm"><CircleDollarSign className="h-8 w-8" /><h2 className="mt-4 text-2xl font-black">Profit snapshot</h2><p className="mt-3 text-4xl font-black">{new Intl.NumberFormat().format((config?.price ?? 0) - (config?.monthly_operating_cost ?? 0))}</p><p className="mt-1 text-sm text-blue-100">Estimated monthly profit per active subscriber</p><div className="mt-6 rounded-xl bg-white/10 p-4 text-sm"><p className="font-bold">Pricing formula</p><p className="mt-2">Revenue − operating cost = estimated profit</p></div></section></div>;
 }
 
-function ResourcePanel({ title, subtitle, loading, error, items, onDelete, onTogglePremium, form }: { title: string; subtitle: string; loading: boolean; error: string; items: { id: number; name: string; status: string; is_premium?: boolean }[]; onDelete?: (id: number) => void; onTogglePremium?: (id: number) => void; form: ReactNode }) {
-  return <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]"><section className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-xl font-black">{title}</h2><p className="mt-1 text-sm text-slate-500">{subtitle}</p>{loading ? <p className="mt-5 text-sm text-slate-500">Loading...</p> : error ? <ErrorBanner error={error} /> : <div className="mt-5 space-y-2">{items.map((item) => <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div className="min-w-0"><p className="truncate font-bold">{item.name}</p><p className="flex items-center gap-2 text-xs text-slate-500">{item.status}{item.is_premium !== undefined && <span className={`rounded-full px-2 py-0.5 font-bold ${item.is_premium ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{item.is_premium ? "Premium" : "Free"}</span>}</p></div><div className="flex shrink-0 gap-2">{onTogglePremium && <button onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700">Make {item.is_premium ? "Free" : "Premium"}</button>}{onDelete && <button onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700">Delete</button>}</div></div>)}</div>}</section><section className="rounded-2xl bg-white p-5 shadow-sm"><h3 className="font-black">Create or update</h3><div className="mt-4">{form}</div></section></div>;
+function ResourcePanel({
+  title,
+  subtitle,
+  loading,
+  error,
+  items,
+  onDelete,
+  onEdit,
+  onTogglePremium,
+  onTogglePublish,
+  form,
+}: {
+  title: string;
+  subtitle: string;
+  loading: boolean;
+  error: string;
+  items: { id: number; name: string; status: string; is_premium?: boolean; is_published?: boolean }[];
+  onDelete?: (id: number) => void;
+  onEdit?: (id: number) => void;
+  onTogglePremium?: (id: number) => void;
+  onTogglePublish?: (id: number) => void;
+  form: ReactNode;
+}) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-black">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        {loading ? <p className="mt-5 text-sm text-slate-500">Loading...</p> : error ? <ErrorBanner error={error} /> : (
+          <div className="mt-5 space-y-2">
+            {items.map((item) => (
+              <div key={item.id} className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate font-bold">{item.name}</p>
+                  <p className="flex items-center gap-2 text-xs text-slate-500">
+                    {item.status}
+                    {item.is_premium !== undefined && (
+                      <span className={`rounded-full px-2 py-0.5 font-bold ${item.is_premium ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                        {item.is_premium ? "Premium" : "Free"}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
+                  {onEdit && <button type="button" onClick={() => onEdit(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-2 text-xs font-bold text-blue-700"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
+                  {onTogglePublish && <button type="button" onClick={() => onTogglePublish(item.id)} className="rounded-lg bg-slate-200 px-2.5 py-2 text-xs font-bold text-slate-700">{item.is_published ? "Unpublish" : "Publish"}</button>}
+                  {onTogglePremium && <button type="button" onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-2.5 py-2 text-xs font-bold text-violet-700">Make {item.is_premium ? "Free" : "Premium"}</button>}
+                  {onDelete && <button type="button" onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700">Delete</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      <section className="rounded-2xl bg-white p-5 shadow-sm">
+        <h3 className="font-black">Create or update</h3>
+        <div className="mt-4">{form}</div>
+      </section>
+    </div>
+  );
 }
