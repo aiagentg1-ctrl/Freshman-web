@@ -11,18 +11,22 @@ export default function UniversityLogo({
   logo?: string | null;
   className?: string;
 }) {
+  // Determine icon size based on className
+  const isLarge = className.includes("h-16") || className.includes("w-16");
+  const iconSize = isLarge ? "h-8 w-8" : "h-5 w-5";
+
   return logo ? (
     <img
       src={logo}
       alt={`${university} logo`}
-      className={`${className} shrink-0 rounded-xl border border-slate-100 bg-white object-contain p-1 shadow-sm`}
+      className={`${className} shrink-0 rounded-xl border border-slate-100 bg-white object-contain p-1.5 shadow-sm`}
     />
   ) : (
     <div
       className={`${className} shrink-0 rounded-xl bg-blue-50 flex items-center justify-center text-[#1D70F5]`}
       aria-label={`${university} logo unavailable`}
     >
-      <GraduationCap className="h-5 w-5" />
+      <GraduationCap className={iconSize} />
     </div>
   );
 }

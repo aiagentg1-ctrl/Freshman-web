@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ChapterExam, ChapterExamMeta, Exam, ExamMeta, getChapterExam, getChapterExams, getExam, getExams, getUniversityLogo, StreamKey } from "../../lib/api";
 import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects";
+import { universities } from "../../lib/universities";
 import ExamRunner, { PdfExamView, HtmlExamView } from "./ExamRunner";
 import PremiumBanner from "./PremiumBanner";
 import UniversityLogo from "./UniversityLogo";
@@ -35,6 +36,12 @@ type View =
 function yearSortKey(year: string): number {
   const match = year.match(/\d{3,4}/);
   return match ? parseInt(match[0], 10) : 0;
+}
+
+// Get university abbreviation from full name
+function getUniversityAbbreviation(universityName: string): string {
+  const university = universities.find((u) => u.name === universityName);
+  return university?.abbreviation || "";
 }
 
 export default function PracticeScreen({
@@ -433,7 +440,7 @@ export default function PracticeScreen({
           <p className="text-xs text-slate-500 mt-0.5">All subjects for this year</p>
 
           {/* Mid/Final Exam Tabs */}
-          <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 mt-3">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5 mt-4">
             {(
               [
                 { key: "mid" as const, label: "Mid Exam" },
@@ -443,7 +450,7 @@ export default function PracticeScreen({
               <button
                 key={tab.key}
                 onClick={() => setView({ ...view, examType: tab.key })}
-                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-colors ${
                   examType === tab.key
                     ? "bg-white text-[#1D70F5] shadow-sm"
                     : "text-slate-500"
@@ -462,80 +469,88 @@ export default function PracticeScreen({
               subtitle={`${examType === "mid" ? "Mid" : "Final"} exams for ${view.year} will appear here once uploaded.`}
             />
           ) : (
-            filteredExams.map((exam) => (
-              <div
-                key={exam.id}
-                className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <UniversityLogo
-                    university={exam.university}
-                    logo={universityLogos.get(exam.university)}
-                    className="w-11 h-11"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 truncate">
-                      {subjectLabel(exam.subject)}
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[#1D70F5] font-semibold text-[10px]">
-                        {exam.year}
-                      </span>
-                      {exam.custom_tag && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-600 font-semibold text-[10px]">
-                          {exam.custom_tag}
+            filteredExams.map((exam) => {
+              const universityAbbr = getUniversityAbbreviation(exam.university);
+              return (
+                <div
+                  key={exam.id}
+                  className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <UniversityLogo
+                      university={exam.university}
+                      logo={universityLogos.get(exam.university)}
+                      className="w-16 h-16"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-slate-900 truncate">
+                        {subjectLabel(exam.subject)}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[#1D70F5] font-semibold text-[10px]">
+                          {exam.year}
                         </span>
-                      )}
-                      {exam.is_premium && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-[10px]">
-                          Premium
+                        {universityAbbr && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px]">
+                            {universityAbbr}
+                          </span>
+                        )}
+                        {exam.custom_tag && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-600 font-semibold text-[10px]">
+                            {exam.custom_tag}
+                          </span>
+                        )}
+                        {exam.is_premium && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-[10px]">
+                            Premium
+                          </span>
+                        )}
+                        {exam.content_type === "pdf" && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 font-semibold text-[10px]">
+                            PDF
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1">
+                          <FileQuestion className="w-3.5 h-3.5" /> {exam.question_count} Qs
                         </span>
-                      )}
-                      {exam.content_type === "pdf" && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 font-semibold text-[10px]">
-                          PDF
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> {exam.duration_minutes} min
                         </span>
-                      )}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1">
-                        <FileQuestion className="w-3.5 h-3.5" /> {exam.question_count} Qs
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" /> {exam.duration_minutes} min
-                      </span>
-                    </p>
+                    {exam.content_type === "html" && (
+                      <button
+                        onClick={() => openExam(exam.id)}
+                        disabled={loadingExam}
+                        className="shrink-0 px-3.5 py-2 rounded-xl bg-[#1D70F5] text-white text-xs font-semibold active:scale-[0.97] transition-transform"
+                      >
+                        Start
+                      </button>
+                    )}
                   </div>
-                  {exam.content_type === "html" && (
-                    <button
-                      onClick={() => openExam(exam.id)}
-                      disabled={loadingExam}
-                      className="shrink-0 px-3.5 py-2 rounded-xl bg-[#1D70F5] text-white text-xs font-semibold active:scale-[0.97] transition-transform"
-                    >
-                      Start
-                    </button>
+                  {exam.content_type === "pdf" && (
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => downloadPdf(exam.id, exam.title)}
+                        disabled={loadingExam}
+                        className="flex-1 bg-[#1D70F5] text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                      >
+                        <Download className="w-4 h-4" /> Download PDF
+                      </button>
+                      <button
+                        onClick={() => openExam(exam.id)}
+                        disabled={loadingExam}
+                        className="flex-1 bg-white border border-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                      >
+                        <FileText className="w-4 h-4" /> Open in Viewer
+                      </button>
+                    </div>
                   )}
                 </div>
-                {exam.content_type === "pdf" && (
-                  <div className="flex gap-2 mt-3">
-                    <button
-                      onClick={() => downloadPdf(exam.id, exam.title)}
-                      disabled={loadingExam}
-                      className="flex-1 bg-[#1D70F5] text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
-                    >
-                      <Download className="w-4 h-4" /> Download PDF
-                    </button>
-                    <button
-                      onClick={() => openExam(exam.id)}
-                      disabled={loadingExam}
-                      className="flex-1 bg-white border border-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
-                    >
-                      <FileText className="w-4 h-4" /> Open in Viewer
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -737,27 +752,15 @@ export default function PracticeScreen({
           <div className="space-y-3">
             {sortedYears.map((year) => {
               const list = examsByYear.get(year) ?? [];
-              // Get unique universities for this year and their logos
-              const uniqueUniversities = [...new Set(list.map((exam) => exam.university).filter(Boolean))];
-              const universityWithLogo = uniqueUniversities[0];
-
               return (
                 <button
                   key={year}
                   onClick={() => setView({ kind: "yearExams", year, examType: "final" })}
                   className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3 text-left active:scale-[0.98] transition-transform"
                 >
-                  {universityWithLogo ? (
-                    <UniversityLogo
-                      university={universityWithLogo}
-                      logo={universityLogos.get(universityWithLogo)}
-                      className="w-11 h-11"
-                    />
-                  ) : (
-                    <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
-                      <CalendarDays className="w-5 h-5 text-violet-600" />
-                    </div>
-                  )}
+                  <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                    <CalendarDays className="w-5 h-5 text-violet-600" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-slate-900">{year}</h3>
                     <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
