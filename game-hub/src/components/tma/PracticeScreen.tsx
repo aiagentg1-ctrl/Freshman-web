@@ -474,13 +474,13 @@ export default function PracticeScreen({
               return (
                 <div
                   key={exam.id}
-                  className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-left"
+                  className="w-full bg-white rounded-2xl p-5 shadow-sm border border-slate-100 text-left"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-5">
                     <UniversityLogo
                       university={exam.university}
                       logo={universityLogos.get(exam.university)}
-                      className="w-16 h-16"
+                      className="w-20 h-20"
                     />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-slate-900 truncate">
