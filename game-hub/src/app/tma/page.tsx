@@ -272,7 +272,7 @@ export default function TMAPage() {
   })();
 
   return (
-    <div className={`min-h-screen max-w-md mx-auto bg-slate-50 shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900 ${isPremium ? "fresho-premium" : ""}`}>
+    <div className={`tma-app-frame min-h-screen max-w-md mx-auto bg-slate-50 shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900 ${isPremium ? "fresho-premium" : ""}`}>
       <DevUserSetup />
       {booting ? (
         <div className="flex-1 flex items-center justify-center">

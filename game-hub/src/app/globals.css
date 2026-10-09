@@ -103,6 +103,17 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   box-sizing: border-box;
 }
 
+@media (min-width: 768px) {
+  .tma-app-frame {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    margin-inline: auto;
+    background-color: #f8fafc;
+    box-shadow: 0 0 40px rgb(15 23 42 / 12%);
+  }
+}
+
 .fresho-premium nav.fixed {
   border-top-color: #b7791f;
   box-shadow: 0 -1px 18px rgb(183 121 31 / 12%);
