@@ -12,8 +12,9 @@ import {
   FileText,
   GraduationCap,
   ListChecks,
+  Crown,
 } from "lucide-react";
-import { ChapterExam, ChapterExamMeta, Exam, ExamMeta, getChapterExam, getChapterExams, getExam, getExams, getUniversityLogo, StreamKey } from "../../lib/api";
+import { ChapterExam, ChapterExamMeta, Exam, ExamMeta, getChapterExam, getChapterExams, getExam, getExams, getUniversityLogo, isPremiumAccessRequired, StreamKey } from "../../lib/api";
 import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects";
 import { universities } from "../../lib/universities";
 import ExamRunner, { PdfExamView, HtmlExamView } from "./ExamRunner";
@@ -26,8 +27,7 @@ type View =
   | { kind: "yearList" }
   | { kind: "yearExams"; year: string; examType?: "mid" | "final" }
   | { kind: "chapterSubjects" }
-  | { kind: "chapterGrades"; subject: string }
-  | { kind: "chapterList"; subject: string; grade: number }
+  | { kind: "chapterList"; subject: string }
   | { kind: "chapterExam"; chapterExam: ChapterExam }
   | { kind: "exam"; exam: Exam };
 
@@ -46,7 +46,6 @@ function getUniversityAbbreviation(universityName: string): string {
 
 export default function PracticeScreen({
   stream,
-  grade,
   university,
   telegramUserId,
   telegramFirstName,
@@ -57,7 +56,6 @@ export default function PracticeScreen({
   onGetPremium,
 }: {
   stream: StreamKey;
-  grade: number;
   university: string;
   telegramUserId?: number;
   telegramFirstName?: string;
@@ -78,6 +76,10 @@ export default function PracticeScreen({
   const [universityLogos, setUniversityLogos] = useState<Map<string, string>>(new Map());
 
   const subjects = useMemo(() => subjectsForStream(stream), [stream]);
+  const streamExams = useMemo(
+    () => exams.filter((exam) => subjects.some((subject) => subject.key === exam.subject)),
+    [exams, subjects]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -129,7 +131,7 @@ export default function PracticeScreen({
   useEffect(() => {
     let cancelled = false;
     setLoadingChapterExams(true);
-    getChapterExams()
+    getChapterExams({ stream })
       .then((data) => {
         if (!cancelled) setChapterExams(data);
       })
@@ -140,7 +142,7 @@ export default function PracticeScreen({
     return () => {
       cancelled = true;
     };
-  }, [grade, stream]);
+  }, [stream]);
 
   // Open an exam handed over by the Home "Continue" card.
   useEffect(() => {
@@ -151,11 +153,21 @@ export default function PracticeScreen({
   }, [resumeExam]);
 
   const openExam = async (examId: number) => {
+    const examMeta = exams.find((item) => item.id === examId);
+    if (examMeta?.is_premium && !isPremium) {
+      onGetPremium();
+      return;
+    }
     setLoadingExam(true);
     try {
       const exam = await getExam(examId);
       setView({ kind: "exam", exam });
-    } catch {
+    } catch (error) {
+      if (isPremiumAccessRequired(error)) {
+        onGetPremium();
+        return;
+      }
+      console.error("Could not load exam:", error);
       alert("Could not load this exam. Please try again.");
     } finally {
       setLoadingExam(false);
@@ -163,11 +175,20 @@ export default function PracticeScreen({
   };
 
   const openChapterExam = async (examId: number) => {
+    const examMeta = chapterExams.find((item) => item.id === examId);
+    if (examMeta?.is_premium && !isPremium) {
+      onGetPremium();
+      return;
+    }
     setLoadingExam(true);
     try {
       setView({ kind: "chapterExam", chapterExam: await getChapterExam(examId) });
     } catch (error) {
       console.error("Failed to load chapter exam:", error);
+      if (isPremiumAccessRequired(error)) {
+        onGetPremium();
+        return;
+      }
       alert("Could not load chapter questions. Please try again.");
     } finally {
       setLoadingExam(false);
@@ -175,6 +196,11 @@ export default function PracticeScreen({
   };
 
   const downloadPdf = async (examId: number, title: string) => {
+    const examMeta = exams.find((item) => item.id === examId);
+    if (examMeta?.is_premium && !isPremium) {
+      onGetPremium();
+      return;
+    }
     setLoadingExam(true);
     try {
       const exam = await getExam(examId);
@@ -184,7 +210,12 @@ export default function PracticeScreen({
       a.target = "_blank";
       a.rel = "noreferrer";
       a.click();
-    } catch {
+    } catch (error) {
+      if (isPremiumAccessRequired(error)) {
+        onGetPremium();
+        return;
+      }
+      console.error("Could not load exam PDF:", error);
       alert("Could not load this PDF. Please try again.");
     } finally {
       setLoadingExam(false);
@@ -193,7 +224,7 @@ export default function PracticeScreen({
 
   const examsBySubject = useMemo(() => {
     const map = new Map<string, ExamMeta[]>();
-    for (const exam of exams) {
+    for (const exam of streamExams) {
       const list = map.get(exam.subject) ?? [];
       list.push(exam);
       map.set(exam.subject, list);
@@ -201,17 +232,17 @@ export default function PracticeScreen({
     // newest year first within each subject
     map.forEach((list) => list.sort((a, b) => yearSortKey(b.year) - yearSortKey(a.year)));
     return map;
-  }, [exams]);
+  }, [streamExams]);
 
   const examsByYear = useMemo(() => {
     const map = new Map<string, ExamMeta[]>();
-    for (const exam of exams) {
+    for (const exam of streamExams) {
       const list = map.get(exam.year) ?? [];
       list.push(exam);
       map.set(exam.year, list);
     }
     return map;
-  }, [exams]);
+  }, [streamExams]);
 
   const sortedYears = useMemo(
     () => [...examsByYear.keys()].sort((a, b) => yearSortKey(b) - yearSortKey(a)),
@@ -223,9 +254,8 @@ export default function PracticeScreen({
     : subjects;
   const chapterExamsForStream = useMemo(
     () => chapterExams
-      .filter((chapter) => chapter.grade < 11 || stream === "general" || !chapter.stream || chapter.stream.toLowerCase() === stream)
       .sort((a, b) => a.chapter_number - b.chapter_number || a.id - b.id),
-    [chapterExams, stream]
+    [chapterExams]
   );
   const chapterSubjects = subjects;
 
@@ -253,7 +283,7 @@ export default function PracticeScreen({
         chapterExamId={chapter.id}
         telegramUserId={telegramUserId}
         telegramFirstName={telegramFirstName}
-        onExit={() => setView({ kind: "chapterList", subject: chapter.subject, grade: chapter.grade })}
+        onExit={() => setView({ kind: "chapterList", subject: chapter.subject })}
       />
     );
   }
@@ -339,11 +369,10 @@ export default function PracticeScreen({
                 {exam.custom_tag}
               </span>
             )}
-            {exam.is_premium && (
-              <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-[10px]">
-                Premium
-              </span>
-            )}
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold text-[10px] ${exam.is_premium ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+              {exam.is_premium && <Crown className="h-3 w-3" />}
+              {exam.is_premium ? "Premium" : "Free"}
+            </span>
             {exam.content_type === "pdf" && (
               <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 font-semibold text-[10px]">
                 PDF
@@ -500,11 +529,10 @@ export default function PracticeScreen({
                             {exam.custom_tag}
                           </span>
                         )}
-                        {exam.is_premium && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-[10px]">
-                            Premium
-                          </span>
-                        )}
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold text-[10px] ${exam.is_premium ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                          {exam.is_premium && <Crown className="h-3 w-3" />}
+                          {exam.is_premium ? "Premium" : "Free"}
+                        </span>
                         {exam.content_type === "pdf" && (
                           <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 font-semibold text-[10px]">
                             PDF
@@ -648,7 +676,7 @@ export default function PracticeScreen({
                   return (
                     <button
                       key={subject.key}
-                      onClick={() => setView({ kind: "chapterGrades", subject: subject.key })}
+                      onClick={() => setView({ kind: "chapterList", subject: subject.key })}
                       className={`min-h-32 rounded-xl border bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 ${subject.cardBorder}`}
                     >
                       <span className={`mb-3 flex h-10 w-10 items-center justify-center rounded-lg ${subject.iconBg}`}>
@@ -664,7 +692,7 @@ export default function PracticeScreen({
                 })}
               </div>
             )
-          ) : view.kind === "chapterGrades" ? (
+          ) : view.kind === "chapterList" ? (
             <div className="space-y-3">
               <button
                 onClick={() => setView({ kind: "chapterSubjects" })}
@@ -673,31 +701,11 @@ export default function PracticeScreen({
                 <ChevronLeft className="h-5 w-5" /> Subjects
               </button>
               <h2 className="pb-1 text-lg font-bold text-slate-900">{subjectLabel(view.subject)} chapters</h2>
-              <button
-                onClick={() => setView({ kind: "chapterList", subject: view.subject, grade })}
-                className="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-white p-4 text-left shadow-sm"
-              >
-                <GraduationCap className="h-5 w-5 shrink-0 text-violet-600" />
-                <span className="flex-1 font-semibold text-slate-900">Chapter sets</span>
-                <ChevronRight className="h-5 w-5 text-slate-300" />
-              </button>
-            </div>
-          ) : view.kind === "chapterList" ? (
-            <div className="space-y-3">
-              <button
-                onClick={() => setView({ kind: "chapterGrades", subject: view.subject })}
-                className="flex items-center gap-1 text-sm font-medium text-slate-500"
-              >
-                <ChevronLeft className="h-5 w-5" /> Subjects
-              </button>
-              <h2 className="pb-1 text-lg font-bold text-slate-900">{subjectLabel(view.subject)} chapters</h2>
-              {chapterExamsForStream.filter(
-                (chapter) => chapter.subject === view.subject && chapter.grade === view.grade
-              ).length === 0 ? (
+              {chapterExamsForStream.filter((chapter) => chapter.subject === view.subject).length === 0 ? (
                 <EmptyState title="No questions yet" subtitle="Chapter questions will appear here once uploaded." />
               ) : (
                 chapterExamsForStream
-                  .filter((chapter) => chapter.subject === view.subject && chapter.grade === view.grade)
+                  .filter((chapter) => chapter.subject === view.subject)
                   .map((chapter) => (
                     <article key={chapter.id} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                       <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">
@@ -705,6 +713,10 @@ export default function PracticeScreen({
                       </p>
                       <h3 className="mt-1 font-bold text-slate-900">{chapter.title}</h3>
                       <p className="mt-1 text-xs text-slate-500">{chapter.question_count} questions · Untimed</p>
+                      <span className={`mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold ${chapter.is_premium ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        {chapter.is_premium && <Crown className="h-3 w-3" />}
+                        {chapter.is_premium ? "Premium" : "Free"}
+                      </span>
                       <button
                         type="button"
                         onClick={() => openChapterExam(chapter.id)}

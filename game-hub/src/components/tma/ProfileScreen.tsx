@@ -8,7 +8,6 @@ import { getTelegramUser, TelegramUser } from "../../lib/telegram";
 import UniversityLogo from "./UniversityLogo";
 import UniversitySelect from "./UniversitySelect";
 
-const GRADES = [9, 10, 11, 12];
 const SUPPORT_URL = "https://t.me/Mirkuz_support";
 
 export default function ProfileScreen({
@@ -19,7 +18,6 @@ export default function ProfileScreen({
   initialRegion,
   initialSchool,
   initialCity,
-  grade,
   stream,
   selectedSubjects,
   isPremium,
@@ -33,7 +31,6 @@ export default function ProfileScreen({
   initialRegion?: string;
   initialSchool?: string;
   initialCity?: string;
-  grade: number;
   stream: StreamKey;
   selectedSubjects: string[];
   isPremium: boolean;
@@ -44,7 +41,6 @@ export default function ProfileScreen({
     region: string;
     school: string;
     city: string;
-    grade: number;
     stream: StreamKey;
     selected_subjects: string[];
   }) => void;
@@ -115,7 +111,6 @@ export default function ProfileScreen({
       region: region.trim(),
       school: school.trim(),
       city: city.trim(),
-      grade,
       stream,
       selected_subjects: selectedSubjects,
     };
@@ -339,20 +334,14 @@ export default function ProfileScreen({
           </p>
         </div>
 
-        {/* Grade & Stream Info (read-only) */}
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
           <h3 className="text-sm font-bold text-slate-900 mb-3">Academic Info</h3>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-500">Department</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-slate-500">Stream</span>
-              <span className="text-sm font-bold text-slate-900 bg-violet-50 px-3 py-1 rounded-lg">{streamLabel(stream)}</span>
-            </div>
+          <div className="flex items-center justify-between py-2">
+            <span className="text-sm text-slate-500">Stream</span>
+            <span className="text-sm font-bold text-slate-900 bg-violet-50 px-3 py-1 rounded-lg">{streamLabel(stream)}</span>
           </div>
           <p className="text-xs text-slate-400 mt-3">
-            Your department is set during onboarding.
+            Your science stream is set during onboarding.
           </p>
         </div>
 

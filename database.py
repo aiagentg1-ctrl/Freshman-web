@@ -55,10 +55,14 @@ async def init_db():
                     id SERIAL PRIMARY KEY,
                     title VARCHAR NOT NULL,
                     html_content TEXT NOT NULL,
+                    is_premium BOOLEAN NOT NULL DEFAULT FALSE,
                     is_published BOOLEAN NOT NULL DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
+            await conn.execute(text(
+                "ALTER TABLE flash_cards ADD COLUMN IF NOT EXISTS is_premium BOOLEAN NOT NULL DEFAULT FALSE"
+            ))
             # Add all XP and leveling columns
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER NOT NULL DEFAULT 0"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS level INTEGER NOT NULL DEFAULT 1"))

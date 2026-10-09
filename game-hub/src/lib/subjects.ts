@@ -129,7 +129,7 @@ export const SUBJECTS: Record<string, SubjectConfig> = {
   },
   history: {
     key: "history",
-    label: "History",
+    label: "History of Ethiopia & Horn",
     icon: ScrollText,
     iconBg: "bg-amber-50",
     iconText: "text-amber-600",
@@ -170,7 +170,7 @@ export const NATURAL_SUBJECTS = [
   "physics",
   "emerging_technology",
   "anthropology",
-  "history_of_ethiopia_and_horn",
+  "history",
   "e_she",
 ] as const;
 

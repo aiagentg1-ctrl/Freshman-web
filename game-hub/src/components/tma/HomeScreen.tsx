@@ -11,7 +11,6 @@ import PremiumBanner from "./PremiumBanner";
 export default function HomeScreen({
   telegramUser,
   fullName,
-  grade,
   stream,
   university,
   selectedSubjects,
@@ -22,7 +21,6 @@ export default function HomeScreen({
 }: {
   telegramUser: TelegramUser | null;
   fullName: string;
-  grade: number;
   stream: StreamKey;
   university: string;
   selectedSubjects: string[];
@@ -262,8 +260,7 @@ export default function HomeScreen({
           </section>
         )}
 
-        {/* Legacy average score fallback */}
-        {grade <= 10 && progress?.average_score && (
+        {progress?.average_score && (
           <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center">

@@ -8,9 +8,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const backendParams = new URLSearchParams();
   const subject = searchParams.get("subject");
-  const grade = searchParams.get("grade");
   if (subject) backendParams.append("subject", subject);
-  if (grade) backendParams.append("grade", grade);
 
   try {
     const response = await fetch(`${BACKEND_URL}/api/notes?${backendParams.toString()}`, {

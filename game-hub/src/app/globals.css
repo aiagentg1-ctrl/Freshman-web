@@ -12,6 +12,93 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+html.fresho-dark {
+  color-scheme: dark;
+  background: #0b1020;
+}
+
+html.fresho-dark body {
+  background-color: #0b1020;
+  color: #e2e8f0;
+}
+
+html.fresho-dark .bg-white {
+  background-color: #151d31 !important;
+}
+
+html.fresho-dark .bg-slate-50,
+html.fresho-dark .bg-slate-100 {
+  background-color: #10182a !important;
+}
+
+html.fresho-dark .bg-violet-50,
+html.fresho-dark .bg-blue-50,
+html.fresho-dark .bg-indigo-50,
+html.fresho-dark .bg-cyan-50,
+html.fresho-dark .bg-sky-50,
+html.fresho-dark .bg-fuchsia-50,
+html.fresho-dark .bg-teal-50,
+html.fresho-dark .bg-emerald-50,
+html.fresho-dark .bg-rose-50,
+html.fresho-dark .bg-orange-50,
+html.fresho-dark .bg-amber-50,
+html.fresho-dark .bg-amber-100,
+html.fresho-dark .bg-emerald-100,
+html.fresho-dark .bg-blue-100,
+html.fresho-dark .bg-violet-100 {
+  background-color: #232143 !important;
+}
+
+html.fresho-dark .text-emerald-700,
+html.fresho-dark .text-emerald-800 {
+  color: #6ee7b7 !important;
+}
+
+html.fresho-dark .text-amber-700,
+html.fresho-dark .text-amber-800 {
+  color: #fcd34d !important;
+}
+
+html.fresho-dark .text-slate-900,
+html.fresho-dark .text-slate-800,
+html.fresho-dark .text-slate-700 {
+  color: #f1f5f9 !important;
+}
+
+html.fresho-dark .text-slate-600,
+html.fresho-dark .text-slate-500 {
+  color: #a8b4c8 !important;
+}
+
+html.fresho-dark .text-slate-400,
+html.fresho-dark .text-slate-300 {
+  color: #8290a8 !important;
+}
+
+html.fresho-dark .border-slate-100,
+html.fresho-dark .border-slate-200,
+html.fresho-dark .border-slate-300 {
+  border-color: #2b3851 !important;
+}
+
+html.fresho-dark input:not([type="checkbox"]):not([type="radio"]),
+html.fresho-dark textarea,
+html.fresho-dark select {
+  color-scheme: dark;
+  background-color: #10182a;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+html.fresho-dark input::placeholder,
+html.fresho-dark textarea::placeholder {
+  color: #8290a8;
+}
+
+html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
 * {
   box-sizing: border-box;
 }

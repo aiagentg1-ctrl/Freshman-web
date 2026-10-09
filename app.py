@@ -29,7 +29,18 @@ from models import (
 
 VALID_SUBJECTS = [s.value for s in SubjectEnum]
 VALID_STREAMS = [s.name for s in StreamEnum]
-VALID_GRADES = [9, 10, 11, 12]
+NATURAL_ONLY_SUBJECTS = {
+    SubjectEnum.LOGIC,
+    SubjectEnum.PSYCHOLOGY,
+    SubjectEnum.PHYSICS,
+    SubjectEnum.HISTORY,
+}
+SOCIAL_ONLY_SUBJECTS = {
+    SubjectEnum.CIVICS,
+    SubjectEnum.GLOBAL_TRENDS,
+    SubjectEnum.ENTREPRENEURSHIP,
+    SubjectEnum.ECONOMICS,
+}
 
 
 @asynccontextmanager
@@ -298,6 +309,38 @@ async def require_premium_membership(session, user_id: int) -> None:
                 "message": f"Join the {stream_name.title()} Science channel to unlock this premium material.",
             },
         )
+
+
+async def require_material_stream_access(
+    session, user_id: int, material_stream: StreamEnum | None
+) -> None:
+    if material_stream is None:
+        return
+    result = await session.execute(select(User.stream).where(User.user_id == user_id))
+    user_stream = result.scalar_one_or_none()
+    if user_stream != material_stream:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "MATERIAL_STREAM_MISMATCH",
+                "message": "This premium material is not available for your science stream.",
+            },
+        )
+
+
+def exam_material_stream(subject: SubjectEnum) -> StreamEnum | None:
+    if subject in NATURAL_ONLY_SUBJECTS:
+        return StreamEnum.NATURAL
+    if subject in SOCIAL_ONLY_SUBJECTS:
+        return StreamEnum.SOCIAL
+    return None
+
+
+async def chapter_exam_stream(session, exam: ChapterExam) -> StreamEnum | None:
+    if exam.stream is not None or exam.note_id is None:
+        return exam.stream
+    result = await session.execute(select(Note.stream).where(Note.id == exam.note_id))
+    return result.scalar_one_or_none()
 
 
 class DeviceSessionRequest(BaseModel):
@@ -619,14 +662,12 @@ async def update_streak(session, user_id: int) -> tuple:
 
 async def award_subject_milestones(session, user: User, subject: SubjectEnum) -> dict:
     """Award one-time subject completion XP after persisted completions change."""
-    scope = f"{subject.value}_{user.grade}_{user.stream.name.lower()}_{user.user_id}"
+    scope = f"{subject.value}_{user.stream.name.lower()}_{user.user_id}"
     note_query = select(Note.id).where(
         Note.subject == subject,
-        Note.grade == user.grade,
         Note.is_published == True,
+        or_(Note.stream == user.stream, Note.stream.is_(None)),
     )
-    if user.grade >= 11:
-        note_query = note_query.where(Note.stream == user.stream)
 
     note_rows = await session.execute(note_query)
     all_note_ids = set(note_rows.scalars().all())
@@ -648,11 +689,9 @@ async def award_subject_milestones(session, user: User, subject: SubjectEnum) ->
 
     chapter_query = select(ChapterExam.id).where(
         ChapterExam.subject == subject,
-        ChapterExam.grade == user.grade,
         ChapterExam.is_published == True,
+        or_(ChapterExam.stream == user.stream, ChapterExam.stream.is_(None)),
     )
-    if user.grade >= 11:
-        chapter_query = chapter_query.where(ChapterExam.stream == user.stream)
     chapter_rows = await session.execute(chapter_query)
     chapter_exam_ids = set(chapter_rows.scalars().all())
     chapter_attempt_rows = await session.execute(
@@ -694,7 +733,7 @@ async def award_subject_milestones(session, user: User, subject: SubjectEnum) ->
     return {"xp_awarded": xp_awarded, "badges_awarded": badges_awarded}
 
 async def calculate_matrik_score(session, user_id: int) -> dict:
-    """Calculate Matrik score based on stream (Natural or Social) for grades 11-12 only."""
+    """Calculate the freshman score for the user's Natural or Social stream."""
     import json
 
     result = await session.execute(select(User).where(User.user_id == user_id))
@@ -702,18 +741,8 @@ async def calculate_matrik_score(session, user_id: int) -> dict:
     if not user:
         return {"eligible": False, "reason": "User not found"}
 
-    print(f"Calculating Matrik score for user {user_id}, grade: {user.grade}, stream: {user.stream.value}")
+    print(f"Calculating freshman score for user {user_id}, stream: {user.stream.value}")
 
-    # Grade 9-10 students don't have Matrik scores
-    if user.grade in [9, 10]:
-        return {
-            "eligible": False,
-            "reason": "Matrik score only available for grades 11-12",
-            "grade": user.grade,
-            "average_score": user.total_score if user.total_score is not None else 0
-        }
-
-    # Grade 11-12 students get Matrik based on stream
     if user.stream == StreamEnum.NATURAL:
         # Natural Science: Physics, Biology, Chemistry, English, Math, Aptitude
         matrik_subjects = [SubjectEnum.PHYSICS, SubjectEnum.BIOLOGY, SubjectEnum.CHEMISTRY,
@@ -727,7 +756,6 @@ async def calculate_matrik_score(session, user_id: int) -> dict:
         score_field = "social_matrik_score"
         breakdown_field = "social_matrik_breakdown"
     else:
-        # General stream (grades 9-10) - no Matrik
         return {
             "eligible": False,
             "reason": "Matrik score only available for Natural and Social streams",
@@ -820,14 +848,17 @@ def serialize_exam(exam: EueeExam, include_content: bool = False) -> dict:
     return data
 
 
-def serialize_flash_card(flash_card: FlashCard) -> dict:
-    return {
+def serialize_flash_card(flash_card: FlashCard, include_content: bool = True) -> dict:
+    data = {
         "id": flash_card.id,
         "title": flash_card.title,
-        "html_content": flash_card.html_content,
+        "is_premium": flash_card.is_premium,
         "is_published": flash_card.is_published,
         "created_at": flash_card.created_at.isoformat(),
     }
+    if include_content:
+        data["html_content"] = flash_card.html_content
+    return data
 
 
 def serialize_university_logo(logo: UniversityLogo) -> dict:
@@ -843,7 +874,6 @@ def serialize_note(note: Note, include_content: bool = False) -> dict:
     data = {
         "id": note.id,
         "subject": note.subject.value,
-        "grade": note.grade,
         "stream": note.stream.value if note.stream else None,
         "chapter_number": note.chapter_number,
         "semester": note.semester,
@@ -866,19 +896,13 @@ class UserUpdate(BaseModel):
     region: Optional[str] = None
     school: Optional[str] = None
     city: Optional[str] = None
-    grade: int
+    grade: Optional[int] = 12
     stream: str
-
-    @validator('grade')
-    def validate_grade(cls, v):
-        if v not in VALID_GRADES:
-            raise ValueError('Grade must be one of 9, 10, 11, 12')
-        return v
 
     @validator('stream')
     def validate_stream(cls, v):
-        if v.upper() not in VALID_STREAMS:
-            raise ValueError('Stream must be GENERAL, NATURAL or SOCIAL')
+        if v.upper() not in ("NATURAL", "SOCIAL"):
+            raise ValueError('Stream must be NATURAL or SOCIAL')
         return v.upper()  # returned value is a StreamEnum member name
 
 
@@ -910,21 +934,15 @@ class UserProfileUpsert(BaseModel):
     region: Optional[str] = None
     school: Optional[str] = None
     city: Optional[str] = None
-    grade: Optional[int] = None
+    grade: Optional[int] = 12
     stream: Optional[str] = None
     selected_subjects: Optional[List[str]] = None
     premium_expires_at: Optional[datetime] = None
 
-    @validator('grade')
-    def validate_optional_grade(cls, v):
-        if v is not None and v not in VALID_GRADES:
-            raise ValueError('Grade must be one of 9, 10, 11, 12')
-        return v
-
     @validator('stream')
     def validate_optional_stream(cls, v):
-        if v is not None and v.upper() not in VALID_STREAMS:
-            raise ValueError('Stream must be GENERAL, NATURAL or SOCIAL')
+        if v is not None and v.upper() not in ("NATURAL", "SOCIAL"):
+            raise ValueError('Stream must be NATURAL or SOCIAL')
         return v.upper() if v else None
 
 
@@ -1017,6 +1035,7 @@ class UniversityLogoCreate(BaseModel):
 class FlashCardCreate(BaseModel):
     title: str
     html_content: str
+    is_premium: bool = False
     is_published: bool = True
 
     @validator('title')
@@ -1058,13 +1077,13 @@ class ExamAttemptCreate(BaseModel):
 
 class NoteCreate(BaseModel):
     subject: str
-    grade: int
-    stream: Optional[str] = None
+    grade: int = 12
+    stream: str
     chapter_number: int
     title: str
     html_content: str
     semester: str = "all"
-    is_premium: bool = False
+    is_premium: bool = True
     is_published: bool = True
 
     @validator('subject')
@@ -1073,19 +1092,11 @@ class NoteCreate(BaseModel):
             raise ValueError(f'Invalid subject. Must be one of: {", ".join(VALID_SUBJECTS)}')
         return v.lower()
 
-    @validator('grade')
-    def validate_grade(cls, v):
-        if v not in VALID_GRADES:
-            raise ValueError('Grade must be one of 9, 10, 11, 12')
-        return v
-
     @validator('stream')
     def validate_stream(cls, v, values):
-        # Stream is required for grades 11-12, not for 9-10
-        if 'grade' in values and values['grade'] in [11, 12]:
-            if not v or v.upper() not in VALID_STREAMS:
-                raise ValueError('Stream must be NATURAL or SOCIAL for grades 11-12')
-        return v.upper() if v else None
+        if v.upper() not in ("NATURAL", "SOCIAL"):
+            raise ValueError('Stream must be NATURAL or SOCIAL')
+        return v.upper()
 
     @validator('title')
     def validate_title(cls, v):
@@ -1119,7 +1130,6 @@ async def get_user(user_id: int, authenticated_user_id: int = Depends(verify_dev
             "region": user.region,
             "school": user.school,
             "city": user.city,
-            "grade": user.grade,
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
             "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
@@ -1144,7 +1154,7 @@ async def update_user(user_id: int, update: UserUpdate):
                 region=update.region.strip() if update.region else "",
                 school=update.school.strip() if update.school else "",
                 city=update.city.strip() if update.city else "",
-                grade=update.grade,
+                grade=update.grade or 12,
                 stream=StreamEnum[update.stream],
                 selected_subjects=json.dumps(update.selected_subjects or []),
             )
@@ -1168,7 +1178,8 @@ async def update_user(user_id: int, update: UserUpdate):
                 user.school = update.school.strip()
             if update.city is not None:
                 user.city = update.city.strip()
-            user.grade = update.grade
+            if update.grade is not None:
+                user.grade = update.grade
             user.stream = new_stream
             if update.selected_subjects is not None:
                 user.selected_subjects = json.dumps(update.selected_subjects)
@@ -1188,7 +1199,6 @@ async def update_user(user_id: int, update: UserUpdate):
             "region": user.region,
             "school": user.school,
             "city": user.city,
-            "grade": user.grade,
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
             "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
@@ -1303,7 +1313,7 @@ async def upsert_user_profile(update: UserProfileUpsert):
                 region=update.region.strip() if update.region else "",
                 school=update.school.strip() if update.school else "",
                 city=update.city.strip() if update.city else "",
-                grade=update.grade or 9,
+                grade=update.grade or 12,
                 stream=StreamEnum[update.stream or "GENERAL"],
             )
             session.add(user)
@@ -1331,6 +1341,7 @@ async def upsert_user_profile(update: UserProfileUpsert):
 
         await session.commit()
         await session.refresh(user)
+        is_premium, _ = await get_premium_membership_status(session, user.user_id)
         return {
             "user_id": user.user_id,
             "first_name": user.first_name,
@@ -1340,10 +1351,10 @@ async def upsert_user_profile(update: UserProfileUpsert):
             "region": user.region,
             "school": user.school,
             "city": user.city,
-            "grade": user.grade,
             "stream": user.stream.value,
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
             "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
+            "is_premium": is_premium,
         }
 
 
@@ -1476,7 +1487,7 @@ async def get_user_profile(user_id: int):
         # Get rank
         rank = get_rank(user_xp)
 
-        # Get Matrik score (will handle grade 9-10 and different streams)
+        # Score calculation is based on the student's stream, not school grade.
         try:
             matrik = await calculate_matrik_score(session, user_id)
             await session.commit()
@@ -1485,63 +1496,31 @@ async def get_user_profile(user_id: int):
             print(f"Warning: Matrik calculation failed: {e}")
             matrik = {"eligible": False, "reason": "Calculation error"}
 
-        # For grade 9-10, show average score instead of Matrik
-        if user.grade in [9, 10]:
-            profile_data = {
-                "user_id": user.user_id,
-                "first_name": user.first_name,
-                "full_name": user.full_name,
-                "custom_name": user.custom_name,
-                "school": user.school,
-                "city": user.city,
-                "grade": user.grade,
-                "stream": user.stream.value,
-                "xp": user_xp,
-                "level": user_level,
-                "rank": rank,
-                "progress_to_next_level": {
-                    "percent": progress_percent,
-                    "current_xp": xp_in_current_level,
-                    "needed": xp_needed_for_next,
-                },
-                "badges": [
-                    {"name": b.badge_name, "emoji": b.badge_emoji, "earned_at": b.earned_at.isoformat()}
-                    for b in badges
-                ],
-                "daily_streak": user_daily_streak,
-                "frozen_streaks": user_frozen_streaks,
-                "score_type": "average",  # Grade 9-10 show average
-                "average_score": user.total_score if user.total_score is not None else 0,
-                "matrik_score": matrik,  # Include for consistency
-            }
-        else:
-            # Grade 11-12 show Matrik score
-            profile_data = {
-                "user_id": user.user_id,
-                "first_name": user.first_name,
-                "full_name": user.full_name,
-                "custom_name": user.custom_name,
-                "school": user.school,
-                "city": user.city,
-                "grade": user.grade,
-                "stream": user.stream.value,
-                "xp": user_xp,
-                "level": user_level,
-                "rank": rank,
-                "progress_to_next_level": {
-                    "percent": progress_percent,
-                    "current_xp": xp_in_current_level,
-                    "needed": xp_needed_for_next,
-                },
-                "badges": [
-                    {"name": b.badge_name, "emoji": b.badge_emoji, "earned_at": b.earned_at.isoformat()}
-                    for b in badges
-                ],
-                "daily_streak": user_daily_streak,
-                "frozen_streaks": user_frozen_streaks,
-                "score_type": "matrik",  # Grade 11-12 show Matrik
-                "matrik_score": matrik,
-            }
+        profile_data = {
+            "user_id": user.user_id,
+            "first_name": user.first_name,
+            "full_name": user.full_name,
+            "custom_name": user.custom_name,
+            "school": user.school,
+            "city": user.city,
+            "stream": user.stream.value,
+            "xp": user_xp,
+            "level": user_level,
+            "rank": rank,
+            "progress_to_next_level": {
+                "percent": progress_percent,
+                "current_xp": xp_in_current_level,
+                "needed": xp_needed_for_next,
+            },
+            "badges": [
+                {"name": b.badge_name, "emoji": b.badge_emoji, "earned_at": b.earned_at.isoformat()}
+                for b in badges
+            ],
+            "daily_streak": user_daily_streak,
+            "frozen_streaks": user_frozen_streaks,
+            "score_type": "matrik",
+            "matrik_score": matrik,
+        }
 
         print(f"Returning profile data: XP={profile_data['xp']}, Level={profile_data['level']}, Streak={profile_data['daily_streak']}")
         return profile_data
@@ -1871,6 +1850,7 @@ async def get_exam(
                     session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
                 )
                 await require_premium_membership(session, user_id)
+                await require_material_stream_access(session, user_id, exam_material_stream(exam.subject))
         return serialize_exam(exam, include_content=True)
 
 
@@ -1968,6 +1948,18 @@ async def toggle_exam_publish(exam_id: int, admin_verified: bool = Depends(verif
         return {"id": exam_id, "is_published": db_exam.is_published}
 
 
+@app.patch("/api/admin/exams/{exam_id}/toggle-premium")
+async def admin_toggle_exam_premium(exam_id: int, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(EueeExam).where(EueeExam.id == exam_id))
+        exam = result.scalar_one_or_none()
+        if not exam:
+            raise HTTPException(status_code=404, detail="Exam not found")
+        exam.is_premium = not exam.is_premium
+        await session.commit()
+        return {"id": exam_id, "is_premium": exam.is_premium}
+
+
 @app.post("/api/exams/{exam_id}/attempts", status_code=201)
 async def submit_exam_attempt(
     exam_id: int,
@@ -1993,6 +1985,9 @@ async def submit_exam_attempt(
 
         if exam.is_premium:
             await require_premium_membership(session, attempt.user_id)
+            await require_material_stream_access(
+                session, attempt.user_id, exam_material_stream(exam.subject)
+            )
 
         result = await session.execute(select(User).where(User.user_id == attempt.user_id))
         db_user = result.scalar_one_or_none()
@@ -2172,16 +2167,14 @@ async def submit_exam_attempt(
 # ---------- Notes endpoints ----------
 
 @app.get("/api/notes")
-async def get_notes(subject: Optional[str] = None, grade: Optional[int] = None, stream: Optional[str] = None, include_drafts: bool = False):
+async def get_notes(subject: Optional[str] = None, stream: Optional[str] = None, include_drafts: bool = False):
     async with AsyncSessionLocal() as session:
         query = select(Note)
         if subject:
             query = query.where(Note.subject == SubjectEnum[subject.upper()])
-        if grade:
-            query = query.where(Note.grade == grade)
         if stream:
             selected_stream = StreamEnum[stream.upper()]
-            query = query.where(or_(Note.stream == selected_stream, Note.stream == StreamEnum.GENERAL, Note.stream.is_(None)))
+            query = query.where(or_(Note.stream == selected_stream, Note.stream.is_(None)))
         if not include_drafts:
             query = query.where(Note.is_published == True)
 
@@ -2190,12 +2183,30 @@ async def get_notes(subject: Optional[str] = None, grade: Optional[int] = None, 
 
 
 @app.get("/api/notes/{note_id}")
-async def get_note(note_id: int):
+async def get_note(
+    note_id: int,
+    x_fresho_user_id: Optional[int] = Header(None),
+    x_fresho_device_id: Optional[str] = Header(None),
+    x_fresho_session_token: Optional[str] = Header(None),
+    x_admin_secret: Optional[str] = Header(None),
+    x_admin_key: Optional[str] = Header(None),
+    x_admin_password: Optional[str] = Header(None),
+):
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Note).where(Note.id == note_id))
         note = result.scalar_one_or_none()
         if not note:
             raise HTTPException(status_code=404, detail="Note not found")
+        admin_key = x_admin_secret or x_admin_key or x_admin_password or ""
+        is_admin = bool(ADMIN_SECRET) and hmac.compare_digest(admin_key, ADMIN_SECRET)
+        if not note.is_published and not is_admin:
+            raise HTTPException(status_code=404, detail="Note not found")
+        if note.is_premium and not is_admin:
+            user_id = await require_active_device_session(
+                session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
+            )
+            await require_premium_membership(session, user_id)
+            await require_material_stream_access(session, user_id, note.stream)
         return serialize_note(note, include_content=True)
 
 
@@ -2205,7 +2216,7 @@ async def create_note(note: NoteCreate, admin_verified: bool = Depends(verify_ad
         stream_value = StreamEnum[note.stream.upper()] if note.stream else None
         new_note = Note(
             subject=SubjectEnum[note.subject.upper()],
-            grade=note.grade,
+            grade=12,
             stream=stream_value,
             chapter_number=note.chapter_number,
             title=note.title,
@@ -2273,12 +2284,24 @@ async def toggle_note_publish(note_id: int, admin_verified: bool = Depends(verif
         return {"id": note_id, "is_published": db_note.is_published}
 
 
+@app.patch("/api/admin/notes/{note_id}/toggle-premium")
+async def admin_toggle_note_premium(note_id: int, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Note).where(Note.id == note_id))
+        note = result.scalar_one_or_none()
+        if not note:
+            raise HTTPException(status_code=404, detail="Note not found")
+        note.is_premium = not note.is_premium
+        await session.commit()
+        return {"id": note_id, "is_premium": note.is_premium}
+
+
 # ---------- Chapter Exam endpoints ----------
 
 class ChapterExamCreate(BaseModel):
     note_id: Optional[int] = None
     subject: Optional[str] = None
-    grade: Optional[int] = None
+    grade: int = 12
     stream: Optional[str] = None
     chapter_number: Optional[int] = None
     title: str
@@ -2321,7 +2344,6 @@ def serialize_chapter_exam(exam: ChapterExam, include_content: bool = False) -> 
         "id": exam.id,
         "note_id": exam.note_id,
         "subject": exam.subject.value,
-        "grade": exam.grade,
         "stream": exam.stream.value if exam.stream else None,
         "chapter_number": exam.chapter_number,
         "title": exam.title,
@@ -2344,10 +2366,10 @@ async def resolve_chapter_exam_metadata(session, exam: ChapterExamCreate):
             raise HTTPException(status_code=404, detail="Note not found")
         return note.id, note.subject, note.grade, note.stream, note.chapter_number
 
-    if exam.subject is None or exam.grade not in VALID_GRADES or exam.chapter_number is None or exam.chapter_number < 1:
+    if exam.subject is None or exam.chapter_number is None or exam.chapter_number < 1:
         raise HTTPException(
             status_code=422,
-            detail="Standalone chapter questions require a valid subject, grade, and chapter number",
+            detail="Standalone chapter questions require a subject and chapter number",
         )
     try:
         subject = SubjectEnum[exam.subject.upper()]
@@ -2360,7 +2382,6 @@ async def resolve_chapter_exam_metadata(session, exam: ChapterExamCreate):
 @app.get("/api/chapter-exams")
 async def get_chapter_exams(
     subject: Optional[str] = None,
-    grade: Optional[int] = None,
     stream: Optional[str] = None,
     note_id: Optional[int] = None,
     include_drafts: bool = False
@@ -2371,11 +2392,9 @@ async def get_chapter_exams(
             query = select(ChapterExam)
             if subject:
                 query = query.where(ChapterExam.subject == SubjectEnum[subject.upper()])
-            if grade:
-                query = query.where(ChapterExam.grade == grade)
             if stream:
                 selected_stream = StreamEnum[stream.upper()]
-                query = query.where(or_(ChapterExam.stream == selected_stream, ChapterExam.stream == StreamEnum.GENERAL, ChapterExam.stream.is_(None)))
+                query = query.where(or_(ChapterExam.stream == selected_stream, ChapterExam.stream.is_(None)))
             if note_id:
                 query = query.where(ChapterExam.note_id == note_id)
             if not include_drafts:
@@ -2416,6 +2435,7 @@ async def get_chapter_exam(
                         session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
                     )
                     await require_premium_membership(session, user_id)
+                    await require_material_stream_access(session, user_id, await chapter_exam_stream(session, exam))
             return serialize_chapter_exam(exam, include_content=True)
     except HTTPException:
         raise
@@ -2438,6 +2458,18 @@ async def admin_get_chapter_exams(admin_verified: bool = Depends(verify_admin_se
             )
         )
         return [serialize_chapter_exam(exam) for exam in result.scalars().all()]
+
+
+@app.patch("/api/admin/chapter-exams/{exam_id}/toggle-premium")
+async def admin_toggle_chapter_exam_premium(exam_id: int, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(ChapterExam).where(ChapterExam.id == exam_id))
+        exam = result.scalar_one_or_none()
+        if not exam:
+            raise HTTPException(status_code=404, detail="Chapter exam not found")
+        exam.is_premium = not exam.is_premium
+        await session.commit()
+        return {"id": exam_id, "is_premium": exam.is_premium}
 
 
 @app.post("/api/chapter-exams", status_code=201)
@@ -2530,6 +2562,7 @@ async def submit_chapter_exam_attempt(
             raise HTTPException(status_code=404, detail="Chapter exam not found")
         if exam.is_premium:
             await require_premium_membership(session, attempt.user_id)
+            await require_material_stream_access(session, attempt.user_id, await chapter_exam_stream(session, exam))
 
         user_result = await session.execute(select(User).where(User.user_id == attempt.user_id))
         user = user_result.scalar_one_or_none()
@@ -2739,7 +2772,34 @@ async def get_flash_cards():
         result = await session.execute(
             select(FlashCard).where(FlashCard.is_published.is_(True)).order_by(FlashCard.created_at.desc())
         )
-        return [serialize_flash_card(flash_card) for flash_card in result.scalars().all()]
+        return [serialize_flash_card(flash_card, include_content=False) for flash_card in result.scalars().all()]
+
+
+@app.get("/api/flash-cards/{flash_card_id}")
+async def get_flash_card(
+    flash_card_id: int,
+    x_fresho_user_id: Optional[int] = Header(None),
+    x_fresho_device_id: Optional[str] = Header(None),
+    x_fresho_session_token: Optional[str] = Header(None),
+    x_admin_secret: Optional[str] = Header(None),
+    x_admin_key: Optional[str] = Header(None),
+    x_admin_password: Optional[str] = Header(None),
+):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(FlashCard).where(FlashCard.id == flash_card_id))
+        flash_card = result.scalar_one_or_none()
+        if not flash_card:
+            raise HTTPException(status_code=404, detail="Flash card not found")
+        admin_key = x_admin_secret or x_admin_key or x_admin_password or ""
+        is_admin = bool(ADMIN_SECRET) and hmac.compare_digest(admin_key, ADMIN_SECRET)
+        if not flash_card.is_published and not is_admin:
+            raise HTTPException(status_code=404, detail="Flash card not found")
+        if flash_card.is_premium and not is_admin:
+            user_id = await require_active_device_session(
+                session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
+            )
+            await require_premium_membership(session, user_id)
+        return serialize_flash_card(flash_card)
 
 
 @app.get("/api/admin/flash-cards")
@@ -2786,6 +2846,18 @@ async def admin_delete_flash_card(flash_card_id: int, admin_verified: bool = Dep
         await session.delete(flash_card)
         await session.commit()
         return {"deleted": True, "id": flash_card_id}
+
+
+@app.patch("/api/admin/flash-cards/{flash_card_id}/toggle-premium")
+async def admin_toggle_flash_card_premium(flash_card_id: int, admin_verified: bool = Depends(verify_admin_secret)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(FlashCard).where(FlashCard.id == flash_card_id))
+        flash_card = result.scalar_one_or_none()
+        if not flash_card:
+            raise HTTPException(status_code=404, detail="Flash card not found")
+        flash_card.is_premium = not flash_card.is_premium
+        await session.commit()
+        return {"id": flash_card_id, "is_premium": flash_card.is_premium}
 
 
 @app.get("/api/admin/notes")

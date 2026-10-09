@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame, Lock, RefreshCw, X } from "lucide-react";
+import { Flame, Lock, Moon, RefreshCw, Sun, X } from "lucide-react";
 import BottomNav, { Tab } from "../../components/tma/BottomNav";
 import HomeScreen from "../../components/tma/HomeScreen";
 import NotesScreen from "../../components/tma/NotesScreen";
@@ -22,17 +22,15 @@ interface LocalProfile {
   region?: string;
   school?: string;
   city?: string;
-  grade: number;
   stream: StreamKey;
   selected_subjects: string[];
-  premium_expires_at?: string | null;
+  is_premium: boolean;
 }
 
-const VALID_STREAMS: StreamKey[] = ["general", "natural", "social"];
+const VALID_STREAMS: StreamKey[] = ["natural", "social"];
 
 function isCompleteProfile(
   p: {
-    grade?: number | null;
     stream?: string | null;
     selected_subjects?: string[];
     university?: string | null;
@@ -42,10 +40,8 @@ function isCompleteProfile(
     !!p &&
     typeof p.university === "string" &&
     p.university.trim().length > 0 &&
-    p.grade === 12 &&
     VALID_STREAMS.includes((p.stream || "").toLowerCase() as StreamKey) &&
-    Array.isArray(p.selected_subjects) &&
-    p.selected_subjects.length > 0
+    Array.isArray(p.selected_subjects)
   );
 }
 
@@ -62,6 +58,16 @@ export default function TMAPage() {
   const [deviceError, setDeviceError] = useState("");
   const [sessionRetry, setSessionRetry] = useState(0);
   const [showPremiumDialog, setShowPremiumDialog] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    setDarkMode(localStorage.getItem("freshoTheme") === "dark");
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("fresho-dark", darkMode);
+    localStorage.setItem("freshoTheme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   useEffect(() => {
     migrateLegacyStorage();
@@ -140,7 +146,7 @@ export default function TMAPage() {
         setDeviceStatus("active");
 
         const remote = await getUser(session.user_id);
-        if (remote && isCompleteProfile({ grade: remote.grade, stream: remote.stream })) {
+        if (remote && isCompleteProfile({ stream: remote.stream, university: remote.university, selected_subjects: remote.selected_subjects })) {
           setProfile({
             full_name: remote.full_name,
             custom_name: remote.custom_name || undefined,
@@ -148,10 +154,9 @@ export default function TMAPage() {
             region: remote.region || "",
             school: remote.school || "",
             city: remote.city || "",
-            grade: remote.grade,
             stream: remote.stream.toLowerCase() as StreamKey,
             selected_subjects: remote.selected_subjects || [],
-            premium_expires_at: remote.premium_expires_at || null,
+            is_premium: remote.is_premium === true,
           });
         } else {
           try {
@@ -218,32 +223,31 @@ export default function TMAPage() {
       region,
       school: "",
       city: "",
-      grade: 12,
       stream,
       selected_subjects,
-      premium_expires_at: null,
+      is_premium: false,
     };
-    localStorage.setItem("freshoProfile", JSON.stringify(next));
     if (telegramUser) {
       try {
-        await updateUser(telegramUser.id, {
+        const savedProfile = await updateUser(telegramUser.id, {
           first_name: telegramUser.first_name,
           full_name: fullName,
           university,
           region,
-          grade: 12,
           stream,
           selected_subjects,
         });
+        next.is_premium = savedProfile.is_premium === true;
       } catch (error) {
         console.error("Failed to save onboarding profile:", error);
       }
     }
+    localStorage.setItem("freshoProfile", JSON.stringify(next));
     setProfile(next);
   };
 
-  const handleProfileChange = (next: LocalProfile) => {
-    setProfile(next);
+  const handleProfileChange = (next: Omit<LocalProfile, "is_premium">) => {
+    setProfile((current) => current ? { ...current, ...next } : current);
   };
 
   const handleDeviceSignOut = async () => {
@@ -264,14 +268,20 @@ export default function TMAPage() {
   };
 
   const isPremium = (() => {
-    if (!profile?.premium_expires_at) return false;
-    const expiry = new Date(profile.premium_expires_at).getTime();
-    return Number.isFinite(expiry) && expiry > Date.now();
+    return profile?.is_premium === true;
   })();
 
   return (
-    <div className="min-h-screen max-w-md mx-auto bg-[#F8FAFC] shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900">
+    <div className="min-h-screen max-w-md mx-auto bg-slate-50 shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900">
       <DevUserSetup />
+      <button
+        type="button"
+        onClick={() => setDarkMode((value) => !value)}
+        aria-label={darkMode ? "Switch to day mode" : "Switch to night mode"}
+        className="fixed right-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-slate-900/90 text-white shadow-lg"
+      >
+        {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </button>
       {booting ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1D70F5]" />
@@ -296,14 +306,13 @@ export default function TMAPage() {
           )}
         </div>
       ) : !profile ? (
-        // Setup modal always shows before the tabs until grade/stream is chosen.
+        // Students choose their stream and university during onboarding.
         <OnboardingScreen onComplete={handleOnboardingComplete} />
       ) : (
         <>
           {activeTab === "practice" && (
             <PracticeScreen
               stream={profile.stream}
-              grade={profile.grade}
               university={profile.university}
               telegramUserId={telegramUser?.id}
               telegramFirstName={telegramUser?.first_name}
@@ -317,7 +326,6 @@ export default function TMAPage() {
           {activeTab === "notes" && (
             <NotesScreen
               stream={profile.stream}
-              grade={profile.grade}
               university={profile.university}
               telegramUserId={telegramUser?.id}
               isPremium={isPremium}
@@ -328,7 +336,6 @@ export default function TMAPage() {
             <HomeScreen
               telegramUser={telegramUser}
               fullName={profile.custom_name || profile.full_name}
-              grade={profile.grade}
               stream={profile.stream}
               university={profile.university}
               selectedSubjects={profile.selected_subjects}
@@ -339,7 +346,12 @@ export default function TMAPage() {
             />
           )}
           {activeTab === "game" && (
-            <GameScreen stream={profile.stream} university={profile.university} />
+            <GameScreen
+              stream={profile.stream}
+              university={profile.university}
+              isPremium={isPremium}
+              onGetPremium={() => setShowPremiumDialog(true)}
+            />
           )}
           {activeTab === "profile" && (
             <ProfileScreen
@@ -350,7 +362,6 @@ export default function TMAPage() {
               initialRegion={profile.region}
               initialSchool={profile.school}
               initialCity={profile.city}
-              grade={profile.grade}
               stream={profile.stream}
               selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}

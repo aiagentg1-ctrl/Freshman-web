@@ -18,6 +18,38 @@ export interface ExamMeta {
   semester?: string;
 }
 
+export async function adminToggleExamPremium(examId: number): Promise<{ id: number; is_premium: boolean }> {
+  return request(`/api/admin/exams/${examId}/toggle-premium`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+}
+
+export class ApiRequestError extends Error {
+  constructor(message: string, public readonly status: number, public readonly code?: string) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+export async function adminToggleNotePremium(noteId: number): Promise<{ id: number; is_premium: boolean }> {
+  return request(`/api/admin/notes/${noteId}/toggle-premium`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+}
+
+export function isPremiumAccessRequired(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.code === "PREMIUM_MEMBERSHIP_REQUIRED";
+}
+
+export async function adminToggleFlashCardPremium(id: number): Promise<{ id: number; is_premium: boolean }> {
+  return request(`/api/admin/flash-cards/${id}/toggle-premium`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
+}
+
 export interface Exam extends ExamMeta {
   /** HTML markup when content_type is "html"; a URL or data URI when "pdf". */
   content_data: string;
@@ -26,7 +58,6 @@ export interface Exam extends ExamMeta {
 export interface NoteMeta {
   id: number;
   subject: string;
-  grade: number;
   stream: string | null;
   chapter_number: number;
   title: string;
@@ -42,7 +73,8 @@ export interface Note extends NoteMeta {
 export interface FlashCard {
   id: number;
   title: string;
-  html_content: string;
+  html_content?: string;
+  is_premium: boolean;
   is_published: boolean;
   created_at: string;
 }
@@ -51,7 +83,6 @@ export interface ChapterExamMeta {
   id: number;
   note_id: number | null;
   subject: string;
-  grade: number;
   stream: string | null;
   chapter_number: number;
   title: string;
@@ -69,7 +100,6 @@ export interface ChapterExam extends ChapterExamMeta {
 export interface ChapterExamInput {
   note_id?: number | null;
   subject?: string;
-  grade?: number;
   stream?: string | null;
   chapter_number?: number;
   title: string;
@@ -90,7 +120,6 @@ export interface UserProfile {
   region: string;
   school?: string;
   city?: string;
-  grade: number;
   stream: string;
   selected_subjects: string[];
   premium_expires_at?: string | null;
@@ -125,9 +154,7 @@ export interface UserProgress {
   region?: string | null;
   school?: string | null;
   city?: string | null;
-  grade: number;
   stream: string;
-  premium_expires_at?: string | null;
   xp: number;
   level: number;
   rank: { name: string; min_xp: number; emoji: string };
@@ -274,7 +301,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     console.error(`❌ API Error: ${fullPath}`, error);
-    throw new Error(error.detail || error.error || `Request failed: ${response.status}`);
+    const detail = error.detail;
+    const code = typeof detail === "object" && detail !== null && "code" in detail
+      ? String(detail.code)
+      : undefined;
+    const errorMessage = typeof detail === "object" && detail !== null && "message" in detail
+      ? String(detail.message)
+      : typeof detail === "string"
+        ? detail
+        : error.error || `Request failed: ${response.status}`;
+    throw new ApiRequestError(errorMessage, response.status, code);
   }
 
   const data = await response.json();
@@ -368,10 +404,10 @@ export async function submitExamAttempt(
   });
 }
 
-export async function getNotes(subject: string, grade: number, stream?: string): Promise<NoteMeta[]> {
+export async function getNotes(subject: string, stream?: string): Promise<NoteMeta[]> {
   const streamParam = stream ? `&stream=${encodeURIComponent(stream)}` : "";
   return request<NoteMeta[]>(
-    `/api/notes?subject=${encodeURIComponent(subject)}&grade=${grade}${streamParam}`
+    `/api/notes?subject=${encodeURIComponent(subject)}${streamParam}`
   );
 }
 
@@ -383,13 +419,16 @@ export async function getFlashCards(): Promise<FlashCard[]> {
   return request<FlashCard[]>("/api/flash-cards");
 }
 
+export async function getFlashCard(id: number): Promise<FlashCard> {
+  return request<FlashCard>(`/api/flash-cards/${id}`);
+}
+
 export async function getChapterExam(id: number): Promise<ChapterExam> {
   return request<ChapterExam>(`/api/chapter-exams/${id}`);
 }
 
 export async function getChapterExams(filters: {
   subject?: string;
-  grade?: number;
   stream?: string;
   note_id?: number;
 } = {}): Promise<ChapterExamMeta[]> {
@@ -430,6 +469,13 @@ export async function adminUpdateChapterExam(examId: number, exam: ChapterExamIn
 
 export async function adminDeleteChapterExam(examId: number): Promise<void> {
   await request(`/api/chapter-exams/${examId}`, { method: "DELETE", headers: getAdminHeaders() });
+}
+
+export async function adminToggleChapterExamPremium(examId: number): Promise<{ id: number; is_premium: boolean }> {
+  return request(`/api/admin/chapter-exams/${examId}/toggle-premium`, {
+    method: "PATCH",
+    headers: getAdminHeaders(),
+  });
 }
 
 export async function submitChapterExamAttempt(
@@ -523,7 +569,6 @@ export async function updateUser(
     region?: string;
     school?: string;
     city?: string;
-    grade: number;
     stream: string;
     selected_subjects: string[];
     premium_expires_at?: string | null;

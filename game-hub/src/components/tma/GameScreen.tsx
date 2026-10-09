@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { BookOpen, ChevronLeft, Crown, Medal, Sparkles, Trophy } from "lucide-react";
-import { getFlashCards, type FlashCard, type StreamKey } from "../../lib/api";
+import { getFlashCard, getFlashCards, isPremiumAccessRequired, type FlashCard, type StreamKey } from "../../lib/api";
 import HtmlViewer from "./HtmlViewer";
 import Leaderboard from "./Leaderboard";
 
 export default function GameScreen({
   stream,
   university,
+  isPremium,
+  onGetPremium,
 }: {
   stream: StreamKey;
   university: string;
+  isPremium: boolean;
+  onGetPremium: () => void;
 }) {
   const [cards, setCards] = useState<FlashCard[]>([]);
   const [activeCard, setActiveCard] = useState(0);
@@ -19,6 +23,8 @@ export default function GameScreen({
   const [known, setKnown] = useState<string[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [cardContent, setCardContent] = useState("");
+  const [loadingCard, setLoadingCard] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -40,6 +46,37 @@ export default function GameScreen({
   const changeCard = (direction: number) => {
     setActiveCard((current) => (current + direction + cards.length) % cards.length);
     setRevealed(false);
+    setCardContent("");
+  };
+
+  const revealCard = async () => {
+    if (!card) return;
+    if (card.is_premium && !isPremium) {
+      onGetPremium();
+      return;
+    }
+    if (revealed) {
+      setRevealed(false);
+      return;
+    }
+    if (cardContent) {
+      setRevealed(true);
+      return;
+    }
+    setLoadingCard(true);
+    try {
+      const detail = await getFlashCard(card.id);
+      setCardContent(detail.html_content || "");
+      setRevealed(true);
+    } catch (error) {
+      if (isPremiumAccessRequired(error)) onGetPremium();
+      else {
+        console.error("Could not load flash card:", error);
+        alert("Could not load this flash card. Please try again.");
+      }
+    } finally {
+      setLoadingCard(false);
+    }
   };
 
   const markKnown = () => {
@@ -131,17 +168,20 @@ export default function GameScreen({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setRevealed((value) => !value)}
-                  className="flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50/60 p-5 text-center"
+                  onClick={() => void revealCard()}
+                  className={`flex min-h-52 w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed p-5 text-center ${card.is_premium ? "border-amber-200 bg-gradient-to-br from-amber-50 to-violet-50" : "border-violet-200 bg-violet-50/60"}`}
                 >
-                  <Sparkles className="mb-2 h-5 w-5 text-violet-500" />
+                  {card.is_premium ? <Crown className="mb-2 h-5 w-5 text-amber-500" /> : <Sparkles className="mb-2 h-5 w-5 text-violet-500" />}
                   <span className="text-sm font-black text-slate-900">{card.title}</span>
+                  <span className={`mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold ${card.is_premium ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                    {card.is_premium ? "PREMIUM" : "FREE"}
+                  </span>
                   <span className="mt-2 max-w-full overflow-hidden text-xs text-slate-500">
-                    {revealed ? "Tap to hide the answer" : "Tap to reveal the answer"}
+                    {loadingCard ? "Unlocking card..." : revealed ? "Tap to hide the answer" : card.is_premium && !isPremium ? "Tap to explore Premium" : "Tap to reveal the answer"}
                   </span>
                   {revealed && (
                     <span className="mt-3 h-28 w-full overflow-y-auto rounded-xl bg-white p-3 text-left shadow-sm">
-                      <HtmlViewer html={card.html_content} className="text-sm leading-6 text-slate-700" />
+                      <HtmlViewer html={cardContent} className="text-sm leading-6 text-slate-700" />
                     </span>
                   )}
                 </button>

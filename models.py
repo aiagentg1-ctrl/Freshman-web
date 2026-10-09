@@ -145,6 +145,7 @@ class FlashCard(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String, nullable=False)
     html_content = Column(Text, nullable=False)
+    is_premium = Column(Boolean, nullable=False, default=False, server_default="0")
     is_published = Column(Boolean, nullable=False, default=True, server_default="1")
     created_at = Column(DateTime, default=datetime.utcnow)
 

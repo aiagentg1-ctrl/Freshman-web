@@ -1,33 +1,28 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { BookMarked, ChevronLeft, ChevronRight, CheckCircle2, Circle } from "lucide-react";
-import { ChapterExam, ChapterExamMeta, Exam, getChapterExam, getChapterExams, getNote, getNotes, Note, NoteMeta, StreamKey } from "../../lib/api";
+import { BookMarked, ChevronLeft, ChevronRight, CheckCircle2, Circle, Crown } from "lucide-react";
+import { ChapterExam, ChapterExamMeta, Exam, getChapterExam, getChapterExams, getNote, getNotes, isPremiumAccessRequired, Note, NoteMeta, StreamKey } from "../../lib/api";
 import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects";
 import NotesReader from "./NotesReader";
 import { EmptyState } from "./PracticeScreen";
 import ExamRunner from "./ExamRunner";
 import PremiumBanner from "./PremiumBanner";
 
-const GRADES = [9, 10, 11, 12];
-
 type View =
   | { kind: "subjects" }
-  | { kind: "grades"; subject: string }
-  | { kind: "chapters"; subject: string; grade: number }
+  | { kind: "chapters"; subject: string }
   | { kind: "reader"; note: Note; chapterExams: ChapterExamMeta[] }
   | { kind: "chapterExam"; note: Note; chapterExam: ChapterExam; chapterExams: ChapterExamMeta[] };
 
 export default function NotesScreen({
   stream,
-  grade,
   university,
   telegramUserId,
   isPremium,
   onGetPremium,
 }: {
   stream: StreamKey;
-  grade: number;
   university: string;
   telegramUserId?: number;
   isPremium: boolean;
@@ -53,14 +48,19 @@ export default function NotesScreen({
 
   const subjects = useMemo(() => subjectsForStream(stream), [stream]);
 
-  const selectGrade = async (subject: string, grade: number) => {
+  const selectSubject = async (subject: string) => {
     setLoading(true);
-    setView({ kind: "chapters", subject, grade });
+    setView({ kind: "chapters", subject });
     setChapters([]);
     try {
-      const notes = await getNotes(subject, grade, stream);
+      const notes = await getNotes(subject, stream);
       setChapters(notes.sort((a, b) => a.chapter_number - b.chapter_number || a.id - b.id));
-    } catch {
+    } catch (error) {
+      if (isPremiumAccessRequired(error)) {
+        onGetPremium();
+        return;
+      }
+      console.error("Could not load notes:", error);
       setChapters([]);
     } finally {
       setLoading(false);
@@ -68,6 +68,11 @@ export default function NotesScreen({
   };
 
   const openChapter = async (noteId: number) => {
+    const noteMeta = chapters.find((chapter) => chapter.id === noteId);
+    if (noteMeta?.is_premium && !isPremium) {
+      onGetPremium();
+      return;
+    }
     setLoading(true);
     try {
       const [note, chapterExams] = await Promise.all([
@@ -76,10 +81,15 @@ export default function NotesScreen({
       ]);
       localStorage.setItem(
         "freshoLastNote",
-        JSON.stringify({ id: note.id, title: note.title, subject: note.subject, grade: note.grade })
+        JSON.stringify({ id: note.id, title: note.title, subject: note.subject })
       );
       setView({ kind: "reader", note, chapterExams });
-    } catch {
+    } catch (error) {
+      if (isPremiumAccessRequired(error)) {
+        onGetPremium();
+        return;
+      }
+      console.error("Could not load note:", error);
       alert("Could not load this chapter. Please try again.");
     } finally {
       setLoading(false);
@@ -97,6 +107,10 @@ export default function NotesScreen({
       setView({ kind: "chapterExam", note, chapterExam, chapterExams });
     } catch (error) {
       console.error("Could not load chapter exam:", error);
+      if (isPremiumAccessRequired(error)) {
+        onGetPremium();
+        return;
+      }
       alert("Could not load the chapter questions. Please try again.");
     } finally {
       setLoading(false);
@@ -138,7 +152,7 @@ export default function NotesScreen({
         chapterExams={view.chapterExams}
         telegramUserId={telegramUserId}
         onTakeChapterExam={(chapterExamId) => openChapterExam(note, chapterExamId, view.chapterExams)}
-        onBack={() => setView({ kind: "chapters", subject: note.subject, grade: note.grade })}
+        onBack={() => setView({ kind: "chapters", subject: note.subject })}
         onNoteCompleted={() => handleNoteCompleted(note.id)}
       />
     );
@@ -210,11 +224,10 @@ export default function NotesScreen({
                           Completed
                         </span>
                       )}
-                      {chapter.is_premium && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-[10px]">
-                          Premium
-                        </span>
-                      )}
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold text-[10px] ${chapter.is_premium ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        {chapter.is_premium && <Crown className="h-3 w-3" />}
+                        {chapter.is_premium ? "Premium" : "Free"}
+                      </span>
                     </p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
@@ -222,33 +235,6 @@ export default function NotesScreen({
               );
             })
           )}
-        </div>
-      </div>
-    );
-  }
-
-  if (view.kind === "grades") {
-    return (
-      <div className="flex flex-col flex-1">
-        <div className="px-4 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
-          <button
-            onClick={() => setView({ kind: "subjects" })}
-            className="flex items-center gap-1 text-slate-500 text-sm font-medium mb-2"
-          >
-            <ChevronLeft className="w-5 h-5" /> Back
-          </button>
-          <h1 className="text-xl font-bold text-slate-900">{subjectLabel(view.subject)}</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Choose a subject to browse its chapters</p>
-        </div>
-
-        <div className="px-4 py-4">
-          <button
-            type="button"
-            onClick={() => void selectGrade(view.subject, grade)}
-            className="w-full rounded-xl bg-[#1D70F5] py-3 text-sm font-semibold text-white"
-          >
-            Browse chapters
-          </button>
         </div>
       </div>
     );
@@ -277,7 +263,7 @@ export default function NotesScreen({
           return (
             <button
               key={subject.key}
-              onClick={() => void selectGrade(subject.key, grade)}
+              onClick={() => void selectSubject(subject.key)}
               className={`w-full bg-white rounded-2xl p-4 shadow-sm border ${subject.cardBorder} flex items-center gap-3 text-left active:scale-[0.98] transition-transform`}
             >
               <div

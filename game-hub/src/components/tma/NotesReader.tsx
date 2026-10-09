@@ -133,7 +133,7 @@ export default function NotesReader({
 
       <div className="px-4 pb-2 pt-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">
-          {subjectLabel(note.subject)} • Grade {note.grade}
+          {subjectLabel(note.subject)} • {note.stream === "social" ? "Social Science" : "Natural Science"}
         </p>
         <h1 className="mt-1 text-xl font-bold text-slate-900">
           Chapter {note.chapter_number}: {note.title}
