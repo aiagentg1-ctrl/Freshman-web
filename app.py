@@ -29,6 +29,7 @@ from models import (
 
 VALID_SUBJECTS = [s.value for s in SubjectEnum]
 VALID_STREAMS = [s.name for s in StreamEnum]
+VALID_GRADES = [9, 10, 11, 12]
 
 
 @asynccontextmanager
