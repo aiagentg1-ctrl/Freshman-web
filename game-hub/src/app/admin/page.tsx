@@ -24,6 +24,7 @@ import {
   adminCreateChapterExam,
   adminGetChapterExams,
   adminGetChapterExam,
+  adminUpdateChapterExam,
   adminDeleteChapterExam,
   adminToggleChapterExamPremium,
   adminToggleChapterExamPublish,
