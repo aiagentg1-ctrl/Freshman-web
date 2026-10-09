@@ -52,7 +52,7 @@ export default function FlashCardManager() {
     setEditing(card);
     setCreating(false);
     setTitle(card.title);
-    setContent(card.html_content);
+    setContent(card.html_content ?? "");
     setPublished(card.is_published);
     setMessage("");
     setError("");
