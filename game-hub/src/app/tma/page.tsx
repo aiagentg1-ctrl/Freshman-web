@@ -272,8 +272,9 @@ export default function TMAPage() {
   })();
 
   return (
-    <div className={`tma-app-frame min-h-screen max-w-md mx-auto bg-slate-50 shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900 ${isPremium ? "fresho-premium" : ""}`}>
-      <DevUserSetup />
+    <div className="tma-desktop-shell">
+      <div className={`tma-app-frame min-h-screen max-w-md mx-auto bg-slate-50 shadow-2xl relative flex flex-col font-sans pb-24 text-slate-900 ${isPremium ? "fresho-premium" : ""}`}>
+        <DevUserSetup />
       {booting ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1D70F5]" />
@@ -410,6 +411,7 @@ export default function TMAPage() {
           </section>
         </div>
       )}
+      </div>
     </div>
   );
 }

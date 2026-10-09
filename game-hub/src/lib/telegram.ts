@@ -63,16 +63,5 @@ export function expandTelegramApp() {
   if (tg) {
     tg.ready();
     tg.expand();
-    const desktopPlatforms = ["macos", "tdesktop", "web", "weba", "webk"];
-    const isDesktop =
-      window.screen.width >= 768 ||
-      desktopPlatforms.includes(String(tg.platform || "").toLowerCase());
-    if (
-      isDesktop &&
-      typeof tg.requestFullscreen === "function" &&
-      !tg.isFullscreen
-    ) {
-      tg.requestFullscreen();
-    }
   }
 }

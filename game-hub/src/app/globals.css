@@ -104,6 +104,21 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
 }
 
 @media (min-width: 768px) {
+  body:has(.tma-desktop-shell) {
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #f0f2f5;
+  }
+
+  .tma-desktop-shell {
+    display: flex;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+    min-height: 100vh;
+  }
+
   .tma-app-frame {
     width: 100%;
     max-width: 480px;
@@ -111,6 +126,10 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
     margin-inline: auto;
     background-color: #f8fafc;
     box-shadow: 0 0 40px rgb(15 23 42 / 12%);
+  }
+
+  html.fresho-dark body:has(.tma-desktop-shell) {
+    background-color: #0b1020;
   }
 }
 
