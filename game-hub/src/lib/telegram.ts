@@ -12,7 +12,14 @@ export function getTelegramWebApp(): any {
 }
 
 export function getTelegramInitData(): string {
-  return getTelegramWebApp()?.initData || "";
+  const tg = getTelegramWebApp();
+  const initData = tg?.initData || "";
+  console.log("Telegram WebApp initData:", initData ? `Present (${initData.length} chars)` : "Missing");
+  console.log("Telegram WebApp object:", tg ? "Available" : "Not available");
+  if (tg) {
+    console.log("Telegram WebApp.initDataUnsafe:", tg.initDataUnsafe);
+  }
+  return initData;
 }
 
 export function getTelegramUser(): TelegramUser | null {

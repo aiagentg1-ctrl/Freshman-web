@@ -187,6 +187,8 @@ const RECENT_EXAM_ATTEMPTS_KEY = "freshoRecentExamAttempts";
 const IN_PROGRESS_EXAM_KEY = "freshoInProgressExam";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
+console.log("BACKEND_URL configured:", BACKEND_URL);
+
 export function getRecentExamAttempts(): RecentExamAttempt[] {
   try {
     const attempts: unknown = JSON.parse(localStorage.getItem(RECENT_EXAM_ATTEMPTS_KEY) || "[]");

@@ -123,28 +123,45 @@ PREMIUM_CHANNEL_IDS = {
 
 def telegram_user_from_init_data(init_data: str) -> int:
     if not BOT_TOKEN:
+        print("ERROR: BOT_TOKEN is not set")
         raise HTTPException(status_code=503, detail="Fresho bot authentication is not configured")
+
+    # Debug logging
+    print(f"Received init_data length: {len(init_data)}")
+    print(f"BOT_TOKEN length: {len(BOT_TOKEN)}")
 
     fields = dict(parse_qsl(init_data, keep_blank_values=True))
     received_hash = fields.pop("hash", None)
     if not received_hash:
+        print("ERROR: No hash in init_data")
         raise HTTPException(status_code=401, detail="Telegram authentication data is missing")
 
     data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
     secret_key = hmac.new(BOT_TOKEN.encode(), b"WebAppData", hashlib.sha256).digest()
     expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+    print(f"Expected hash: {expected_hash[:16]}...")
+    print(f"Received hash: {received_hash[:16]}...")
+
     if not hmac.compare_digest(expected_hash, received_hash):
+        print("ERROR: Hash mismatch - Telegram authentication data is invalid")
+        print(f"Data check string length: {len(data_check_string)}")
+        print(f"Fields keys: {list(fields.keys())}")
         raise HTTPException(status_code=401, detail="Telegram authentication data is invalid")
 
     try:
         auth_date = int(fields["auth_date"])
         telegram_user_id = int(json.loads(fields["user"])["id"])
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        print(f"ERROR: Could not parse user data: {error}")
         raise HTTPException(status_code=401, detail="Telegram authentication data is incomplete") from error
 
     now = int(datetime.now(timezone.utc).timestamp())
     if auth_date > now + 60 or now - auth_date > 86_400:
+        print(f"ERROR: Auth date expired - auth_date: {auth_date}, now: {now}")
         raise HTTPException(status_code=401, detail="Telegram authentication data has expired")
+
+    print(f"Successfully authenticated user: {telegram_user_id}")
     return telegram_user_id
 
 
