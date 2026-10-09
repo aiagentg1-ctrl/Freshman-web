@@ -13,16 +13,17 @@ import {
   GraduationCap,
   ListChecks,
 } from "lucide-react";
-import { ChapterExam, ChapterExamMeta, Exam, ExamMeta, getChapterExam, getChapterExams, getExam, getExams, StreamKey } from "../../lib/api";
+import { ChapterExam, ChapterExamMeta, Exam, ExamMeta, getChapterExam, getChapterExams, getExam, getExams, getUniversityLogo, StreamKey } from "../../lib/api";
 import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects";
 import ExamRunner, { PdfExamView, HtmlExamView } from "./ExamRunner";
 import PremiumBanner from "./PremiumBanner";
+import UniversityLogo from "./UniversityLogo";
 
 type View =
   | { kind: "subjectList" }
   | { kind: "subjectExams"; subject: string }
   | { kind: "yearList" }
-  | { kind: "yearExams"; year: string }
+  | { kind: "yearExams"; year: string; examType?: "mid" | "final" }
   | { kind: "chapterSubjects" }
   | { kind: "chapterGrades"; subject: string }
   | { kind: "chapterList"; subject: string; grade: number }
@@ -67,6 +68,7 @@ export default function PracticeScreen({
   const [loading, setLoading] = useState(true);
   const [loadingChapterExams, setLoadingChapterExams] = useState(true);
   const [loadingExam, setLoadingExam] = useState(false);
+  const [universityLogos, setUniversityLogos] = useState<Map<string, string>>(new Map());
 
   const subjects = useMemo(() => subjectsForStream(stream), [stream]);
 
@@ -85,6 +87,37 @@ export default function PracticeScreen({
       cancelled = true;
     };
   }, [university]);
+
+  // Load university logos for exams
+  useEffect(() => {
+    let cancelled = false;
+    const loadLogos = async () => {
+      const uniqueUniversities = [...new Set(exams.map((exam) => exam.university).filter(Boolean))];
+      const logoMap = new Map<string, string>();
+
+      await Promise.all(
+        uniqueUniversities.map(async (uni) => {
+          try {
+            const logo = await getUniversityLogo(uni);
+            if (logo) {
+              logoMap.set(uni, logo.data_uri);
+            }
+          } catch (error) {
+            console.error(`Failed to load logo for ${uni}:`, error);
+          }
+        })
+      );
+
+      if (!cancelled) {
+        setUniversityLogos(logoMap);
+      }
+    };
+
+    loadLogos();
+    return () => {
+      cancelled = true;
+    };
+  }, [exams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,9 +257,14 @@ export default function PracticeScreen({
       return (
         <PdfExamView
           exam={view.exam}
-          onExit={() =>
-            setView(mode === "subject" ? { kind: "subjectList" } : { kind: "yearList" })
-          }
+          onExit={() => {
+            if (mode === "year") {
+              const year = view.exam.year;
+              setView({ kind: "yearExams", year, examType: view.exam.exam_type });
+            } else {
+              setView({ kind: "subjectList" });
+            }
+          }}
         />
       );
     }
@@ -237,9 +275,14 @@ export default function PracticeScreen({
         return (
           <HtmlExamView
             exam={view.exam}
-            onExit={() =>
-              setView(mode === "subject" ? { kind: "subjectList" } : { kind: "yearList" })
-            }
+            onExit={() => {
+              if (mode === "year") {
+                const year = view.exam.year;
+                setView({ kind: "yearExams", year, examType: view.exam.exam_type });
+              } else {
+                setView({ kind: "subjectList" });
+              }
+            }}
           />
         );
       }
@@ -251,9 +294,14 @@ export default function PracticeScreen({
         telegramUserId={telegramUserId}
         telegramFirstName={telegramFirstName}
         onGoHome={onGoHome}
-        onExit={() =>
-          setView(mode === "subject" ? { kind: "subjectList" } : { kind: "yearList" })
-        }
+        onExit={() => {
+          if (mode === "year") {
+            const year = view.exam.year;
+            setView({ kind: "yearExams", year, examType: view.exam.exam_type });
+          } else {
+            setView({ kind: "subjectList" });
+          }
+        }}
       />
     );
   }
@@ -369,6 +417,9 @@ export default function PracticeScreen({
   // ---------- By Year → subjects for that year ----------
   if (view.kind === "yearExams") {
     const yearExams = examsByYear.get(view.year) ?? [];
+    const examType = view.examType ?? "final";
+    const filteredExams = yearExams.filter((exam) => exam.exam_type === examType);
+
     return (
       <div className="flex flex-col flex-1">
         <div className="px-4 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
@@ -380,10 +431,112 @@ export default function PracticeScreen({
           </button>
           <h1 className="text-xl font-bold text-slate-900">{view.year}</h1>
           <p className="text-xs text-slate-500 mt-0.5">All subjects for this year</p>
+
+          {/* Mid/Final Exam Tabs */}
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 mt-3">
+            {(
+              [
+                { key: "mid" as const, label: "Mid Exam" },
+                { key: "final" as const, label: "Final Exam" },
+              ]
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setView({ ...view, examType: tab.key })}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  examType === tab.key
+                    ? "bg-white text-[#1D70F5] shadow-sm"
+                    : "text-slate-500"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex-1 px-4 py-4 space-y-3">
-          {yearExams.map((exam) => examRow(exam, true))}
+          {filteredExams.length === 0 ? (
+            <EmptyState
+              title={`No ${examType} exams yet`}
+              subtitle={`${examType === "mid" ? "Mid" : "Final"} exams for ${view.year} will appear here once uploaded.`}
+            />
+          ) : (
+            filteredExams.map((exam) => (
+              <div
+                key={exam.id}
+                className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <UniversityLogo
+                    university={exam.university}
+                    logo={universityLogos.get(exam.university)}
+                    className="w-11 h-11"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 truncate">
+                      {subjectLabel(exam.subject)}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[#1D70F5] font-semibold text-[10px]">
+                        {exam.year}
+                      </span>
+                      {exam.custom_tag && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-600 font-semibold text-[10px]">
+                          {exam.custom_tag}
+                        </span>
+                      )}
+                      {exam.is_premium && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-semibold text-[10px]">
+                          Premium
+                        </span>
+                      )}
+                      {exam.content_type === "pdf" && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 font-semibold text-[10px]">
+                          PDF
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1">
+                        <FileQuestion className="w-3.5 h-3.5" /> {exam.question_count} Qs
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" /> {exam.duration_minutes} min
+                      </span>
+                    </p>
+                  </div>
+                  {exam.content_type === "html" && (
+                    <button
+                      onClick={() => openExam(exam.id)}
+                      disabled={loadingExam}
+                      className="shrink-0 px-3.5 py-2 rounded-xl bg-[#1D70F5] text-white text-xs font-semibold active:scale-[0.97] transition-transform"
+                    >
+                      Start
+                    </button>
+                  )}
+                </div>
+                {exam.content_type === "pdf" && (
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => downloadPdf(exam.id, exam.title)}
+                      disabled={loadingExam}
+                      className="flex-1 bg-[#1D70F5] text-white py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                    >
+                      <Download className="w-4 h-4" /> Download PDF
+                    </button>
+                    <button
+                      onClick={() => openExam(exam.id)}
+                      disabled={loadingExam}
+                      className="flex-1 bg-white border border-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                    >
+                      <FileText className="w-4 h-4" /> Open in Viewer
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     );
@@ -584,15 +737,27 @@ export default function PracticeScreen({
           <div className="space-y-3">
             {sortedYears.map((year) => {
               const list = examsByYear.get(year) ?? [];
+              // Get unique universities for this year and their logos
+              const uniqueUniversities = [...new Set(list.map((exam) => exam.university).filter(Boolean))];
+              const universityWithLogo = uniqueUniversities[0];
+
               return (
                 <button
                   key={year}
-                  onClick={() => setView({ kind: "yearExams", year })}
+                  onClick={() => setView({ kind: "yearExams", year, examType: "final" })}
                   className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3 text-left active:scale-[0.98] transition-transform"
                 >
-                  <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
-                    <CalendarDays className="w-5 h-5 text-violet-600" />
-                  </div>
+                  {universityWithLogo ? (
+                    <UniversityLogo
+                      university={universityWithLogo}
+                      logo={universityLogos.get(universityWithLogo)}
+                      className="w-11 h-11"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                      <CalendarDays className="w-5 h-5 text-violet-600" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-slate-900">{year}</h3>
                     <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">

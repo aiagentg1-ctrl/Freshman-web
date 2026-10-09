@@ -1750,7 +1750,7 @@ async def get_leaderboard(
                     base = base.where(EueeExamAttempt.created_at >= week_ago)
 
                 leaderboard_query = base.order_by(desc("best_score"), desc("avg_score"), User.user_id)
-                result = await session.execute(leaderaderboard_query)
+                result = await session.execute(leaderboard_query)
                 all_rows = result.all()
                 leaderboard = all_rows[:10]
                 logos = {}
