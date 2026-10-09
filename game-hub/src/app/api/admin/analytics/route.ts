@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/backend";
 
-const BACKEND_URL = process.env.BACKEND_URL || process.env.API_BASE_URL || "https://mirkuz-telegram-bot.onrender.com";
 const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_KEY || process.env.ADMIN_PASSWORD || "mirkuz123";
 
 function getProvidedKey(request: NextRequest): string {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/backend";
 import { freshoSessionHeaders } from "@/lib/serverSession";
 
-const API_BASE_URL = process.env.API_BASE_URL || process.env.BACKEND_URL || "http://localhost:8000";
 const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_KEY || process.env.ADMIN_PASSWORD || "mirkuz123";
 
 const NO_CACHE = {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (year) backendParams.append("year", year);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/exams?${backendParams.toString()}`, {
+    const response = await fetch(`${BACKEND_URL}/api/exams?${backendParams.toString()}`, {
       headers: { ...NO_CACHE, ...freshoSessionHeaders(request) },
       cache: "no-store",
     });
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   try {
-    const response = await fetch(`${API_BASE_URL}/api/exams`, {
+    const response = await fetch(`${BACKEND_URL}/api/exams`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL } from "@/lib/backend";
 import { freshoSessionHeaders } from "@/lib/serverSession";
 
-const API_BASE_URL = process.env.API_BASE_URL || process.env.BACKEND_URL || "http://localhost:8000";
 const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_KEY || process.env.ADMIN_PASSWORD || "mirkuz123";
 
 export async function GET(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (grade) backendParams.append("grade", grade);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/notes?${backendParams.toString()}`, {
+    const response = await fetch(`${BACKEND_URL}/api/notes?${backendParams.toString()}`, {
       headers: {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         Pragma: "no-cache",
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   try {
-    const response = await fetch(`${API_BASE_URL}/api/notes`, {
+    const response = await fetch(`${BACKEND_URL}/api/notes`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

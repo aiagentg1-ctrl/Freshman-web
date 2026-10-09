@@ -235,12 +235,16 @@ export function clearExamProgress(examId: number): void {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const fullPath = `${BACKEND_URL}${path}`;
+  const headers = new Headers(options?.headers);
+  headers.set("Content-Type", "application/json");
+  const isAdminRequest =
+    headers.has("x-admin-key") ||
+    headers.has("x-admin-secret") ||
+    headers.has("x-admin-password");
+  const fullPath = isAdminRequest ? path : `${BACKEND_URL}${path}`;
 
   console.log(`📡 API Request: ${fullPath}`, options?.method || "GET");
 
-  const headers = new Headers(options?.headers);
-  headers.set("Content-Type", "application/json");
   if (process.env.NEXT_PUBLIC_BROWSER_DEMO_MODE === "true") {
     headers.set("X-Fresho-Demo-Mode", "true");
     headers.set(
@@ -736,7 +740,7 @@ export async function adminDeleteExam(examId: number): Promise<void> {
 }
 
 export async function adminToggleExamPublish(examId: number): Promise<{ id: number; is_published: boolean }> {
-  return request(`/api/exams/${examId}/toggle-publish`, {
+  return request(`/api/admin/exams/${examId}/toggle-publish`, {
     method: "PATCH",
     headers: getAdminHeaders(),
   });
@@ -751,7 +755,7 @@ export async function adminCreateNote(note: Omit<Note, "id">): Promise<Note> {
 }
 
 export async function adminUpdateNote(noteId: number, note: Omit<Note, "id">): Promise<Note> {
-  return request<Note>(`/api/notes/${noteId}`, {
+  return request<Note>(`/api/admin/notes/${noteId}`, {
     method: "PUT",
     headers: getAdminHeaders(),
     body: JSON.stringify(note),
@@ -759,14 +763,14 @@ export async function adminUpdateNote(noteId: number, note: Omit<Note, "id">): P
 }
 
 export async function adminDeleteNote(noteId: number): Promise<void> {
-  return request(`/api/notes/${noteId}`, {
+  return request(`/api/admin/notes/${noteId}`, {
     method: "DELETE",
     headers: getAdminHeaders(),
   });
 }
 
 export async function adminToggleNotePublish(noteId: number): Promise<{ id: number; is_published: boolean }> {
-  return request(`/api/notes/${noteId}/toggle-publish`, {
+  return request(`/api/admin/notes/${noteId}/toggle-publish`, {
     method: "PATCH",
     headers: getAdminHeaders(),
   });
