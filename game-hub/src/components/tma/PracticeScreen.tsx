@@ -154,11 +154,6 @@ export default function PracticeScreen({
 
   const openExam = async (examId: number) => {
     const examMeta = exams.find((item) => item.id === examId);
-    // Yearly exams require premium
-    if (!isPremium) {
-      onGetPremium();
-      return;
-    }
     if (examMeta?.is_premium && !isPremium) {
       onGetPremium();
       return;
@@ -181,11 +176,6 @@ export default function PracticeScreen({
 
   const openChapterExam = async (examId: number) => {
     const examMeta = chapterExams.find((item) => item.id === examId);
-    // Allow Chapter 1 for free users, but require premium for other chapters
-    if (!isPremium && examMeta?.chapter_number !== 1) {
-      onGetPremium();
-      return;
-    }
     if (examMeta?.is_premium && !isPremium) {
       onGetPremium();
       return;
@@ -207,11 +197,6 @@ export default function PracticeScreen({
 
   const downloadPdf = async (examId: number, title: string) => {
     const examMeta = exams.find((item) => item.id === examId);
-    // Enforce premium access for all PDF downloads
-    if (!isPremium) {
-      onGetPremium();
-      return;
-    }
     if (examMeta?.is_premium && !isPremium) {
       onGetPremium();
       return;
@@ -358,8 +343,10 @@ export default function PracticeScreen({
     );
   }
 
-  const examRow = (exam: ExamMeta, showSubject: boolean) => (
-    <div
+  const examRow = (exam: ExamMeta, showSubject: boolean) => {
+    const isLocked = exam.is_premium && !isPremium;
+    return (
+      <div
       key={exam.id}
       className={`w-full rounded-2xl p-4 text-left shadow-sm ${exam.is_premium ? "border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-violet-50 ring-1 ring-amber-200" : "border border-slate-100 bg-white"}`}
     >
@@ -408,10 +395,10 @@ export default function PracticeScreen({
         {exam.content_type === "html" && (
           <button
             onClick={() => openExam(exam.id)}
-            disabled={loadingExam || !isPremium}
-            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-[0.97] transition-transform ${!isPremium ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
+            disabled={loadingExam || isLocked}
+            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-[0.97] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
           >
-            {isPremium ? "Start" : "🔒 Premium"}
+            {isLocked ? "🔒 Premium" : "Start"}
           </button>
         )}
       </div>
@@ -419,22 +406,23 @@ export default function PracticeScreen({
         <div className="flex gap-2 mt-3">
           <button
             onClick={() => downloadPdf(exam.id, exam.title)}
-            disabled={loadingExam || !isPremium}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${!isPremium ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
+            disabled={loadingExam || isLocked}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
           >
-            <Download className="w-4 h-4" /> {isPremium ? "Download PDF" : "🔒 Premium"}
+            <Download className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Download PDF"}
           </button>
           <button
             onClick={() => openExam(exam.id)}
-            disabled={loadingExam || !isPremium}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${!isPremium ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-slate-200 text-slate-700"}`}
+            disabled={loadingExam || isLocked}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-slate-200 text-slate-700"}`}
           >
-            <FileText className="w-4 h-4" /> {isPremium ? "Open in Viewer" : "🔒 Premium"}
+            <FileText className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Open in Viewer"}
           </button>
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // ---------- By Subject → subject exam years ----------
   if (view.kind === "subjectExams") {
@@ -517,6 +505,7 @@ export default function PracticeScreen({
           ) : (
             filteredExams.map((exam) => {
               const universityAbbr = getUniversityAbbreviation(exam.university);
+              const isLocked = exam.is_premium && !isPremium;
               return (
                 <div
                   key={exam.id}
@@ -568,10 +557,10 @@ export default function PracticeScreen({
                     {exam.content_type === "html" && (
                       <button
                         onClick={() => openExam(exam.id)}
-                        disabled={loadingExam || !isPremium}
-                        className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-[0.97] transition-transform ${!isPremium ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
+                        disabled={loadingExam || isLocked}
+                        className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-[0.97] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
                       >
-                        {isPremium ? "Start" : "🔒 Premium"}
+                        {isLocked ? "🔒 Premium" : "Start"}
                       </button>
                     )}
                   </div>
@@ -579,17 +568,17 @@ export default function PracticeScreen({
                     <div className="flex gap-2 mt-3">
                       <button
                         onClick={() => downloadPdf(exam.id, exam.title)}
-                        disabled={loadingExam || !isPremium}
-                        className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${!isPremium ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
+                        disabled={loadingExam || isLocked}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
                       >
-                        <Download className="w-4 h-4" /> {isPremium ? "Download PDF" : "🔒 Premium"}
+                        <Download className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Download PDF"}
                       </button>
                       <button
                         onClick={() => openExam(exam.id)}
-                        disabled={loadingExam || !isPremium}
-                        className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${!isPremium ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-slate-200 text-slate-700"}`}
+                        disabled={loadingExam || isLocked}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-slate-200 text-slate-700"}`}
                       >
-                        <FileText className="w-4 h-4" /> {isPremium ? "Open in Viewer" : "🔒 Premium"}
+                        <FileText className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Open in Viewer"}
                       </button>
                     </div>
                   )}
@@ -725,7 +714,7 @@ export default function PracticeScreen({
                 chapterExamsForStream
                   .filter((chapter) => chapter.subject === view.subject)
                   .map((chapter) => {
-                    const isLocked = !isPremium && chapter.chapter_number !== 1;
+                    const isLocked = chapter.is_premium && !isPremium;
                     return (
                       <article key={chapter.id} className={`rounded-xl p-4 shadow-sm ${chapter.is_premium ? "border border-amber-300 bg-gradient-to-br from-amber-50 via-white to-violet-50 ring-1 ring-amber-200" : "border border-slate-100 bg-white"}`}>
                         <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">

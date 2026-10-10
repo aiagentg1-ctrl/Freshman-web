@@ -12,84 +12,85 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* YouTube/Twitter-style Dark Mode - Comfortable & Neutral */
+/* Beautiful Dark Mode - Polished & Professional */
 html.fresho-dark {
   color-scheme: dark;
-  background: #0f0f0f;
+  background: #09090b;
 }
 
 html.fresho-dark body {
-  background-color: #0f0f0f;
-  color: #ffffff;
+  background-color: #09090b;
+  color: #fafafa;
 }
 
 html.fresho-dark .bg-white {
-  background-color: #1e1e1e !important;
+  background-color: #18181b !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 html.fresho-dark .bg-slate-50,
 html.fresho-dark .bg-slate-100 {
-  background-color: #272727 !important;
+  background-color: #27272a !important;
 }
 
 html.fresho-dark .bg-violet-50 {
-  background-color: #2a2a2a !important;
+  background-color: #2a2a2e !important;
 }
 
 html.fresho-dark .bg-blue-50 {
-  background-color: #2a2a2a !important;
+  background-color: #1e2a3e !important;
 }
 
 html.fresho-dark .bg-indigo-50 {
-  background-color: #2a2a2a !important;
+  background-color: #2a2a3e !important;
 }
 
 html.fresho-dark .bg-cyan-50 {
-  background-color: #2a2a2a !important;
+  background-color: #1e3a45 !important;
 }
 
 html.fresho-dark .bg-sky-50 {
-  background-color: #2a2a2a !important;
+  background-color: #1e3545 !important;
 }
 
 html.fresho-dark .bg-fuchsia-50 {
-  background-color: #2a2a2a !important;
+  background-color: #3e2a45 !important;
 }
 
 html.fresho-dark .bg-teal-50 {
-  background-color: #2a2a2a !important;
+  background-color: #1e3a38 !important;
 }
 
 html.fresho-dark .bg-emerald-50 {
-  background-color: #2a2a2a !important;
+  background-color: #1e3a2e !important;
 }
 
 html.fresho-dark .bg-rose-50 {
-  background-color: #2a2a2a !important;
+  background-color: #3e2a3e !important;
 }
 
 html.fresho-dark .bg-orange-50 {
-  background-color: #2a2a2a !important;
+  background-color: #3e322a !important;
 }
 
 html.fresho-dark .bg-amber-50 {
-  background-color: #2a2a2a !important;
+  background-color: #3e322a !important;
 }
 
 html.fresho-dark .bg-amber-100 {
-  background-color: #333333 !important;
+  background-color: #4a3c2e !important;
 }
 
 html.fresho-dark .bg-emerald-100 {
-  background-color: #333333 !important;
+  background-color: #2e4a3a !important;
 }
 
 html.fresho-dark .bg-blue-100 {
-  background-color: #333333 !important;
+  background-color: #2e4a5a !important;
 }
 
 html.fresho-dark .bg-violet-100 {
-  background-color: #333333 !important;
+  background-color: #3e3a5a !important;
 }
 
 html.fresho-dark .text-emerald-700,
@@ -105,42 +106,474 @@ html.fresho-dark .text-amber-800 {
 html.fresho-dark .text-slate-900,
 html.fresho-dark .text-slate-800,
 html.fresho-dark .text-slate-700 {
-  color: #ffffff !important;
+  color: #fafafa !important;
 }
 
 html.fresho-dark .text-slate-600,
 html.fresho-dark .text-slate-500 {
-  color: #aaaaaa !important;
+  color: #a1a1aa !important;
 }
 
 html.fresho-dark .text-slate-400,
 html.fresho-dark .text-slate-300 {
-  color: #888888 !important;
+  color: #71717a !important;
 }
 
 html.fresho-dark .border-slate-100,
 html.fresho-dark .border-slate-200,
 html.fresho-dark .border-slate-300 {
-  border-color: #333333 !important;
+  border-color: #3f3f46 !important;
 }
 
 html.fresho-dark input:not([type="checkbox"]):not([type="radio"]),
 html.fresho-dark textarea,
 html.fresho-dark select {
   color-scheme: dark;
-  background-color: #272727;
-  color: #ffffff;
-  border-color: #404040;
+  background-color: #27272a;
+  color: #fafafa;
+  border-color: #3f3f46;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 html.fresho-dark input::placeholder,
 html.fresho-dark textarea::placeholder {
-  color: #888888;
+  color: #71717a;
 }
 
 html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #404040;
+  background: #3f3f46;
+  border-radius: 4px;
 }
+
+html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  body:has(.tma-desktop-shell) {
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #f0f2f5;
+  }
+
+  .tma-desktop-shell {
+    display: flex;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  .tma-app-frame {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    margin-inline: auto;
+    background-color: #f8fafc;
+  }
+
+  html.fresho-dark body:has(.tma-desktop-shell) {
+    background-color: #09090b;
+  }
+
+  html.fresho-dark .tma-app-frame {
+    background-color: #09090b;
+  }
+}
+
+.fresho-premium nav.fixed {
+  border-top-color: #b7791f;
+  box-shadow: 0 -1px 18px rgb(183 121 31 / 12%);
+}
+
+/* TMA-specific styles */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* ============ Admin-uploaded HTML content (exams & notes) ============ */
+.html-content {
+  font-size: 15px;
+  line-height: 1.7;
+  word-wrap: break-word;
+}
+
+/* Natural mode - display HTML as-is without forced styling */
+.html-content.natural-mode {
+  font-size: inherit;
+  line-height: inherit;
+  word-wrap: inherit;
+  color: inherit;
+  background: inherit;
+}
+
+/* In natural mode, remove all forced backgrounds, borders, and colors */
+.html-content.natural-mode *,
+.html-content.natural-mode *::before,
+.html-content.natural-mode *::after {
+  background: inherit !important;
+  background-color: inherit !important;
+  border: inherit !important;
+  border-color: inherit !important;
+  color: inherit !important;
+}
+
+.html-content .matrix-bracket {
+  display: inline-flex;
+  align-items: center;
+  border-left: 2.5px solid #1D70F5;
+  border-right: 2.5px solid #1D70F5;
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin: 4px 6px;
+}
+
+.html-content .math-table {
+  border-collapse: collapse;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.html-content .math-table td {
+  padding: 4px 10px;
+  font-family: monospace;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.html-content sub {
+  vertical-align: sub;
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+.html-content sup {
+  vertical-align: super;
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+.html-content svg {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.html-content .vector-arrow,
+.html-content .greek-symbol,
+.html-content [data-vector],
+.html-content [data-greek] {
+  font-weight: 600;
+}
+
+.html-content h1,
+.html-content h2,
+.html-content h3,
+.html-content h4 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.25em 0 0.5em;
+}
+
+.html-content h1 { font-size: 1.5rem; }
+.html-content h2 { font-size: 1.25rem; }
+.html-content h3 { font-size: 1.1rem; }
+.html-content h4 { font-size: 1rem; }
+
+.html-content p {
+  margin: 0.75em 0;
+}
+
+.html-content ul,
+.html-content ol {
+  margin: 0.75em 0;
+  padding-left: 1.5em;
+}
+
+.html-content ul { list-style: disc; }
+.html-content ol { list-style: decimal; }
+
+.html-content li {
+  margin: 0.4em 0;
+}
+
+.html-content li > ul,
+.html-content li > ol {
+  margin: 0.3em 0;
+}
+
+.html-content a {
+  text-decoration: underline;
+}
+
+.html-content strong,
+.html-content b {
+  font-weight: 700;
+}
+
+.html-content em,
+.html-content i {
+  font-style: italic;
+}
+
+.html-content blockquote {
+  border-left: 3px solid #1d70f5;
+  padding: 0.5em 1em;
+  margin: 1em 0;
+  background: #f0f7ff;
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #334155;
+}
+
+html.fresho-dark .html-content blockquote {
+  background: #1e2a3e;
+  color: #cbd5e1;
+}
+
+.html-content code {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html.fresho-dark .html-content code {
+  background: #27272a;
+  border-color: #3f3f46;
+  color: #86efac;
+}
+
+.html-content pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 1em;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+html.fresho-dark .html-content pre {
+  background: #18181b;
+  border: 1px solid #3f3f46;
+}
+
+.html-content pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+}
+
+.html-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.875rem;
+}
+
+.html-content th,
+.html-content td {
+  border: 1px solid #e2e8f0;
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.html-content th {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+html.fresho-dark .html-content th {
+  background: #27272a;
+  color: #f8fafc;
+}
+
+html.fresho-dark .html-content td {
+  border-color: #3f3f46;
+  color: #cbd5e1;
+}
+
+.html-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 0.75em 0;
+}
+
+.html-content hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 1.5em 0;
+}
+
+/* Equation / formula boxes — #F8FAFC background with borders */
+.html-content .equation,
+.html-content .formula,
+.html-content .formula-box,
+.html-content .math {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.9em 1.1em;
+  margin: 1em 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.95em;
+  overflow-x: auto;
+  text-align: center;
+}
+
+html.fresho-dark .html-content .equation,
+html.fresho-dark .html-content .formula,
+html.fresho-dark .html-content .formula-box,
+html.fresho-dark .html-content .math {
+  background: #27272a;
+  border-color: #3f3f46;
+  color: #f8fafc;
+}
+
+/* Pastel callout cards — 💡 Key Points / Remember */
+.html-content .key-point,
+.html-content .keypoint,
+.html-content .tip,
+.html-content .note-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-left: 4px solid #1d70f5;
+  border-radius: 0.75rem;
+  padding: 0.9em 1.1em;
+  margin: 1em 0;
+  color: #1e3a8a;
+}
+
+html.fresho-dark .html-content .key-point,
+html.fresho-dark .html-content .keypoint,
+html.fresho-dark .html-content .tip,
+html.fresho-dark .html-content .note-box {
+  background: #1e2a3e;
+  border-color: #2d3a5a;
+  color: #bfdbfe;
+}
+
+.html-content .remember,
+.html-content .warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  border-radius: 0.75rem;
+  padding: 0.9em 1.1em;
+  margin: 1em 0;
+  color: #78350f;
+}
+
+html.fresho-dark .html-content .remember,
+html.fresho-dark .html-content .warning {
+  background: #3e322a;
+  border-color: #4a3c2e;
+  color: #fde68a;
+}
+
+.html-content .important,
+.html-content .definition {
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-left: 4px solid #8b5cf6;
+  border-radius: 0.75rem;
+  padding: 0.9em 1.1em;
+  margin: 1em 0;
+  color: #4c1d95;
+}
+
+html.fresho-dark .html-content .important,
+html.fresho-dark .html-content .definition {
+  background: #2a2a3e;
+  border-color: #3e3a5a;
+  color: #ddd6fe;
+}
+
+/* Exam paper — individual question blocks */
+.html-content.exam-paper ol > li,
+.html-content.exam-paper .question {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.9em 1.1em;
+  margin: 0.75em 0;
+  list-style-position: inside;
+}
+
+.html-content.exam-paper {
+  counter-reset: question;
+}
+
+/* Force styles for dynamic HTML questions & matrices */
+.matrix-bracket {
+  display: inline-flex !important;
+  align-items: center !important;
+  border-left: 3px solid #1D70F5 !important;
+  border-right: 3px solid #1D70F5 !important;
+  border-radius: 4px !important;
+  padding: 4px 10px !important;
+  margin: 4px 8px !important;
+}
+
+.math-table {
+  border-collapse: collapse !important;
+  margin: 0 auto !important;
+}
+
+.math-table td {
+  padding: 4px 12px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+}
+
+sub {
+  vertical-align: sub !important;
+  font-size: 0.75em !important;
+}
+
+sup {
+  vertical-align: super !important;
+  font-size: 0.75em !important;
+}
+
 
 * {
   box-sizing: border-box;
