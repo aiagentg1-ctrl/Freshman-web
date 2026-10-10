@@ -31,6 +31,7 @@ export interface ExamQuestion {
   options: string[];
   correctAnswer: number; // index into options
   explanation?: string;
+  university?: string;
 }
 
 function extractJsonArray(source: string, openBracket: number): string | null {
@@ -61,7 +62,7 @@ function extractJsonArray(source: string, openBracket: number): string | null {
   return null;
 }
 
-function normalizeQuestions(raw: unknown[]): ExamQuestion[] {
+function normalizeQuestions(raw: unknown[], defaultUniversity?: string): ExamQuestion[] {
   const out: ExamQuestion[] = [];
   raw.forEach((item, i) => {
     const q = item as Record<string, unknown>;
@@ -95,6 +96,9 @@ function normalizeQuestions(raw: unknown[]): ExamQuestion[] {
       options: options.map((o) => String(o)),
       correctAnswer: correct,
       explanation: typeof explanation === "string" ? explanation : explanation == null ? undefined : JSON.stringify(explanation),
+      university: typeof q.university === "string" && q.university.trim()
+        ? q.university.trim()
+        : defaultUniversity,
     });
   });
   return out;
@@ -131,11 +135,14 @@ export function parseExamQuestions(html: string): ExamQuestion[] | null {
   for (const candidate of candidates) {
     try {
       let parsed: unknown = JSON.parse(candidate.trim());
+      let defaultUniversity: string | undefined;
       if (parsed && !Array.isArray(parsed) && typeof parsed === "object") {
-        parsed = (parsed as Record<string, unknown>).questions;
+        const payload = parsed as Record<string, unknown>;
+        defaultUniversity = typeof payload.university === "string" ? payload.university.trim() : undefined;
+        parsed = payload.questions;
       }
       if (Array.isArray(parsed)) {
-        const questions = normalizeQuestions(parsed);
+        const questions = normalizeQuestions(parsed, defaultUniversity);
         if (questions.length > 0) return questions;
       }
     } catch {
@@ -143,6 +150,16 @@ export function parseExamQuestions(html: string): ExamQuestion[] | null {
     }
   }
   return null;
+}
+
+function filterQuestionsForUniversities(
+  questions: ExamQuestion[],
+  availableUniversities: string[],
+  selectedUniversities: string[],
+): ExamQuestion[] {
+  if (availableUniversities.length === 0) return questions;
+  const selected = new Set(selectedUniversities);
+  return questions.filter((question) => question.university && selected.has(question.university));
 }
 
 function formatTime(totalSeconds: number): string {
@@ -313,9 +330,14 @@ export default function ExamRunner({
   onGoHome?: () => void;
 }) {
   const questions = useMemo(() => parseExamQuestions(exam.content_data), [exam.content_data]);
+  const availableUniversities = useMemo(
+    () => [...new Set((questions ?? []).map((question) => question.university).filter((university): university is string => Boolean(university)))].sort((a, b) => a.localeCompare(b)),
+    [questions],
+  );
 
   const [stage, setStage] = useState<Stage>("briefing");
   const [restoring, setRestoring] = useState(true);
+  const [selectedUniversities, setSelectedUniversities] = useState<string[]>([]);
   const [timed, setTimed] = useState(chapterExamId === undefined);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
@@ -407,23 +429,37 @@ export default function ExamRunner({
     if (pendingSubmission.current) void persistSubmission(pendingSubmission.current);
   };
 
-  const total = questions?.length ?? exam.question_count;
-  const interactive = questions !== null;
+  const filteredQuestions = useMemo(
+    () => questions ? filterQuestionsForUniversities(questions, availableUniversities, selectedUniversities) : null,
+    [availableUniversities, questions, selectedUniversities],
+  );
+  const total = filteredQuestions?.length ?? exam.question_count;
+  const interactive = filteredQuestions !== null;
   const isHtmlExam = exam.content_type === "html" && !interactive;
 
   useEffect(() => {
     const saved = chapterExamId === undefined ? getSavedExamProgress(exam.id) : null;
     if (saved && questions) {
-      const restoredAnswers = Array.from({ length: total }, (_, index) => {
+      const savedUniversities = Array.isArray(saved.selectedUniversities)
+        ? saved.selectedUniversities.filter((university) => availableUniversities.includes(university))
+        : availableUniversities;
+      const restoredSelection = savedUniversities.length > 0 || availableUniversities.length === 0
+        ? savedUniversities
+        : availableUniversities;
+      const restoredQuestions = filterQuestionsForUniversities(questions, availableUniversities, restoredSelection);
+      const restoredAnswers = Array.from({ length: restoredQuestions.length }, (_, index) => {
         const answer = saved.answers[index];
-        return typeof answer === "number" && answer >= 0 && answer < questions[index].options.length
+        return typeof answer === "number" && answer >= 0 && answer < (restoredQuestions[index]?.options.length ?? 0)
           ? answer
           : null;
       });
-      const restoredCurrent = Math.min(Math.max(saved.currentQuestion, 0), total - 1);
+      const restoredCurrent = Math.min(Math.max(saved.currentQuestion, 0), Math.max(0, restoredQuestions.length - 1));
       const restoredSecondsLeft = Math.max(0, Math.min(saved.secondsLeft, exam.duration_minutes * 60));
       const restoredElapsed = Math.max(0, saved.elapsed);
 
+      if (JSON.stringify(restoredSelection) !== JSON.stringify(selectedUniversities)) {
+        setSelectedUniversities(restoredSelection);
+      }
       answersRef.current = restoredAnswers;
       startedAt.current = Date.now() - (saved.timed
         ? (exam.duration_minutes * 60 - restoredSecondsLeft) * 1000
@@ -431,14 +467,14 @@ export default function ExamRunner({
       submitted.current = false;
       setTimed(saved.timed);
       setAnswers(restoredAnswers);
-      setFlags(saved.flags.filter((flag) => flag >= 0 && flag < total));
+      setFlags(saved.flags.filter((flag) => flag >= 0 && flag < restoredQuestions.length));
       setCurrent(restoredCurrent);
       setSecondsLeft(restoredSecondsLeft);
       setElapsed(restoredElapsed);
       setStage("running");
     }
     setRestoring(false);
-  }, [chapterExamId, exam.duration_minutes, exam.id, questions, total]);
+  }, [availableUniversities, chapterExamId, exam.duration_minutes, exam.id, questions, selectedUniversities, total]);
 
   // Retry pending submissions on mount
   useEffect(() => {
@@ -516,8 +552,9 @@ export default function ExamRunner({
       timed,
       secondsLeft,
       elapsed,
+      selectedUniversities,
     });
-  }, [answers, chapterExamId, current, elapsed, exam, flags, questions, restoring, secondsLeft, stage, timed]);
+  }, [answers, chapterExamId, current, elapsed, exam, flags, questions, restoring, secondsLeft, selectedUniversities, stage, timed]);
 
   useEffect(() => {
     if (stage !== "running") return;
@@ -601,6 +638,8 @@ export default function ExamRunner({
   }, [chapterExamId, exam, persistSubmission, telegramFirstName]);
 
   const startExam = () => {
+    if (availableUniversities.length > 0 && selectedUniversities.length === 0) return;
+    if (interactive && total === 0) return;
     startedAt.current = Date.now();
     submitted.current = false;
     const emptyAnswers = new Array<(number | null)>(total).fill(null);
@@ -620,15 +659,15 @@ export default function ExamRunner({
     setStage("result");
     const finalAnswers = answersRef.current;
 
-    const correctCount = questions
-      ? questions.reduce((acc, q, i) => (finalAnswers[i] === q.correctAnswer ? acc + 1 : acc), 0)
+    const correctCount = filteredQuestions
+      ? filteredQuestions.reduce((acc, q, i) => (finalAnswers[i] === q.correctAnswer ? acc + 1 : acc), 0)
       : 0;
-    const totalQuestions = questions?.length ?? exam.question_count;
+    const totalQuestions = filteredQuestions?.length ?? exam.question_count;
     const scorePercentage =
       totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
     const timeSpent = Math.round((Date.now() - (startedAt.current || Date.now())) / 1000);
-    const wrongQuestions = questions
-      ? questions
+    const wrongQuestions = filteredQuestions
+      ? filteredQuestions
           .map((q, i) => ({
             id: q.id,
             question: q.questionText,
@@ -652,7 +691,7 @@ export default function ExamRunner({
       totalQuestions,
       timeSpent,
       completedAt,
-      answers: questions?.map((q, i) => ({
+      answers: filteredQuestions?.map((q, i) => ({
         id: q.id,
         questionText: q.questionText,
         options: q.options,
@@ -669,7 +708,7 @@ export default function ExamRunner({
     // Standardized score bridge → Home "Recent Exam Performance" card.
     // Only written for scored (standardized) exams — a legacy reader run must
     // not overwrite a real score with 0%.
-    if (questions && chapterExamId === undefined) {
+    if (filteredQuestions && chapterExamId === undefined) {
       const payload = {
         examId: exam.id,
         subject: exam.subject,
@@ -700,7 +739,7 @@ export default function ExamRunner({
     }
 
     const answersJson = JSON.stringify(
-      questions?.map((q, i) => ({
+      filteredQuestions?.map((q, i) => ({
         id: q.id,
         question: q.questionText,
         selected: finalAnswers[i] !== null ? q.options[finalAnswers[i] as number] : null,
@@ -720,7 +759,7 @@ export default function ExamRunner({
   };
 
   const correctCount =
-    questions?.reduce((acc, q, i) => (answers[i] === q.correctAnswer ? acc + 1 : acc), 0) ?? 0;
+    filteredQuestions?.reduce((acc, q, i) => (answers[i] === q.correctAnswer ? acc + 1 : acc), 0) ?? 0;
   const answeredCount = answers.filter((a) => a !== null).length;
   const timeSpentSoFar = timed
     ? exam.duration_minutes * 60 - secondsLeft
@@ -875,9 +914,9 @@ export default function ExamRunner({
             </button>
           )}
 
-          {showAnswers && questions && (
+          {showAnswers && filteredQuestions && (
             <div className="space-y-3">
-              {questions.map((q, i) => {
+              {filteredQuestions.map((q, i) => {
                 const chosen = answers[i];
                 const isCorrect = chosen === q.correctAnswer;
                 return (
@@ -996,6 +1035,70 @@ export default function ExamRunner({
             </div>
           </div>
 
+          {interactive && availableUniversities.length > 0 && (
+            <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Choose universities</h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    The exam will include questions from your selected universities only.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#1D70F5]">
+                  {selectedUniversities.length} / {availableUniversities.length}
+                </span>
+              </div>
+              <div className="mb-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUniversities(availableUniversities)}
+                  className="min-h-9 rounded-lg border border-blue-100 px-3 text-xs font-semibold text-[#1D70F5]"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUniversities([])}
+                  className="min-h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="space-y-2">
+                {availableUniversities.map((university) => {
+                  const isSelected = selectedUniversities.includes(university);
+                  const questionCount = questions?.filter((question) => question.university === university).length ?? 0;
+                  return (
+                    <label
+                      key={university}
+                      className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 ${
+                        isSelected ? "border-blue-200 bg-blue-50/60" : "border-slate-100 bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => setSelectedUniversities((selected) => (
+                          isSelected
+                            ? selected.filter((name) => name !== university)
+                            : [...selected, university]
+                        ))}
+                        className="h-4 w-4 accent-[#1D70F5]"
+                      />
+                      <span className="flex-1 text-sm font-medium text-slate-800">{university}</span>
+                      <span className="text-xs font-semibold text-slate-500">{questionCount} Q</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {total === 0 && (
+                <p role="alert" className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Select at least one university to include questions in this exam.
+                </p>
+              )}
+            </section>
+          )}
+
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex gap-3">
             <Info className="w-5 h-5 text-[#1D70F5] shrink-0 mt-0.5" />
             <div>
@@ -1056,7 +1159,8 @@ export default function ExamRunner({
         <div className="px-4 pb-4">
           <button
             onClick={startExam}
-            className="w-full bg-[#1D70F5] text-white py-3.5 rounded-2xl font-semibold shadow-md shadow-blue-200 active:scale-[0.98] transition-transform"
+            disabled={(availableUniversities.length > 0 && selectedUniversities.length === 0) || (interactive && total === 0)}
+            className="w-full rounded-2xl bg-[#1D70F5] py-3.5 font-semibold text-white shadow-md shadow-blue-200 transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Start Exam
           </button>
@@ -1109,7 +1213,10 @@ export default function ExamRunner({
     );
   }
 
-  const q = questions[current];
+  const q = filteredQuestions?.[current];
+  if (!q) {
+    return <div role="alert" className="p-4 text-sm text-red-700">No questions are available for the selected universities.</div>;
+  }
   const isLast = current === total - 1;
   const lowTime = timed && secondsLeft <= 300;
 
@@ -1165,7 +1272,7 @@ export default function ExamRunner({
             </span>
           </div>
           <div className="grid grid-cols-8 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar">
-            {questions.map((_, i) => {
+            {filteredQuestions?.map((_, i) => {
               const answered = answers[i] !== null;
               const flagged = flags.includes(i);
               return (

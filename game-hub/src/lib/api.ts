@@ -234,6 +234,7 @@ export interface SavedExamProgress {
   timed: boolean;
   secondsLeft: number;
   elapsed: number;
+  selectedUniversities?: string[];
 }
 
 const RECENT_EXAM_ATTEMPTS_KEY = "freshoRecentExamAttempts";
