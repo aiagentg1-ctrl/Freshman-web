@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
-import { BarChart3, BookOpen, CircleDollarSign, ClipboardList, FileText, GraduationCap, Image, Layers, Lock, LogOut, Pencil, Settings, Sparkles, TrendingUp, User, Crown } from "lucide-react";
+import { BarChart3, BookOpen, CircleDollarSign, ClipboardList, FileText, GraduationCap, Image, Layers, Lock, LogOut, Pencil, Settings, Sparkles, TrendingUp, User, Crown, Megaphone, Trash2 } from "lucide-react";
 import UniversitySelect from "@/components/tma/UniversitySelect";
 import {
   adminGetAnalytics,
@@ -38,6 +38,9 @@ import {
   adminReviewSubjectSuggestion,
   adminGetSubscriptionConfig,
   adminUpdateSubscriptionConfig,
+  adminGetBroadcasts,
+  adminCreateBroadcast,
+  adminDeleteBroadcast,
   type AdminAnalytics,
   type AdminExamMeta,
   type ChapterExamMeta,
@@ -46,11 +49,12 @@ import {
   type SubjectSuggestion,
   type SubscriptionConfig,
   type UniversityLogo,
+  type Broadcast,
 } from "@/lib/api";
 import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
 import { migrateLegacyStorage } from "@/lib/legacyStorage";
 
-type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing";
+type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing" | "broadcasts";
 type ErrorState = string;
 
 const ADMIN_KEY_STORAGE = "freshoAdminKey";
@@ -64,6 +68,7 @@ const tabs: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
   { id: "suggestions", label: "Suggestions", icon: User },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "pricing", label: "Pricing", icon: CircleDollarSign },
+  { id: "broadcasts", label: "Broadcasts", icon: Megaphone },
 ];
 
 const examPayload = {
@@ -177,7 +182,7 @@ export default function AdminDashboard() {
     return <main className="min-h-screen bg-slate-950 px-4 py-16 text-white"><section className="mx-auto max-w-md rounded-3xl bg-white p-7 text-slate-900 shadow-2xl"><div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600"><Lock className="h-7 w-7 text-white" /></div><h1 className="text-2xl font-black">Freshman Admin</h1><p className="mt-2 text-sm leading-6 text-slate-500">Manage the study experience for new Fresho students.</p><form onSubmit={unlock} className="mt-6 space-y-3"><input type="password" value={key} onChange={(event) => setKey(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100" placeholder="Admin key" autoFocus />{authError && <p className="text-sm font-semibold text-red-600">{authError}</p>}<button disabled={authenticating} className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:opacity-50">{authenticating ? "Verifying..." : "Open Dashboard"}</button></form></section></main>;
   }
 
-  return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b bg-white px-4 py-5 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Fresho Control Center</p><h1 className="text-2xl font-black">Freshman Learning Dashboard</h1></div><button onClick={signOut} className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"><LogOut className="h-4 w-4" /> Sign out</button></div></header><div className="mx-auto max-w-7xl px-4 py-6 sm:px-8"><nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex min-w-max items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${activeTab === tab.id ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" />{tab.label}</button>; })}</nav>{activeTab === "overview" && <Overview />}{activeTab === "exams" && <ExamsManager />}{activeTab === "notes" && <NotesManager />}{activeTab === "chapter-exams" && <ChapterExamsManager />}{activeTab === "flash-cards" && <FlashCardsManager />}{activeTab === "logos" && <LogosManager />}{activeTab === "suggestions" && <SuggestionsManager />}{activeTab === "analytics" && <AnalyticsManager />}{activeTab === "pricing" && <PricingManager />}</div></main>;
+  return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b bg-white px-4 py-5 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Fresho Control Center</p><h1 className="text-2xl font-black">Freshman Learning Dashboard</h1></div><button onClick={signOut} className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"><LogOut className="h-4 w-4" /> Sign out</button></div></header><div className="mx-auto max-w-7xl px-4 py-6 sm:px-8"><nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex min-w-max items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${activeTab === tab.id ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" />{tab.label}</button>; })}</nav>{activeTab === "overview" && <Overview />}{activeTab === "exams" && <ExamsManager />}{activeTab === "notes" && <NotesManager />}{activeTab === "chapter-exams" && <ChapterExamsManager />}{activeTab === "flash-cards" && <FlashCardsManager />}{activeTab === "logos" && <LogosManager />}{activeTab === "suggestions" && <SuggestionsManager />}{activeTab === "analytics" && <AnalyticsManager />}{activeTab === "pricing" && <PricingManager />}{activeTab === "broadcasts" && <BroadcastsManager />}</div></main>;
 }
 
 function Overview() {
@@ -565,6 +570,149 @@ function ResourcePanel({
         <h3 className="font-black">Create or update</h3>
         <div className="mt-4">{form}</div>
       </section>
+    </div>
+  );
+}
+
+function BroadcastsManager() {
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    message: "",
+    target_audience: "all" as "all" | "premium" | "free",
+    expires_at: "",
+  });
+
+  const load = () => {
+    setLoading(true);
+    setError("");
+    adminGetBroadcasts()
+      .then(setBroadcasts)
+      .catch((value) => setError(message(value)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function createBroadcast(event: FormEvent) {
+    event.preventDefault();
+    if (!form.message.trim()) {
+      setError("Message cannot be empty.");
+      return;
+    }
+    setError("");
+    try {
+      await adminCreateBroadcast({
+        message: form.message,
+        target_audience: form.target_audience,
+        expires_at: form.expires_at || null,
+      });
+      setForm({ message: "", target_audience: "all", expires_at: "" });
+      load();
+    } catch (value) {
+      setError(message(value));
+    }
+  }
+
+  async function deleteBroadcast(id: number) {
+    if (!confirm("Delete this broadcast?")) return;
+    try {
+      await adminDeleteBroadcast(id);
+      load();
+    } catch (value) {
+      setError(message(value));
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && <ErrorBanner error={error} />}
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-black mb-4">Create New Broadcast</h2>
+        <form onSubmit={createBroadcast} className="space-y-4">
+          <div>
+            <label className="block mb-1 text-xs font-bold text-slate-600">Message</label>
+            <textarea
+              value={form.message}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 min-h-[100px]"
+              placeholder="Enter your broadcast message..."
+            />
+          </div>
+          <div>
+            <label className="block mb-1 text-xs font-bold text-slate-600">Target Audience</label>
+            <select
+              value={form.target_audience}
+              onChange={(e) => setForm({ ...form, target_audience: e.target.value as "all" | "premium" | "free" })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+            >
+              <option value="all">All Users</option>
+              <option value="premium">Premium Users Only</option>
+              <option value="free">Free Users Only</option>
+            </select>
+          </div>
+          <div>
+            <label className="block mb-1 text-xs font-bold text-slate-600">Expires At (Optional)</label>
+            <input
+              type="datetime-local"
+              value={form.expires_at}
+              onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-700 transition-colors"
+          >
+            Send Broadcast
+          </button>
+        </form>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <h2 className="text-xl font-black mb-4">Active Broadcasts</h2>
+        {loading ? (
+          <p className="text-sm text-slate-500">Loading...</p>
+        ) : broadcasts.length === 0 ? (
+          <p className="text-sm text-slate-500">No active broadcasts.</p>
+        ) : (
+          <div className="space-y-3">
+            {broadcasts.map((broadcast) => (
+              <div
+                key={broadcast.id}
+                className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50"
+              >
+                <Megaphone className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900">{broadcast.message}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-slate-500">
+                      Target: <span className="font-semibold">{broadcast.target_audience}</span>
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      Created: {new Date(broadcast.created_at).toLocaleString()}
+                    </span>
+                    {broadcast.expires_at && (
+                      <span className="text-xs text-slate-500">
+                        Expires: {new Date(broadcast.expires_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => deleteBroadcast(broadcast.id)}
+                  className="shrink-0 p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

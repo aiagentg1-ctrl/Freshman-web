@@ -9,6 +9,7 @@ import OnboardingScreen from "../../components/tma/OnboardingScreen";
 import PracticeScreen from "../../components/tma/PracticeScreen";
 import ProfileScreen from "../../components/tma/ProfileScreen";
 import GameScreen from "../../components/tma/GameScreen";
+import GPACalculatorScreen from "../../components/tma/GPACalculatorScreen";
 import { DevUserSetup } from "../../components/DevUserSetup";
 import { dailyCheckIn, DailyCheckIn, ExamMeta, getUser, releaseDeviceSession, startDeviceSession, StreamKey, updateUser } from "../../lib/api";
 import { expandTelegramApp, getTelegramInitData, getTelegramUser, TelegramUser } from "../../lib/telegram";
@@ -363,6 +364,9 @@ export default function TMAPage() {
               onProfileChange={handleProfileChange}
               onSignOut={handleDeviceSignOut}
             />
+          )}
+          {activeTab === "gpa" && (
+            <GPACalculatorScreen onClose={() => setActiveTab("home")} />
           )}
           <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </>

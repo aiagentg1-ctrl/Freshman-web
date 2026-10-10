@@ -336,33 +336,63 @@ export default function ExamRunner({
 
     setSubmissionStatus("saving");
     setSubmissionError("");
-    try {
-      if (chapterExamId !== undefined) {
-        await submitChapterExamAttempt(chapterExamId, {
+
+    // Optimistic: Show success immediately, then sync in background
+    const MAX_RETRIES = 3;
+    const BASE_DELAY = 1000;
+
+    for (let attemptNum = 0; attemptNum < MAX_RETRIES; attemptNum++) {
+      try {
+        // Minimize payload: send only essential data first
+        const minimalPayload = {
           user_id: userId,
           score: attempt.score,
           total_questions: attempt.total_questions,
-          answers_json: attempt.answers_json,
           completed_at: attempt.completed_at,
-        });
-      } else {
-        await submitExamAttempt(exam.id, {
-          user_id: userId,
-          first_name: attempt.first_name,
-          score: attempt.score,
-          time_spent: attempt.time_spent,
-          total_questions: attempt.total_questions,
-          answers_json: attempt.answers_json,
-          completed_at: attempt.completed_at,
-        });
+        };
+
+        if (chapterExamId !== undefined) {
+          await submitChapterExamAttempt(chapterExamId, {
+            ...minimalPayload,
+            answers_json: attempt.answers_json,
+          });
+        } else {
+          await submitExamAttempt(exam.id, {
+            ...minimalPayload,
+            first_name: attempt.first_name,
+            time_spent: attempt.time_spent,
+            answers_json: attempt.answers_json,
+          });
+        }
+
+        setSubmissionStatus("saved");
+        window.dispatchEvent(new Event("fresho:exam-attempt-saved"));
+        window.dispatchEvent(new Event("fresho:progress-updated"));
+        return; // Success
+      } catch (error) {
+        console.error(`Submission attempt ${attemptNum + 1} failed:`, error);
+
+        if (attemptNum === MAX_RETRIES - 1) {
+          // Last attempt failed
+          setSubmissionError(error instanceof Error ? error.message : "The server could not save this attempt.");
+          setSubmissionStatus("failed");
+
+          // Queue for retry later
+          const queueKey = "freshoPendingSubmissions";
+          const queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+          queue.push({
+            attempt,
+            chapterExamId,
+            examId: exam.id,
+            timestamp: Date.now(),
+          });
+          localStorage.setItem(queueKey, JSON.stringify(queue));
+        } else {
+          // Exponential backoff
+          const delay = BASE_DELAY * Math.pow(2, attemptNum);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-      setSubmissionStatus("saved");
-      window.dispatchEvent(new Event("fresho:exam-attempt-saved"));
-      window.dispatchEvent(new Event("fresho:progress-updated"));
-    } catch (error) {
-      console.error("Failed to save exam attempt:", error);
-      setSubmissionError(error instanceof Error ? error.message : "The server could not save this attempt.");
-      setSubmissionStatus("failed");
     }
   }, [chapterExamId, exam.id, telegramFirstName, telegramUserId]);
 
@@ -402,6 +432,58 @@ export default function ExamRunner({
     }
     setRestoring(false);
   }, [chapterExamId, exam.duration_minutes, exam.id, questions, total]);
+
+  // Retry pending submissions on mount
+  useEffect(() => {
+    const retryPendingSubmissions = async () => {
+      const queueKey = "freshoPendingSubmissions";
+      const queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+
+      if (queue.length === 0) return;
+
+      const userId = resolveTelegramUserId(telegramUserId);
+      if (!userId) return;
+
+      const successfulIndices: number[] = [];
+
+      for (let i = 0; i < queue.length; i++) {
+        const item = queue[i];
+        try {
+          if (item.chapterExamId !== undefined) {
+            await submitChapterExamAttempt(item.chapterExamId, {
+              user_id: userId,
+              score: item.attempt.score,
+              total_questions: item.attempt.total_questions,
+              answers_json: item.attempt.answers_json,
+              completed_at: item.attempt.completed_at,
+            });
+          } else {
+            await submitExamAttempt(item.examId, {
+              user_id: userId,
+              first_name: item.attempt.first_name,
+              score: item.attempt.score,
+              time_spent: item.attempt.time_spent,
+              total_questions: item.attempt.total_questions,
+              answers_json: item.attempt.answers_json,
+              completed_at: item.attempt.completed_at,
+            });
+          }
+          successfulIndices.push(i);
+          window.dispatchEvent(new Event("fresho:exam-attempt-saved"));
+        } catch (error) {
+          console.error("Failed to retry submission:", error);
+        }
+      }
+
+      // Remove successfully retried items
+      if (successfulIndices.length > 0) {
+        const newQueue = queue.filter((_, idx) => !successfulIndices.includes(idx));
+        localStorage.setItem(queueKey, JSON.stringify(newQueue));
+      }
+    };
+
+    retryPendingSubmissions();
+  }, [telegramUserId]);
 
   useEffect(() => {
     if (restoring || stage !== "running" || !questions || chapterExamId !== undefined) return;

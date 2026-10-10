@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ClipboardList, GraduationCap, Sparkles, Target, TrendingUp, XCircle, Award, Flame, Zap, Shield, Crown, Moon, Sun, Settings2 } from "lucide-react";
-import { ExamMeta, ExamReviewQuestion, getInProgressExam, getRecentExamAttempts, getUserProgress, getUserStats, RecentExamAttempt, StreamKey, UserProgress, UserStats } from "../../lib/api";
+import { ArrowRight, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ClipboardList, GraduationCap, Sparkles, Target, TrendingUp, XCircle, Award, Flame, Zap, Shield, Crown, Moon, Sun, Settings2, Megaphone, X } from "lucide-react";
+import { ExamMeta, ExamReviewQuestion, getInProgressExam, getRecentExamAttempts, getUserProgress, getUserStats, RecentExamAttempt, StreamKey, UserProgress, UserStats, getActiveBroadcasts, Broadcast } from "../../lib/api";
 import { streamLabel, subjectLabel } from "../../lib/subjects";
 import { TelegramUser } from "../../lib/telegram";
 import MathContent from "./MathContent";
@@ -39,6 +39,8 @@ export default function HomeScreen({
   const [recentAttempts, setRecentAttempts] = useState<RecentExamAttempt[]>([]);
   const [reviewAttempt, setReviewAttempt] = useState<RecentExamAttempt | null>(null);
   const [showRecentAttempts, setShowRecentAttempts] = useState(false);
+  const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
+  const [dismissedBroadcasts, setDismissedBroadcasts] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const refreshRecentAttempts = () => setRecentAttempts(getRecentExamAttempts());
@@ -57,11 +59,20 @@ export default function HomeScreen({
           });
       }
     };
+    const refreshBroadcasts = async () => {
+      try {
+        const activeBroadcasts = await getActiveBroadcasts(isPremium);
+        setBroadcasts(activeBroadcasts);
+      } catch (error) {
+        console.error("Failed to load broadcasts:", error);
+      }
+    };
     const refreshAll = () => {
       console.log("Refreshing all data...");
       refreshRecentAttempts();
       refreshInProgressExam();
       refreshProgress();
+      refreshBroadcasts();
       if (telegramUser) getUserStats(telegramUser.id).then(setStats);
     };
     refreshAll();
@@ -75,7 +86,7 @@ export default function HomeScreen({
       window.removeEventListener("fresho:progress-updated", refreshProgress);
       window.removeEventListener("fresho:exam-attempt-saved", refreshAll);
     };
-  }, [telegramUser]);
+  }, [telegramUser, isPremium]);
 
   const firstName = telegramUser?.first_name || fullName.split(" ")[0] || "Student";
   const lastExam =
@@ -141,6 +152,36 @@ export default function HomeScreen({
           )}
         </div>
       </div>
+
+      {/* Admin Broadcasts */}
+      {broadcasts.filter(b => !dismissedBroadcasts.has(b.id)).length > 0 && (
+        <div className="px-4 space-y-2">
+          {broadcasts.filter(b => !dismissedBroadcasts.has(b.id)).map((broadcast) => (
+            <div
+              key={broadcast.id}
+              className="bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl p-4 text-white shadow-lg"
+            >
+              <div className="flex items-start gap-3">
+                <Megaphone className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium leading-relaxed">{broadcast.message}</p>
+                  <p className="text-[10px] text-blue-100 mt-1">
+                    {new Date(broadcast.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setDismissedBroadcasts(prev => new Set([...prev, broadcast.id]));
+                  }}
+                  className="shrink-0 p-1 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex-1 px-4 py-5 space-y-5">
         {isPremium && (

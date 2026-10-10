@@ -1,13 +1,14 @@
 "use client";
 
-import { BookOpen, Gamepad2, Home, Target, User } from "lucide-react";
+import { BookOpen, Calculator, Gamepad2, Home, Target, User } from "lucide-react";
 
-export type Tab = "practice" | "notes" | "home" | "game" | "profile";
+export type Tab = "practice" | "notes" | "home" | "game" | "profile" | "gpa";
 
 const TABS: { key: Tab; label: string; icon: typeof Target }[] = [
   { key: "practice", label: "Practice", icon: Target },
   { key: "notes", label: "Notes", icon: BookOpen },
   { key: "home", label: "Home", icon: Home },
+  { key: "gpa", label: "GPA", icon: Calculator },
   { key: "game", label: "Game", icon: Gamepad2 },
   { key: "profile", label: "Profile", icon: User },
 ];

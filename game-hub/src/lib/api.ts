@@ -705,6 +705,58 @@ export async function adminGetExam(id: number): Promise<Exam> {
   });
 }
 
+// Broadcast system
+export interface Broadcast {
+  id: number;
+  message: string;
+  target_audience: "all" | "premium" | "free";
+  created_at: string;
+  expires_at?: string | null;
+  is_active: boolean;
+}
+
+export async function adminGetBroadcasts(): Promise<Broadcast[]> {
+  return request<Broadcast[]>("/api/admin/broadcasts", {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminCreateBroadcast(payload: {
+  message: string;
+  target_audience: "all" | "premium" | "free";
+  expires_at?: string | null;
+}): Promise<Broadcast> {
+  return request<Broadcast>("/api/admin/broadcasts", {
+    method: "POST",
+    headers: getAdminHeaders(),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminDeleteBroadcast(id: number): Promise<void> {
+  await request(`/api/admin/broadcasts/${id}`, {
+    method: "DELETE",
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function getActiveBroadcasts(isPremium: boolean): Promise<Broadcast[]> {
+  try {
+    const broadcasts = await request<Broadcast[]>("/api/broadcasts/active");
+    return broadcasts.filter(b => {
+      if (b.target_audience === "all") return true;
+      if (b.target_audience === "premium") return isPremium;
+      if (b.target_audience === "free") return !isPremium;
+      return false;
+    });
+  } catch {
+    return [];
+  }
+}
+    headers: getAdminHeaders(),
+  });
+}
+
 export async function adminGetNotes(): Promise<NoteMeta[]> {
   return request<NoteMeta[]>("/api/admin/notes", {
     headers: getAdminHeaders(),
