@@ -566,18 +566,19 @@ sup {
   .tma-desktop-shell {
     display: flex;
     justify-content: center;
-    flex: 1;
+    flex: 1 1 100%;
     width: 100%;
+    min-width: 0;
     min-height: 100vh;
   }
 
   .tma-app-frame {
+    flex: 1 1 auto;
     width: 100%;
-    max-width: 480px;
-    flex: 0 1 480px;
+    max-width: 100%;
     min-width: 0;
     min-height: 100vh;
-    margin-inline: auto;
+    margin: 0;
     background-color: #f8fafc;
   }
 
