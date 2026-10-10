@@ -90,15 +90,31 @@ function normalizeQuestions(raw: unknown[], defaultUniversity?: string): ExamQue
 
     const explanation = q.explanation ?? q.solution ?? q.rationale ?? q.answerExplanation ?? q.answer_explanation;
 
+    const rawUniversity = typeof q.university === "string" && q.university.trim()
+      ? q.university.trim()
+      : defaultUniversity;
+    const normalizedUniversity = rawUniversity?.toLocaleLowerCase().replace(/[\s_-]+/g, " ").trim();
+    const university = normalizedUniversity && [
+      "general",
+      "worksheet",
+      "general worksheet",
+      "general exam",
+      "worksheet exam",
+      "general / worksheet",
+      "common",
+      "all universities",
+      "all university",
+    ].includes(normalizedUniversity)
+      ? undefined
+      : rawUniversity;
+
     out.push({
       id: typeof q.id === "number" ? q.id : i + 1,
       questionText: text,
       options: options.map((o) => String(o)),
       correctAnswer: correct,
       explanation: typeof explanation === "string" ? explanation : explanation == null ? undefined : JSON.stringify(explanation),
-      university: typeof q.university === "string" && q.university.trim()
-        ? q.university.trim()
-        : defaultUniversity,
+      university,
     });
   });
   return out;
@@ -156,10 +172,13 @@ function filterQuestionsForUniversities(
   questions: ExamQuestion[],
   availableUniversities: string[],
   selectedUniversities: string[],
+  includeGeneral: boolean,
 ): ExamQuestion[] {
-  if (availableUniversities.length === 0) return questions;
   const selected = new Set(selectedUniversities);
-  return questions.filter((question) => question.university && selected.has(question.university));
+  return questions.filter((question) => {
+    if (!question.university) return includeGeneral;
+    return availableUniversities.length === 0 || selected.has(question.university);
+  });
 }
 
 function formatTime(totalSeconds: number): string {
@@ -338,6 +357,7 @@ export default function ExamRunner({
   const [stage, setStage] = useState<Stage>("briefing");
   const [restoring, setRestoring] = useState(true);
   const [selectedUniversities, setSelectedUniversities] = useState<string[]>([]);
+  const [includeGeneral, setIncludeGeneral] = useState(false);
   const [timed, setTimed] = useState(chapterExamId === undefined);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
@@ -430,9 +450,16 @@ export default function ExamRunner({
   };
 
   const filteredQuestions = useMemo(
-    () => questions ? filterQuestionsForUniversities(questions, availableUniversities, selectedUniversities) : null,
-    [availableUniversities, questions, selectedUniversities],
+    () => questions
+      ? filterQuestionsForUniversities(questions, availableUniversities, selectedUniversities, includeGeneral)
+      : null,
+    [availableUniversities, includeGeneral, questions, selectedUniversities],
   );
+  const generalQuestionCount = questions?.filter((question) => !question.university).length ?? 0;
+  const hasGeneralQuestions = generalQuestionCount > 0;
+  const hasSourceOptions = availableUniversities.length > 0 || hasGeneralQuestions;
+  const selectedSourceCount = selectedUniversities.length + (includeGeneral && hasGeneralQuestions ? 1 : 0);
+  const sourceOptionCount = availableUniversities.length + (hasGeneralQuestions ? 1 : 0);
   const total = filteredQuestions?.length ?? exam.question_count;
   const interactive = filteredQuestions !== null;
   const isHtmlExam = exam.content_type === "html" && !interactive;
@@ -446,7 +473,13 @@ export default function ExamRunner({
       const restoredSelection = savedUniversities.length > 0 || availableUniversities.length === 0
         ? savedUniversities
         : availableUniversities;
-      const restoredQuestions = filterQuestionsForUniversities(questions, availableUniversities, restoredSelection);
+      const restoredGeneral = saved.selectedGeneral ?? (availableUniversities.length === 0);
+      const restoredQuestions = filterQuestionsForUniversities(
+        questions,
+        availableUniversities,
+        restoredSelection,
+        restoredGeneral,
+      );
       const restoredAnswers = Array.from({ length: restoredQuestions.length }, (_, index) => {
         const answer = saved.answers[index];
         return typeof answer === "number" && answer >= 0 && answer < (restoredQuestions[index]?.options.length ?? 0)
@@ -460,6 +493,7 @@ export default function ExamRunner({
       if (JSON.stringify(restoredSelection) !== JSON.stringify(selectedUniversities)) {
         setSelectedUniversities(restoredSelection);
       }
+      if (restoredGeneral !== includeGeneral) setIncludeGeneral(restoredGeneral);
       answersRef.current = restoredAnswers;
       startedAt.current = Date.now() - (saved.timed
         ? (exam.duration_minutes * 60 - restoredSecondsLeft) * 1000
@@ -474,7 +508,7 @@ export default function ExamRunner({
       setStage("running");
     }
     setRestoring(false);
-  }, [availableUniversities, chapterExamId, exam.duration_minutes, exam.id, questions, selectedUniversities, total]);
+  }, [availableUniversities, chapterExamId, exam.duration_minutes, exam.id, includeGeneral, questions, selectedUniversities, total]);
 
   // Retry pending submissions on mount
   useEffect(() => {
@@ -553,8 +587,9 @@ export default function ExamRunner({
       secondsLeft,
       elapsed,
       selectedUniversities,
+      selectedGeneral: includeGeneral,
     });
-  }, [answers, chapterExamId, current, elapsed, exam, flags, questions, restoring, secondsLeft, selectedUniversities, stage, timed]);
+  }, [answers, chapterExamId, current, elapsed, exam, flags, includeGeneral, questions, restoring, secondsLeft, selectedUniversities, stage, timed]);
 
   useEffect(() => {
     if (stage !== "running") return;
@@ -638,7 +673,7 @@ export default function ExamRunner({
   }, [chapterExamId, exam, persistSubmission, telegramFirstName]);
 
   const startExam = () => {
-    if (availableUniversities.length > 0 && selectedUniversities.length === 0) return;
+    if (hasSourceOptions && selectedSourceCount === 0) return;
     if (interactive && total === 0) return;
     startedAt.current = Date.now();
     submitted.current = false;
@@ -1035,36 +1070,58 @@ export default function ExamRunner({
             </div>
           </div>
 
-          {interactive && availableUniversities.length > 0 && (
+          {interactive && hasSourceOptions && (
             <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Choose universities</h2>
+                  <h2 className="text-sm font-bold text-slate-900">Choose exam sources</h2>
                   <p className="mt-1 text-xs text-slate-500">
-                    The exam will include questions from your selected universities only.
+                    Choose General / Worksheet questions, universities, or both.
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#1D70F5]">
-                  {selectedUniversities.length} / {availableUniversities.length}
+                  {selectedSourceCount} / {sourceOptionCount}
                 </span>
               </div>
               <div className="mb-3 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedUniversities(availableUniversities)}
+                  onClick={() => {
+                    setSelectedUniversities(availableUniversities);
+                    setIncludeGeneral(hasGeneralQuestions);
+                  }}
                   className="min-h-9 rounded-lg border border-blue-100 px-3 text-xs font-semibold text-[#1D70F5]"
                 >
                   Select all
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedUniversities([])}
+                  onClick={() => {
+                    setSelectedUniversities([]);
+                    setIncludeGeneral(false);
+                  }}
                   className="min-h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600"
                 >
                   Clear
                 </button>
               </div>
               <div className="space-y-2">
+                {hasGeneralQuestions && (
+                  <label
+                    className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 ${
+                      includeGeneral ? "border-blue-200 bg-blue-50/60" : "border-slate-100 bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={includeGeneral}
+                      onChange={() => setIncludeGeneral((selected) => !selected)}
+                      className="h-4 w-4 accent-[#1D70F5]"
+                    />
+                    <span className="flex-1 text-sm font-medium text-slate-800">General / Worksheet</span>
+                    <span className="text-xs font-semibold text-slate-500">{generalQuestionCount} Q</span>
+                  </label>
+                )}
                 {availableUniversities.map((university) => {
                   const isSelected = selectedUniversities.includes(university);
                   const questionCount = questions?.filter((question) => question.university === university).length ?? 0;
@@ -1093,7 +1150,7 @@ export default function ExamRunner({
               </div>
               {total === 0 && (
                 <p role="alert" className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Select at least one university to include questions in this exam.
+                  Select at least one exam source to include questions.
                 </p>
               )}
             </section>
@@ -1159,7 +1216,7 @@ export default function ExamRunner({
         <div className="px-4 pb-4">
           <button
             onClick={startExam}
-            disabled={(availableUniversities.length > 0 && selectedUniversities.length === 0) || (interactive && total === 0)}
+            disabled={(hasSourceOptions && selectedSourceCount === 0) || (interactive && total === 0)}
             className="w-full rounded-2xl bg-[#1D70F5] py-3.5 font-semibold text-white shadow-md shadow-blue-200 transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Start Exam
