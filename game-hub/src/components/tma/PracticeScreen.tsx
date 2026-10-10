@@ -38,6 +38,18 @@ function yearSortKey(year: string): number {
   return match ? parseInt(match[0], 10) : 0;
 }
 
+function sortExamsByUniversity(exams: ExamMeta[], preferredUniversity: string): ExamMeta[] {
+  const preferred = preferredUniversity.trim().toLocaleLowerCase();
+  return [...exams].sort((a, b) => {
+    const aUniversity = a.university.trim();
+    const bUniversity = b.university.trim();
+    const aPreferred = Boolean(preferred) && aUniversity.toLocaleLowerCase() === preferred;
+    const bPreferred = Boolean(preferred) && bUniversity.toLocaleLowerCase() === preferred;
+    if (aPreferred !== bPreferred) return aPreferred ? -1 : 1;
+    return aUniversity.localeCompare(bUniversity, undefined, { sensitivity: "base" });
+  });
+}
+
 function getExamTypeCounts(exams: ExamMeta[]) {
   return {
     mid: exams.filter((exam) => exam.exam_type.toLowerCase() === "mid").length,
@@ -89,14 +101,17 @@ export default function PracticeScreen({
 
   const subjects = useMemo(() => subjectsForStream(stream), [stream]);
   const streamExams = useMemo(
-    () => exams.filter((exam) => subjects.some((subject) => subject.key === exam.subject)),
-    [exams, subjects]
+    () => sortExamsByUniversity(
+      exams.filter((exam) => subjects.some((subject) => subject.key === exam.subject)),
+      university,
+    ),
+    [exams, subjects, university]
   );
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getExams(undefined, university)
+    getExams()
       .then((data) => {
         if (!cancelled) setExams(data);
       })
@@ -107,7 +122,7 @@ export default function PracticeScreen({
     return () => {
       cancelled = true;
     };
-  }, [university]);
+  }, []);
 
   // Load university logos for exams
   useEffect(() => {
