@@ -4,7 +4,7 @@ import { Crown, Sparkles } from "lucide-react";
 
 export default function PremiumBanner({ onGetPremium }: { onGetPremium: () => void }) {
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-3 shadow-sm">
+    <section className="premium-offer-banner relative overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 p-3 shadow-sm">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-orange-200">
           <Crown className="h-5 w-5" />

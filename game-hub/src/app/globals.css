@@ -12,178 +12,154 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Beautiful Dark Mode - Polished & Professional */
+/* A softer navy palette keeps night mode colorful and comfortable. */
 html.fresho-dark {
   color-scheme: dark;
-  background: #09090b;
+  background: #111a2b;
 }
 
 html.fresho-dark body {
-  background-color: #09090b;
-  color: #fafafa;
+  background-color: #111a2b;
+  color: #edf2fb;
 }
 
 html.fresho-dark .bg-white {
-  background-color: #18181b !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background-color: #202d43 !important;
+  box-shadow: 0 6px 18px rgb(5 12 25 / 16%);
 }
 
-html.fresho-dark .bg-slate-50,
+html.fresho-dark .bg-slate-50 {
+  background-color: #151f32 !important;
+}
+
 html.fresho-dark .bg-slate-100 {
-  background-color: #27272a !important;
+  background-color: #1c2940 !important;
 }
 
 html.fresho-dark .bg-violet-50 {
-  background-color: #2a2a2e !important;
+  background-color: #302b48 !important;
 }
 
 html.fresho-dark .bg-blue-50 {
-  background-color: #1e2a3e !important;
+  background-color: #203653 !important;
 }
 
 html.fresho-dark .bg-indigo-50 {
-  background-color: #2a2a3e !important;
+  background-color: #2b3150 !important;
 }
 
 html.fresho-dark .bg-cyan-50 {
-  background-color: #1e3a45 !important;
+  background-color: #1f3a49 !important;
 }
 
 html.fresho-dark .bg-sky-50 {
-  background-color: #1e3545 !important;
+  background-color: #20394f !important;
 }
 
 html.fresho-dark .bg-fuchsia-50 {
-  background-color: #3e2a45 !important;
+  background-color: #3b2b48 !important;
 }
 
 html.fresho-dark .bg-teal-50 {
-  background-color: #1e3a38 !important;
+  background-color: #1e3b3a !important;
 }
 
 html.fresho-dark .bg-emerald-50 {
-  background-color: #1e3a2e !important;
+  background-color: #203c34 !important;
 }
 
 html.fresho-dark .bg-rose-50 {
-  background-color: #3e2a3e !important;
+  background-color: #3d2d43 !important;
 }
 
 html.fresho-dark .bg-orange-50 {
-  background-color: #3e322a !important;
+  background-color: #403328 !important;
 }
 
 html.fresho-dark .bg-amber-50 {
-  background-color: #3e322a !important;
+  background-color: #403826 !important;
 }
 
 html.fresho-dark .bg-amber-100 {
-  background-color: #4a3c2e !important;
+  background-color: #514329 !important;
 }
 
 html.fresho-dark .bg-emerald-100 {
-  background-color: #2e4a3a !important;
+  background-color: #2b4b3b !important;
 }
 
 html.fresho-dark .bg-blue-100 {
-  background-color: #2e4a5a !important;
+  background-color: #2a4964 !important;
 }
 
 html.fresho-dark .bg-violet-100 {
-  background-color: #3e3a5a !important;
+  background-color: #413b65 !important;
 }
 
 html.fresho-dark .text-emerald-700,
 html.fresho-dark .text-emerald-800 {
-  color: #4ade80 !important;
+  color: #71e3a3 !important;
 }
 
 html.fresho-dark .text-amber-700,
 html.fresho-dark .text-amber-800 {
-  color: #fbbf24 !important;
+  color: #ffd16b !important;
 }
 
 html.fresho-dark .text-slate-900,
 html.fresho-dark .text-slate-800,
 html.fresho-dark .text-slate-700 {
-  color: #fafafa !important;
+  color: #edf2fb !important;
 }
 
 html.fresho-dark .text-slate-600,
 html.fresho-dark .text-slate-500 {
-  color: #a1a1aa !important;
+  color: #b2bfd3 !important;
 }
 
 html.fresho-dark .text-slate-400,
 html.fresho-dark .text-slate-300 {
-  color: #71717a !important;
+  color: #91a0b8 !important;
 }
 
 html.fresho-dark .border-slate-100,
 html.fresho-dark .border-slate-200,
 html.fresho-dark .border-slate-300 {
-  border-color: #3f3f46 !important;
+  border-color: #35435b !important;
 }
 
 html.fresho-dark input:not([type="checkbox"]):not([type="radio"]),
 html.fresho-dark textarea,
 html.fresho-dark select {
   color-scheme: dark;
-  background-color: #27272a;
-  color: #fafafa;
-  border-color: #3f3f46;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  background-color: #1b2940;
+  color: #edf2fb;
+  border-color: #3a4c68;
+  box-shadow: inset 0 1px 2px rgb(5 12 25 / 16%);
 }
 
 html.fresho-dark input::placeholder,
 html.fresho-dark textarea::placeholder {
-  color: #71717a;
+  color: #91a0b8;
 }
 
 html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: #465671;
   border-radius: 4px;
 }
 
 html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: #5b6c88;
+}
+
+html.fresho-dark .premium-offer-banner {
+  border-color: rgb(245 158 11 / 42%);
+  background: linear-gradient(135deg, #332b3d, #3b3038 55%, #3d2b39);
+  box-shadow: 0 8px 22px rgb(5 12 25 / 18%);
 }
 
 * {
   box-sizing: border-box;
-}
-
-@media (min-width: 768px) {
-  body:has(.tma-desktop-shell) {
-    display: flex;
-    justify-content: center;
-    min-height: 100vh;
-    background-color: #f0f2f5;
-  }
-
-  .tma-desktop-shell {
-    display: flex;
-    justify-content: center;
-    flex: 1;
-    width: 100%;
-    min-height: 100vh;
-  }
-
-  .tma-app-frame {
-    width: 100%;
-    max-width: 100%;
-    min-height: 100vh;
-    margin-inline: auto;
-    background-color: #f8fafc;
-  }
-
-  html.fresho-dark body:has(.tma-desktop-shell) {
-    background-color: #09090b;
-  }
-
-  html.fresho-dark .tma-app-frame {
-    background-color: #09090b;
-  }
 }
 
 .fresho-premium nav.fixed {
@@ -597,18 +573,20 @@ sup {
 
   .tma-app-frame {
     width: 100%;
-    max-width: 100%;
+    max-width: 480px;
+    flex: 0 1 480px;
+    min-width: 0;
     min-height: 100vh;
     margin-inline: auto;
     background-color: #f8fafc;
   }
 
   html.fresho-dark body:has(.tma-desktop-shell) {
-    background-color: #0f0f0f;
+    background-color: #111a2b;
   }
 
   html.fresho-dark .tma-app-frame {
-    background-color: #0f0f0f;
+    background-color: #151f32;
   }
 }
 
