@@ -34,6 +34,13 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         if engine.dialect.name == "postgresql":
+            from models import SubjectEnum
+
+            for label in SubjectEnum.__members__:
+                escaped_label = label.replace("'", "''")
+                await conn.execute(text(
+                    f"ALTER TYPE subjectenum ADD VALUE IF NOT EXISTS '{escaped_label}'"
+                ))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_name VARCHAR"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS university VARCHAR"))
             await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS region VARCHAR"))
