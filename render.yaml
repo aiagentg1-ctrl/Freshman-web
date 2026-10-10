@@ -1,7 +1,7 @@
 services:
   # Python Telegram Bot with HTTP server for Render health checks
   - type: web
-    name: freshman-backend
+    name: fresho-backend
     runtime: python
     buildCommand: pip install -r requirements.txt
     # Bot runs in background; uvicorn serves the FastAPI app on the

@@ -14,89 +14,131 @@ body {
 
 html.fresho-dark {
   color-scheme: dark;
-  background: #0b1020;
+  background: #1a1d2d;
 }
 
 html.fresho-dark body {
-  background-color: #0b1020;
+  background-color: #1a1d2d;
   color: #e2e8f0;
 }
 
 html.fresho-dark .bg-white {
-  background-color: #151d31 !important;
+  background-color: #252a40 !important;
 }
 
 html.fresho-dark .bg-slate-50,
 html.fresho-dark .bg-slate-100 {
-  background-color: #10182a !important;
+  background-color: #1f2338 !important;
 }
 
-html.fresho-dark .bg-violet-50,
-html.fresho-dark .bg-blue-50,
-html.fresho-dark .bg-indigo-50,
-html.fresho-dark .bg-cyan-50,
-html.fresho-dark .bg-sky-50,
-html.fresho-dark .bg-fuchsia-50,
-html.fresho-dark .bg-teal-50,
-html.fresho-dark .bg-emerald-50,
-html.fresho-dark .bg-rose-50,
-html.fresho-dark .bg-orange-50,
-html.fresho-dark .bg-amber-50,
-html.fresho-dark .bg-amber-100,
-html.fresho-dark .bg-emerald-100,
-html.fresho-dark .bg-blue-100,
+html.fresho-dark .bg-violet-50 {
+  background-color: #2d2645 !important;
+}
+
+html.fresho-dark .bg-blue-50 {
+  background-color: #1e2a4a !important;
+}
+
+html.fresho-dark .bg-indigo-50 {
+  background-color: #282345 !important;
+}
+
+html.fresho-dark .bg-cyan-50 {
+  background-color: #1e3a45 !important;
+}
+
+html.fresho-dark .bg-sky-50 {
+  background-color: #1e3545 !important;
+}
+
+html.fresho-dark .bg-fuchsia-50 {
+  background-color: #3d2345 !important;
+}
+
+html.fresho-dark .bg-teal-50 {
+  background-color: #1e3a38 !important;
+}
+
+html.fresho-dark .bg-emerald-50 {
+  background-color: #1e3a2e !important;
+}
+
+html.fresho-dark .bg-rose-50 {
+  background-color: #3e1e2e !important;
+}
+
+html.fresho-dark .bg-orange-50 {
+  background-color: #3e2e1e !important;
+}
+
+html.fresho-dark .bg-amber-50 {
+  background-color: #3e321e !important;
+}
+
+html.fresho-dark .bg-amber-100 {
+  background-color: #4a3c24 !important;
+}
+
+html.fresho-dark .bg-emerald-100 {
+  background-color: #2e4a32 !important;
+}
+
+html.fresho-dark .bg-blue-100 {
+  background-color: #243a4a !important;
+}
+
 html.fresho-dark .bg-violet-100 {
-  background-color: #232143 !important;
+  background-color: #3d2f4a !important;
 }
 
 html.fresho-dark .text-emerald-700,
 html.fresho-dark .text-emerald-800 {
-  color: #6ee7b7 !important;
+  color: #86efac !important;
 }
 
 html.fresho-dark .text-amber-700,
 html.fresho-dark .text-amber-800 {
-  color: #fcd34d !important;
+  color: #fde047 !important;
 }
 
 html.fresho-dark .text-slate-900,
 html.fresho-dark .text-slate-800,
 html.fresho-dark .text-slate-700 {
-  color: #f1f5f9 !important;
+  color: #f8fafc !important;
 }
 
 html.fresho-dark .text-slate-600,
 html.fresho-dark .text-slate-500 {
-  color: #a8b4c8 !important;
+  color: #cbd5e1 !important;
 }
 
 html.fresho-dark .text-slate-400,
 html.fresho-dark .text-slate-300 {
-  color: #8290a8 !important;
+  color: #94a3b8 !important;
 }
 
 html.fresho-dark .border-slate-100,
 html.fresho-dark .border-slate-200,
 html.fresho-dark .border-slate-300 {
-  border-color: #2b3851 !important;
+  border-color: #3b4255 !important;
 }
 
 html.fresho-dark input:not([type="checkbox"]):not([type="radio"]),
 html.fresho-dark textarea,
 html.fresho-dark select {
   color-scheme: dark;
-  background-color: #10182a;
+  background-color: #1f2338;
   color: #e2e8f0;
-  border-color: #334155;
+  border-color: #3b4255;
 }
 
 html.fresho-dark input::placeholder,
 html.fresho-dark textarea::placeholder {
-  color: #8290a8;
+  color: #94a3b8;
 }
 
 html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #4b5563;
 }
 
 * {
@@ -129,7 +171,7 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   }
 
   html.fresho-dark body:has(.tma-desktop-shell) {
-    background-color: #0b1020;
+    background-color: #1a1d2d;
   }
 }
 
@@ -201,8 +243,8 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
 .html-content .matrix-bracket {
   display: inline-flex;
   align-items: center;
-  border-left: 2.5px solid #0F172A;
-  border-right: 2.5px solid #0F172A;
+  border-left: 2.5px solid #1D70F5;
+  border-right: 2.5px solid #1D70F5;
   border-radius: 4px;
   padding: 2px 8px;
   margin: 4px 6px;
@@ -305,6 +347,11 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   color: #334155;
 }
 
+html.fresho-dark .html-content blockquote {
+  background: #1e2a4a;
+  color: #cbd5e1;
+}
+
 .html-content code {
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
@@ -314,6 +361,12 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+html.fresho-dark .html-content code {
+  background: #1f2338;
+  border-color: #3b4255;
+  color: #86efac;
+}
+
 .html-content pre {
   background: #0f172a;
   color: #e2e8f0;
@@ -321,6 +374,11 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   padding: 1em;
   overflow-x: auto;
   font-size: 0.85rem;
+}
+
+html.fresho-dark .html-content pre {
+  background: #151d31;
+  border: 1px solid #3b4255;
 }
 
 .html-content pre code {
@@ -347,6 +405,16 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
 .html-content th {
   background: #f8fafc;
   font-weight: 600;
+}
+
+html.fresho-dark .html-content th {
+  background: #1f2338;
+  color: #f8fafc;
+}
+
+html.fresho-dark .html-content td {
+  border-color: #3b4255;
+  color: #cbd5e1;
 }
 
 .html-content img {
@@ -378,6 +446,15 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   text-align: center;
 }
 
+html.fresho-dark .html-content .equation,
+html.fresho-dark .html-content .formula,
+html.fresho-dark .html-content .formula-box,
+html.fresho-dark .html-content .math {
+  background: #1f2338;
+  border-color: #3b4255;
+  color: #f8fafc;
+}
+
 /* Pastel callout cards — 💡 Key Points / Remember */
 .html-content .key-point,
 .html-content .keypoint,
@@ -392,6 +469,15 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   color: #1e3a8a;
 }
 
+html.fresho-dark .html-content .key-point,
+html.fresho-dark .html-content .keypoint,
+html.fresho-dark .html-content .tip,
+html.fresho-dark .html-content .note-box {
+  background: #1e2a4a;
+  border-color: #2d3a5a;
+  color: #bfdbfe;
+}
+
 .html-content .remember,
 .html-content .warning {
   background: #fffbeb;
@@ -403,6 +489,13 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   color: #78350f;
 }
 
+html.fresho-dark .html-content .remember,
+html.fresho-dark .html-content .warning {
+  background: #3e321e;
+  border-color: #4a3c24;
+  color: #fde68a;
+}
+
 .html-content .important,
 .html-content .definition {
   background: #f5f3ff;
@@ -412,6 +505,13 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   padding: 0.9em 1.1em;
   margin: 1em 0;
   color: #4c1d95;
+}
+
+html.fresho-dark .html-content .important,
+html.fresho-dark .html-content .definition {
+  background: #2d2645;
+  border-color: #3d2f4a;
+  color: #ddd6fe;
 }
 
 /* Exam paper — individual question blocks */
@@ -433,8 +533,8 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
 .matrix-bracket {
   display: inline-flex !important;
   align-items: center !important;
-  border-left: 3px solid #0F172A !important;
-  border-right: 3px solid #0F172A !important;
+  border-left: 3px solid #1D70F5 !important;
+  border-right: 3px solid #1D70F5 !important;
   border-radius: 4px !important;
   padding: 4px 10px !important;
   margin: 4px 8px !important;
