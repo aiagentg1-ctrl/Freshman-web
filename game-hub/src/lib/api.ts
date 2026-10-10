@@ -753,9 +753,6 @@ export async function getActiveBroadcasts(isPremium: boolean): Promise<Broadcast
     return [];
   }
 }
-    headers: getAdminHeaders(),
-  });
-}
 
 export async function adminGetNotes(): Promise<NoteMeta[]> {
   return request<NoteMeta[]>("/api/admin/notes", {

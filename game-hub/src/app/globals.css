@@ -164,14 +164,17 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
 
   .tma-app-frame {
     width: 100%;
-    max-width: 480px;
+    max-width: 100%;
     min-height: 100vh;
     margin-inline: auto;
     background-color: #f8fafc;
-    box-shadow: 0 0 40px rgb(15 23 42 / 12%);
   }
 
   html.fresho-dark body:has(.tma-desktop-shell) {
+    background-color: #0f0f0f;
+  }
+
+  html.fresho-dark .tma-app-frame {
     background-color: #0f0f0f;
   }
 }
