@@ -257,6 +257,13 @@ interface AttemptSubmission {
   first_name?: string;
 }
 
+interface PendingSubmission {
+  attempt: AttemptSubmission;
+  chapterExamId?: number;
+  examId: number;
+  timestamp: number;
+}
+
 function SubmissionNotice({
   status,
   error,
@@ -379,7 +386,7 @@ export default function ExamRunner({
 
           // Queue for retry later
           const queueKey = "freshoPendingSubmissions";
-          const queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+          const queue: PendingSubmission[] = JSON.parse(localStorage.getItem(queueKey) || "[]");
           queue.push({
             attempt,
             chapterExamId,
@@ -437,7 +444,7 @@ export default function ExamRunner({
   useEffect(() => {
     const retryPendingSubmissions = async () => {
       const queueKey = "freshoPendingSubmissions";
-      const queue = JSON.parse(localStorage.getItem(queueKey) || "[]");
+      const queue: PendingSubmission[] = JSON.parse(localStorage.getItem(queueKey) || "[]");
 
       if (queue.length === 0) return;
 
