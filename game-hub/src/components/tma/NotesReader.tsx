@@ -33,13 +33,15 @@ export default function NotesReader({
   }, [note.id, telegramUserId]);
 
   const markComplete = async () => {
-    if (!telegramUserId || completed || completing) return;
+    if (!telegramUserId || completing) return;
     setCompleting(true);
     try {
       const result = await completeNote(telegramUserId, note.id);
       localStorage.setItem(`freshoNoteComplete:${telegramUserId}:${note.id}`, "1");
       setCompleted(true);
-      setCompletionMessage(result.xp_awarded > 0 ? `Chapter completed. +${result.xp_awarded} XP` : "Chapter already completed.");
+      setCompletionMessage(result.xp_awarded > 0
+        ? `Chapter completed. +${result.xp_awarded} XP`
+        : "Chapter completed again. No XP on this repeat.");
       window.dispatchEvent(new Event("fresho:progress-updated"));
       onNoteCompleted?.();
     } catch (error) {
@@ -102,11 +104,11 @@ export default function NotesReader({
             <button
               type="button"
               onClick={markComplete}
-              disabled={!telegramUserId || completed || completing}
+              disabled={!telegramUserId || completing}
               className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 disabled:opacity-60"
             >
               {completed ? <CheckCircle2 className="h-4 w-4" /> : null}
-              {completing ? "Saving..." : completed ? "Completed" : "Mark complete · +20 XP"}
+              {completing ? "Saving..." : completed ? "Read again" : "Mark complete · +20 XP"}
             </button>
           </div>
           {completionMessage && <p role="status" className="pt-1 text-center text-xs text-slate-600">{completionMessage}</p>}
@@ -162,11 +164,11 @@ export default function NotesReader({
         <button
           type="button"
           onClick={markComplete}
-          disabled={!telegramUserId || completed || completing}
+          disabled={!telegramUserId || completing}
           className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 disabled:opacity-60"
         >
           {completed ? <CheckCircle2 className="h-4 w-4" /> : null}
-          {completing ? "Saving completion..." : completed ? "Chapter completed" : "Mark chapter complete · +20 XP"}
+          {completing ? "Saving completion..." : completed ? "Read chapter again" : "Mark chapter complete · +20 XP"}
         </button>
         {completionMessage && <p role="status" className="text-center text-xs text-slate-600">{completionMessage}</p>}
       </div>

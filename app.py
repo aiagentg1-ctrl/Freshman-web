@@ -1546,47 +1546,40 @@ async def complete_note(user_id: int, request: NoteCompleteRequest):
         if not note:
             raise HTTPException(status_code=404, detail="Note not found")
 
-        # Check if already completed
-        try:
-            existing_result = await session.execute(
-                select(NoteCompletion).where(
-                    NoteCompletion.user_id == user_id,
-                    NoteCompletion.note_id == request.note_id
-                )
+        # Track each completion so only the second completion earns repeat XP.
+        existing_result = await session.execute(
+            select(NoteCompletion).where(
+                NoteCompletion.user_id == user_id,
+                NoteCompletion.note_id == request.note_id
             )
-            existing = existing_result.scalar_one_or_none()
-        except Exception:
-            # Table might not exist yet
-            existing = None
-
-        if existing:
-            print(f"Note {request.note_id} already completed by user {user_id}")
-            return {"message": "Already completed", "xp_awarded": 0}
+        )
+        previous_completions = existing_result.scalars().all()
+        completion_number = len(previous_completions) + 1
 
         # Create completion record
-        try:
-            completion = NoteCompletion(user_id=user_id, note_id=request.note_id)
-            session.add(completion)
-            print(f"Created note completion record for user {user_id}, note {request.note_id}")
-        except Exception as e:
-            # Table might not exist yet, continue without storing
-            print(f"Warning: Could not create note completion (table may not exist yet): {e}")
+        completion = NoteCompletion(user_id=user_id, note_id=request.note_id)
+        session.add(completion)
+        print(f"Created note completion record for user {user_id}, note {request.note_id}")
 
-        # Award XP for completing note
+        # First reading keeps the normal reward, the second gives 5 XP, and
+        # additional readings award no more completion XP.
         starting_level = user.level or 1
-        print(f"Awarding 20 XP for note completion to user {user_id}")
-        xp, level, level_up = await award_xp(session, user_id, 20, "Note completion")
+        note_xp = 20 if completion_number == 1 else 5 if completion_number == 2 else 0
+        print(f"Awarding {note_xp} XP for note completion #{completion_number} to user {user_id}")
+        if note_xp:
+            xp, level, level_up = await award_xp(session, user_id, note_xp, "Note completion")
+        else:
+            xp, level, level_up = user.xp or 0, user.level or 1, False
 
-        # Award "First Step" badge if this is first note
+        # Award "First Step" only for the user's first note completion.
         try:
             all_completions_result = await session.execute(
-                select(NoteCompletion).where(NoteCompletion.user_id == user_id)
+                select(NoteCompletion.id).where(NoteCompletion.user_id == user_id)
             )
             if len(all_completions_result.scalars().all()) == 1:
                 await award_badge(session, user_id, "first_step")
                 print(f"Awarded first_step badge to user {user_id}")
         except Exception as e:
-            # Table might not exist yet, skip badge check
             print(f"Warning: Could not check first_step badge: {e}")
 
         # Update streak
@@ -1595,20 +1588,22 @@ async def complete_note(user_id: int, request: NoteCompleteRequest):
         # Try to award milestones (may fail if tables don't exist)
         milestone_xp = 0
         milestone_badges = []
-        try:
-            milestone = await award_subject_milestones(session, user, note.subject)
-            milestone_xp = milestone.get("xp_awarded", 0)
-            milestone_badges = milestone.get("badges_awarded", [])
-            print(f"Milestone XP awarded: {milestone_xp}, Badges: {milestone_badges}")
-        except Exception as e:
-            print(f"Warning: Could not award milestones (tables may not exist yet): {e}")
+        if completion_number == 1:
+            try:
+                milestone = await award_subject_milestones(session, user, note.subject)
+                milestone_xp = milestone.get("xp_awarded", 0)
+                milestone_badges = milestone.get("badges_awarded", [])
+                print(f"Milestone XP awarded: {milestone_xp}, Badges: {milestone_badges}")
+            except Exception as e:
+                print(f"Warning: Could not award milestones (tables may not exist yet): {e}")
 
         await session.commit()
         await session.refresh(user)
 
         return {
             "message": "Note completed",
-            "xp_awarded": 20 + milestone_xp,
+            "completion_number": completion_number,
+            "xp_awarded": note_xp + milestone_xp,
             "total_xp": user.xp if user.xp is not None else 0,
             "level": user.level if user.level is not None else 1,
             "level_up": level_up or (user.level if user.level is not None else 1) > starting_level,
@@ -2027,7 +2022,8 @@ async def submit_exam_attempt(
             )
         )
         previous_attempts = previous_attempts_result.scalars().all()
-        is_repeat = len(previous_attempts) > 0
+        attempt_number = len(previous_attempts) + 1
+        is_repeat = attempt_number > 1
 
         # Calculate XP
         xp_to_award = 0
@@ -2037,20 +2033,18 @@ async def submit_exam_attempt(
         print(f"Exam submission - User: {attempt.user_id}, Score: {attempt.score}, Percent: {score_percent}%, Is repeat: {is_repeat}, Total Qs: {total_questions}")
 
         if attempt.score is not None:
-            if is_repeat:
-                best_previous = max(
-                    (previous.score for previous in previous_attempts if previous.score is not None),
-                    default=-1,
-                )
-                xp_to_award = 5 + (10 if attempt.score > best_previous else 0)
-                print(f"Repeat exam - Previous best: {best_previous}, New score: {attempt.score}, XP: {xp_to_award}")
-            else:
+            if attempt_number == 1:
                 xp_to_award = 50
                 if score_percent >= 100:
                     xp_to_award += 20
                 elif score_percent >= 80:
                     xp_to_award += 10
                 print(f"First exam - XP base: 50, Bonuses: {xp_to_award - 50}, Total: {xp_to_award}")
+            elif attempt_number == 2:
+                xp_to_award = 5
+                print("Second exam attempt - XP: 5")
+            else:
+                print(f"Exam attempt #{attempt_number} - no repeat XP")
 
             # Award badges based on score
             if score_percent >= 100:
@@ -2133,12 +2127,13 @@ async def submit_exam_attempt(
         # Try to award milestones (may fail if tables don't exist)
         milestone_xp = 0
         milestone_badges = []
-        try:
-            milestones = await award_subject_milestones(session, db_user, exam.subject)
-            milestone_xp = milestones.get("xp_awarded", 0)
-            milestone_badges = milestones.get("badges_awarded", [])
-        except Exception as e:
-            print(f"Warning: Could not award milestones (tables may not exist yet): {e}")
+        if attempt_number == 1:
+            try:
+                milestones = await award_subject_milestones(session, db_user, exam.subject)
+                milestone_xp = milestones.get("xp_awarded", 0)
+                milestone_badges = milestones.get("badges_awarded", [])
+            except Exception as e:
+                print(f"Warning: Could not award milestones (tables may not exist yet): {e}")
 
         await session.commit()
         await session.refresh(db_user)
@@ -2593,20 +2588,19 @@ async def submit_chapter_exam_attempt(
             )
         )
         previous_attempts = previous_result.scalars().all()
-        is_repeat = bool(previous_attempts)
+        attempt_number = len(previous_attempts) + 1
+        is_repeat = attempt_number > 1
         score_percent = (attempt.score / total_questions * 100) if total_questions > 0 and attempt.score is not None else 0
-        if is_repeat:
-            best_previous = max(
-                (previous.score for previous in previous_attempts if previous.score is not None),
-                default=-1,
-            )
-            xp_to_award = 5 + (10 if attempt.score is not None and attempt.score > best_previous else 0)
-        else:
+        if attempt_number == 1:
             xp_to_award = 30
             if score_percent >= 100:
                 xp_to_award += 20
             elif score_percent >= 80:
                 xp_to_award += 10
+        elif attempt_number == 2:
+            xp_to_award = 5
+        else:
+            xp_to_award = 0
 
         new_attempt = ChapterExamAttempt(
             user_id=attempt.user_id,
@@ -2632,7 +2626,7 @@ async def submit_chapter_exam_attempt(
         total_xp, level, level_up = await award_xp(session, attempt.user_id, xp_to_award, "Chapter exam completion")
 
         chapter_xp = 0
-        if exam.note_id is not None:
+        if attempt_number == 1 and exam.note_id is not None:
             chapter_exam_rows = await session.execute(
                 select(ChapterExam.id).where(ChapterExam.note_id == exam.note_id, ChapterExam.is_published == True)
             )
@@ -2654,7 +2648,9 @@ async def submit_chapter_exam_attempt(
                 if chapter_xp:
                     await award_badge(session, attempt.user_id, "chapter_master")
 
-        subject_milestones = await award_subject_milestones(session, user, exam.subject)
+        subject_milestones = {"xp_awarded": 0, "badges_awarded": []}
+        if attempt_number == 1:
+            subject_milestones = await award_subject_milestones(session, user, exam.subject)
         await session.commit()
         streak, frozen = await update_streak(session, attempt.user_id)
         await session.refresh(user)

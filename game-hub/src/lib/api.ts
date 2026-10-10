@@ -527,6 +527,7 @@ export async function submitChapterExamAttempt(
 
 export async function completeNote(userId: number, noteId: number): Promise<{
   message: string;
+  completion_number?: number;
   xp_awarded: number;
   total_xp?: number;
   level?: number;
