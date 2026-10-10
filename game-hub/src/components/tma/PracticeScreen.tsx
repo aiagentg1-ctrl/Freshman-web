@@ -38,6 +38,18 @@ function yearSortKey(year: string): number {
   return match ? parseInt(match[0], 10) : 0;
 }
 
+function getExamTypeCounts(exams: ExamMeta[]) {
+  return {
+    mid: exams.filter((exam) => exam.exam_type.toLowerCase() === "mid").length,
+    final: exams.filter((exam) => exam.exam_type.toLowerCase() === "final").length,
+  };
+}
+
+function defaultExamType(exams: ExamMeta[]): "mid" | "final" {
+  const counts = getExamTypeCounts(exams);
+  return counts.final === 0 && counts.mid > 0 ? "mid" : "final";
+}
+
 // Get university abbreviation from full name
 function getUniversityAbbreviation(universityName: string): string {
   const university = universities.find((u) => u.name === universityName);
@@ -460,7 +472,9 @@ export default function PracticeScreen({
   if (view.kind === "yearExams") {
     const yearExams = examsByYear.get(view.year) ?? [];
     const examType = view.examType ?? "final";
-    const filteredExams = yearExams.filter((exam) => exam.exam_type === examType);
+    const filteredExams = yearExams.filter(
+      (exam) => exam.exam_type.toLowerCase() === examType
+    );
 
     return (
       <div className="flex flex-col flex-1">
@@ -478,8 +492,8 @@ export default function PracticeScreen({
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5 mt-4">
             {(
               [
-                { key: "mid" as const, label: "Mid Exam" },
-                { key: "final" as const, label: "Final Exam" },
+                { key: "mid" as const, label: `Mid Exam (${getExamTypeCounts(yearExams).mid})` },
+                { key: "final" as const, label: `Final Exam (${getExamTypeCounts(yearExams).final})` },
               ]
             ).map((tab) => (
               <button
@@ -782,7 +796,7 @@ export default function PracticeScreen({
               return (
                 <button
                   key={year}
-                  onClick={() => setView({ kind: "yearExams", year, examType: "final" })}
+                  onClick={() => setView({ kind: "yearExams", year, examType: defaultExamType(list) })}
                   className="w-full bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3 text-left active:scale-[0.98] transition-transform"
                 >
                   <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
@@ -792,7 +806,9 @@ export default function PracticeScreen({
                     <h3 className="font-semibold text-slate-900">{year}</h3>
                     <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                       <ListChecks className="w-3.5 h-3.5" />
-                      {list.length} exam{list.length === 1 ? "" : "s"} •{" "}
+                      {getExamTypeCounts(list).final} final · {getExamTypeCounts(list).mid} mid
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
                       {list.map((e) => subjectLabel(e.subject)).join(", ")}
                     </p>
                   </div>
@@ -802,7 +818,7 @@ export default function PracticeScreen({
             })}
             {generalExams.length > 0 && (
               <button
-                onClick={() => setView({ kind: "yearExams", year: "", examType: "final" })}
+                onClick={() => setView({ kind: "yearExams", year: "", examType: defaultExamType(generalExams) })}
                 className="w-full rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 p-4 text-left transition-transform active:scale-[0.98]"
               >
                 <div className="flex items-center gap-3">
@@ -813,7 +829,7 @@ export default function PracticeScreen({
                     <h3 className="font-semibold text-slate-900">General</h3>
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                       <ListChecks className="h-3.5 w-3.5" />
-                      {generalExams.length} exam{generalExams.length === 1 ? "" : "s"} without a year
+                      {getExamTypeCounts(generalExams).final} final · {getExamTypeCounts(generalExams).mid} mid
                     </p>
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
