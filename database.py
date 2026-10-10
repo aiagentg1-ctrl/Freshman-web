@@ -20,7 +20,9 @@ DATABASE_URL = DATABASE_URL.split("?")[0]
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    connect_args={"ssl": True}
+    connect_args={"ssl": True},
+    pool_pre_ping=True,
+    pool_recycle=300,
 )
 AsyncSessionLocal = sessionmaker(
     engine, class_=AsyncSession, expire_on_commit=False
