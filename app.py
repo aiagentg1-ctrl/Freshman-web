@@ -9,6 +9,8 @@ import hashlib
 import hmac
 import asyncio
 import json
+import math
+import re
 import uvicorn
 import os
 import secrets
@@ -948,12 +950,12 @@ class UserProfileUpsert(BaseModel):
 
 class ExamCreate(BaseModel):
     subject: str
-    year: str
+    year: Optional[str] = None
     title: Optional[str] = None
     university: Optional[str] = None
     custom_tag: Optional[str] = None
-    question_count: int
-    duration_minutes: int
+    question_count: Optional[int] = None
+    duration_minutes: Optional[int] = None
     content_type: str = "html"
     content_data: str
     semester: str = "all"
@@ -969,21 +971,25 @@ class ExamCreate(BaseModel):
 
     @validator('year')
     def validate_year(cls, v):
+        if v is None:
+            return ""
         v = v.strip()
-        if not v:
-            raise ValueError('Year is required, e.g. "2016 E.C." or "2024 G.C."')
         return v
 
     @validator('question_count')
     def validate_question_count(cls, v):
+        if v is None:
+            return v
         if v < 1 or v > 200:
             raise ValueError('Question count must be between 1 and 200')
         return v
 
     @validator('duration_minutes')
     def validate_duration_minutes(cls, v):
-        if v < 1 or v > 300:
-            raise ValueError('Duration must be between 1 and 300 minutes')
+        if v is None:
+            return v
+        if v < 1 or v > 1200:
+            raise ValueError('Duration must be between 1 and 1200 minutes')
         return v
 
     @validator('content_type')
@@ -1795,6 +1801,47 @@ async def get_leaderboard(
             raise HTTPException(status_code=500, detail="Could not load leaderboard") from e
 
 
+def infer_exam_question_count(content_data: str) -> Optional[int]:
+    candidates: list[str] = []
+    script = re.search(
+        r"<script\b[^>]*(?:id=[\"']exam-questions[\"']|data-exam-questions)[^>]*>([\s\S]*?)</script>",
+        content_data,
+        re.IGNORECASE,
+    )
+    if script:
+        candidates.append(script.group(1))
+
+    assignment = re.search(
+        r"(?:window\.)?(?:__)?EXAM_QUESTIONS(?:__)?\s*=",
+        content_data,
+        re.IGNORECASE,
+    )
+    if assignment:
+        remaining = content_data[assignment.end():]
+        array_start = remaining.find("[")
+        if array_start >= 0:
+            try:
+                parsed, _ = json.JSONDecoder().raw_decode(remaining[array_start:])
+                candidates.append(json.dumps(parsed))
+            except json.JSONDecodeError:
+                pass
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate.strip())
+        except json.JSONDecodeError:
+            continue
+        questions = parsed if isinstance(parsed, list) else parsed.get("questions") if isinstance(parsed, dict) else None
+        if isinstance(questions, list) and questions:
+            return len(questions)
+    return None
+
+
+def suggested_exam_duration(subject: str, question_count: int) -> int:
+    minutes_per_question = 4.5 if subject.lower() in {"mathematics", "physics", "chemistry"} else 3
+    return math.ceil(question_count * minutes_per_question)
+
+
 # ---------- EUEE exam endpoints ----------
 
 @app.get("/api/exams")
@@ -1851,16 +1898,28 @@ async def get_exam(
 
 @app.post("/api/exams", status_code=201)
 async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_admin_secret)):
+    question_count = exam.question_count
+    if question_count is None and exam.content_type == "html":
+        question_count = infer_exam_question_count(exam.content_data)
+    if question_count is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Question count is required when it cannot be detected from the exam HTML.",
+        )
+    duration_minutes = exam.duration_minutes or suggested_exam_duration(exam.subject, question_count)
     async with AsyncSessionLocal() as session:
-        title = exam.title or f"{exam.subject.capitalize()} EUEE {exam.year}"
+        title = exam.title or (
+            f"{exam.subject.capitalize()} {exam.exam_type.capitalize()} Exam"
+            + (f" {exam.year}" if exam.year else " (General)")
+        )
         new_exam = EueeExam(
             subject=SubjectEnum[exam.subject.upper()],
-            year=exam.year,
+            year=exam.year or "",
             title=title,
             university=exam.university.strip() if exam.university else "",
             custom_tag=(exam.custom_tag or "").strip(),
-            question_count=exam.question_count,
-            duration_minutes=exam.duration_minutes,
+            question_count=question_count,
+            duration_minutes=duration_minutes,
             content_type=exam.content_type,
             content_data=exam.content_data,
             semester=exam.semester,
@@ -1876,21 +1935,26 @@ async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_ad
 
 @app.put("/api/exams/{exam_id}")
 async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Depends(verify_admin_secret)):
+    question_count = exam.question_count
+    if question_count is None and exam.content_type == "html":
+        question_count = infer_exam_question_count(exam.content_data)
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(EueeExam).where(EueeExam.id == exam_id))
         db_exam = result.scalar_one_or_none()
         if not db_exam:
             raise HTTPException(status_code=404, detail="Exam not found")
 
+        question_count = question_count or db_exam.question_count
+        duration_minutes = exam.duration_minutes or suggested_exam_duration(exam.subject, question_count)
         db_exam.subject = SubjectEnum[exam.subject.upper()]
-        db_exam.year = exam.year
+        db_exam.year = exam.year or ""
         db_exam.university = exam.university.strip() if exam.university else ""
         db_exam.is_premium = exam.is_premium
         db_exam.is_published = exam.is_published
         db_exam.title = exam.title or db_exam.title
         db_exam.custom_tag = (exam.custom_tag or "").strip()
-        db_exam.question_count = exam.question_count
-        db_exam.duration_minutes = exam.duration_minutes
+        db_exam.question_count = question_count
+        db_exam.duration_minutes = duration_minutes
         db_exam.content_type = exam.content_type
         db_exam.content_data = exam.content_data
         db_exam.semester = exam.semester

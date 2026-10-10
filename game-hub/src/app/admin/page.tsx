@@ -52,6 +52,7 @@ import {
   type Broadcast,
 } from "@/lib/api";
 import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
+import { getExamQuestionCount, getSuggestedExamDuration } from "@/lib/examMetadata";
 import { migrateLegacyStorage } from "@/lib/legacyStorage";
 
 type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing" | "broadcasts";
@@ -77,8 +78,8 @@ const examPayload = {
   title: "",
   university: "",
   custom_tag: "",
-  question_count: 100,
-  duration_minutes: 120,
+  question_count: "" as number | "",
+  duration_minutes: "" as number | "",
   content_type: "html" as "html" | "pdf",
   content_data: "<p>Exam content</p>",
   semester: "all",
@@ -201,9 +202,27 @@ function ExamsManager() {
   const [form, setForm] = useState(examPayload);
   const [editing, setEditing] = useState<AdminExamMeta | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [questionCountEdited, setQuestionCountEdited] = useState(false);
+  const [durationEdited, setDurationEdited] = useState(false);
   const load = () => { setLoading(true); setError(""); adminGetExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
-  function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); }
+  function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); setQuestionCountEdited(false); setDurationEdited(false); }
+  function autoFillExamMetadata(content: string, subject: string, force = false) {
+    const detectedCount = getExamQuestionCount(content);
+    setForm((current) => {
+      const questionCount = !force && questionCountEdited ? current.question_count : (detectedCount ?? "");
+      const numericCount = typeof questionCount === "number" ? questionCount : detectedCount;
+      return {
+        ...current,
+        question_count: questionCount,
+        duration_minutes: !force && durationEdited
+          ? current.duration_minutes
+          : numericCount
+            ? getSuggestedExamDuration(subject, numericCount)
+            : "",
+      };
+    });
+  }
   async function edit(id: number) {
     setError("");
     try {
@@ -211,6 +230,8 @@ function ExamsManager() {
       setEditing(items.find((item) => item.id === id) || null);
       setForm({ ...exam, semester: exam.semester ?? "all" });
       setUploadedFile(null);
+      setQuestionCountEdited(true);
+      setDurationEdited(true);
     } catch (value) { setError(message(value)); }
   }
   async function save(event: FormEvent) {
@@ -218,24 +239,204 @@ function ExamsManager() {
     if (!form.university) { setError("Select a university."); return; }
     setError("");
     try {
+      const contentData = uploadedFile
+        ? await readLocalFile(uploadedFile, form.content_type)
+        : form.content_data;
+      const detectedCount = form.content_type === "html" ? getExamQuestionCount(contentData) : null;
+      const questionCount = typeof form.question_count === "number" && form.question_count > 0
+        ? form.question_count
+        : detectedCount;
+      if (!questionCount) {
+        setError("Enter the question count, or upload HTML with a supported exam-questions JSON block.");
+        return;
+      }
+      const durationMinutes = typeof form.duration_minutes === "number" && form.duration_minutes > 0
+        ? form.duration_minutes
+        : getSuggestedExamDuration(form.subject, questionCount);
       const payload = uploadedFile
-        ? { ...form, content_data: await readLocalFile(uploadedFile, form.content_type) }
-        : form;
+        ? { ...form, question_count: questionCount, duration_minutes: durationMinutes, content_data: contentData }
+        : { ...form, question_count: questionCount, duration_minutes: durationMinutes };
       if (editing) await adminUpdateExam(editing.id, payload);
       else await adminCreateExam(payload);
       reset();
       load();
     } catch (value) { setError(message(value)); }
   }
-  function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (file) {
-      setUploadedFile(file);
-      setForm({ ...form, content_type: file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "html" });
+      const contentType = file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "html";
+      setError("");
+      if (contentType === "html") {
+        try {
+          const content = await readLocalFile(file, "html");
+          setUploadedFile(null);
+          setForm((current) => ({ ...current, content_type: "html", content_data: content }));
+          autoFillExamMetadata(content, form.subject, true);
+          setQuestionCountEdited(false);
+          setDurationEdited(false);
+        } catch (value) {
+          setError(message(value));
+        }
+      } else {
+        setUploadedFile(file);
+        setForm((current) => ({ ...current, content_type: "pdf" }));
+      }
     }
   }
   async function remove(id: number) { if (!window.confirm("Delete this exam?")) return; try { await adminDeleteExam(id); load(); } catch (value) { setError(message(value)); } }
-  return <ResourcePanel title="Exam management" subtitle="Create and publish freshman-level past exams." loading={loading} error={error} items={items.map((item) => ({ id: item.id, name: `${item.title} · ${item.year}`, status: item.is_published ? "Published" : "Draft", is_premium: item.is_premium, is_published: item.is_published }))} onEdit={edit} onTogglePublish={(id) => adminToggleExamPublish(id).then(load).catch((value) => setError(message(value)))} onDelete={remove} onTogglePremium={(id) => adminToggleExamPremium(id).then(load).catch((value) => setError(message(value)))} form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2"><label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Subject</span><select required className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}><option value="">Select a subject</option>{allStudentSubjects.map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}</select></label><Field label="Year" value={form.year} onChange={(value) => setForm({ ...form, year: value })} /><Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" /><label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">University</span><UniversitySelect value={form.university} onChange={(value) => setForm({ ...form, university: value })} allowCustom={false} /></label><select className="rounded-xl border border-slate-200 px-3 py-2" value={form.exam_type} onChange={(event) => setForm({ ...form, exam_type: event.target.value as "final" | "mid" })}><option value="final">Final exam</option><option value="mid">Mid exam</option></select><Field label="Questions" type="number" value={form.question_count} onChange={(value) => setForm({ ...form, question_count: Number(value) })} /><Field label="Minutes" type="number" value={form.duration_minutes} onChange={(value) => setForm({ ...form, duration_minutes: Number(value) })} /><select className="rounded-xl border border-slate-200 px-3 py-2" value={form.content_type} onChange={(event) => setForm({ ...form, content_type: event.target.value as "html" | "pdf" })}><option value="html">HTML</option><option value="pdf">PDF</option></select><label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">Upload HTML or PDF from your device</span><input type="file" accept=".html,.htm,.pdf,text/html,application/pdf" onChange={handleFileUpload} className="block w-full rounded-xl border border-slate-200 p-3 text-sm" />{uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}</label><textarea aria-label="Exam HTML or content URL" placeholder="Or paste HTML / PDF URL" className="min-h-24 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.content_data} onChange={(event) => { setUploadedFile(null); setForm({ ...form, content_data: event.target.value }); }} /><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish immediately</label><div className="flex gap-2 md:col-span-2"><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Create exam"}</button>{editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}</div></form>} />;
+  return (
+    <ResourcePanel
+      title="Exam management"
+      subtitle="Create and publish freshman-level past exams."
+      loading={loading}
+      error={error}
+      items={items.map((item) => ({
+        id: item.id,
+        name: `${item.title} · ${item.year || "General"}`,
+        status: item.is_published ? "Published" : "Draft",
+        is_premium: item.is_premium,
+        is_published: item.is_published,
+      }))}
+      onEdit={edit}
+      onTogglePublish={(id) => adminToggleExamPublish(id).then(load).catch((value) => setError(message(value)))}
+      onDelete={remove}
+      onTogglePremium={(id) => adminToggleExamPremium(id).then(load).catch((value) => setError(message(value)))}
+      form={
+        <form onSubmit={save} className="grid gap-3 md:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-slate-600">Subject</span>
+            <select
+              required
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+              value={form.subject}
+              onChange={(event) => {
+                const subject = event.target.value;
+                setForm((current) => ({
+                  ...current,
+                  subject,
+                  duration_minutes: durationEdited || typeof current.question_count !== "number"
+                    ? current.duration_minutes
+                    : getSuggestedExamDuration(subject, current.question_count),
+                }));
+              }}
+            >
+              <option value="">Select a subject</option>
+              {allStudentSubjects.map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-slate-600">Year (optional)</span>
+            <input
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+              placeholder="Leave blank to place in General"
+              value={form.year}
+              onChange={(event) => setForm({ ...form, year: event.target.value })}
+            />
+          </label>
+          <Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" />
+          <label className="block md:col-span-2">
+            <span className="mb-1 block text-xs font-bold text-slate-600">University</span>
+            <UniversitySelect value={form.university} onChange={(value) => setForm({ ...form, university: value })} allowCustom={false} />
+          </label>
+          <select
+            className="rounded-xl border border-slate-200 px-3 py-2"
+            value={form.exam_type}
+            onChange={(event) => setForm({ ...form, exam_type: event.target.value as "final" | "mid" })}
+          >
+            <option value="final">Final exam</option>
+            <option value="mid">Mid exam</option>
+          </select>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-slate-600">Question count</span>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+              value={form.question_count}
+              onChange={(event) => {
+                const value = event.target.value;
+                const questionCount = value ? Number(value) : "";
+                setQuestionCountEdited(Boolean(value));
+                setForm((current) => ({
+                  ...current,
+                  question_count: questionCount,
+                  duration_minutes: durationEdited
+                    ? current.duration_minutes
+                    : questionCount
+                      ? getSuggestedExamDuration(current.subject, questionCount)
+                      : "",
+                }));
+              }}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-slate-600">Minutes</span>
+            <input
+              type="number"
+              min={1}
+              max={1200}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2"
+              value={form.duration_minutes}
+              onChange={(event) => {
+                const value = event.target.value;
+                setDurationEdited(Boolean(value));
+                setForm({ ...form, duration_minutes: value ? Number(value) : "" });
+              }}
+            />
+          </label>
+          <p className="text-xs text-slate-500 md:col-span-2">
+            HTML question counts are detected automatically. Suggested time is 4.5 minutes per question for Mathematics, Physics, and Chemistry, and 3 minutes for other subjects. Both values can be edited.
+          </p>
+          <select
+            className="rounded-xl border border-slate-200 px-3 py-2"
+            value={form.content_type}
+            onChange={(event) => setForm({ ...form, content_type: event.target.value as "html" | "pdf" })}
+          >
+            <option value="html">HTML</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <label className="block md:col-span-2">
+            <span className="mb-1 block text-xs font-bold text-slate-600">Upload HTML or PDF from your device</span>
+            <input
+              type="file"
+              accept=".html,.htm,.pdf,text/html,application/pdf"
+              onChange={(event) => void handleFileUpload(event)}
+              className="block w-full rounded-xl border border-slate-200 p-3 text-sm"
+            />
+            {uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}
+          </label>
+          <textarea
+            aria-label="Exam HTML or content URL"
+            placeholder="Or paste HTML / PDF URL"
+            className="min-h-24 rounded-xl border border-slate-200 p-3 md:col-span-2"
+            value={form.content_data}
+            onChange={(event) => {
+              const content = event.target.value;
+              setUploadedFile(null);
+              setQuestionCountEdited(false);
+              setDurationEdited(false);
+              setForm((current) => ({ ...current, content_data: content }));
+              if (form.content_type === "html") autoFillExamMetadata(content, form.subject, true);
+            }}
+          />
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} />
+            <Crown className="h-4 w-4 text-amber-500" /> Premium access
+          </label>
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} />
+            Publish immediately
+          </label>
+          <div className="flex gap-2 md:col-span-2">
+            <button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Create exam"}</button>
+            {editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}
+          </div>
+        </form>
+      }
+    />
+  );
 }
 
 function NotesManager() {

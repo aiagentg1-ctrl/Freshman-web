@@ -245,9 +245,10 @@ export default function PracticeScreen({
   }, [streamExams]);
 
   const sortedYears = useMemo(
-    () => [...examsByYear.keys()].sort((a, b) => yearSortKey(b) - yearSortKey(a)),
+    () => [...examsByYear.keys()].filter(Boolean).sort((a, b) => yearSortKey(b) - yearSortKey(a)),
     [examsByYear]
   );
+  const generalExams = examsByYear.get("") ?? [];
 
   const visibleSubjects = subjectFilter
     ? subjects.filter((s) => s.key === subjectFilter)
@@ -470,8 +471,8 @@ export default function PracticeScreen({
           >
             <ChevronLeft className="w-5 h-5" /> Back
           </button>
-          <h1 className="text-xl font-bold text-slate-900">{view.year}</h1>
-          <p className="text-xs text-slate-500 mt-0.5">All subjects for this year</p>
+          <h1 className="text-xl font-bold text-slate-900">{view.year || "General Exams"}</h1>
+          <p className="text-xs text-slate-500 mt-0.5">{view.year ? "All subjects for this year" : "Exams without a specified year"}</p>
 
           {/* Mid/Final Exam Tabs */}
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1.5 mt-4">
@@ -500,7 +501,9 @@ export default function PracticeScreen({
           {filteredExams.length === 0 ? (
             <EmptyState
               title={`No ${examType} exams yet`}
-              subtitle={`${examType === "mid" ? "Mid" : "Final"} exams for ${view.year} will appear here once uploaded.`}
+              subtitle={view.year
+                ? `${examType === "mid" ? "Mid" : "Final"} exams for ${view.year} will appear here once uploaded.`
+                : `General ${examType === "mid" ? "mid" : "final"} exams will appear here once uploaded.`}
             />
           ) : (
             filteredExams.map((exam) => {
@@ -522,9 +525,11 @@ export default function PracticeScreen({
                         {subjectLabel(exam.subject)}
                       </h3>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[#1D70F5] font-semibold text-[10px]">
-                          {exam.year}
-                        </span>
+                        {exam.year && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[#1D70F5] font-semibold text-[10px]">
+                            {exam.year}
+                          </span>
+                        )}
                         {universityAbbr && (
                           <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold text-[10px]">
                             {universityAbbr}
@@ -765,7 +770,7 @@ export default function PracticeScreen({
               );
             })}
           </div>
-        ) : sortedYears.length === 0 ? (
+        ) : sortedYears.length === 0 && generalExams.length === 0 ? (
           <EmptyState
             title="No exams yet"
             subtitle="Uploaded exams will appear here grouped by year."
@@ -795,6 +800,26 @@ export default function PracticeScreen({
                 </button>
               );
             })}
+            {generalExams.length > 0 && (
+              <button
+                onClick={() => setView({ kind: "yearExams", year: "", examType: "final" })}
+                className="w-full rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 p-4 text-left transition-transform active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white">
+                    <CalendarDays className="h-5 w-5 text-[#1D70F5]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-slate-900">General</h3>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                      <ListChecks className="h-3.5 w-3.5" />
+                      {generalExams.length} exam{generalExams.length === 1 ? "" : "s"} without a year
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                </div>
+              </button>
+            )}
           </div>
         )}
       </div>
