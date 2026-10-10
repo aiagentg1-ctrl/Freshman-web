@@ -12,133 +12,134 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* YouTube/Twitter-style Dark Mode - Comfortable & Neutral */
 html.fresho-dark {
   color-scheme: dark;
-  background: #1a1d2d;
+  background: #0f0f0f;
 }
 
 html.fresho-dark body {
-  background-color: #1a1d2d;
-  color: #e2e8f0;
+  background-color: #0f0f0f;
+  color: #ffffff;
 }
 
 html.fresho-dark .bg-white {
-  background-color: #252a40 !important;
+  background-color: #1e1e1e !important;
 }
 
 html.fresho-dark .bg-slate-50,
 html.fresho-dark .bg-slate-100 {
-  background-color: #1f2338 !important;
+  background-color: #272727 !important;
 }
 
 html.fresho-dark .bg-violet-50 {
-  background-color: #2d2645 !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-blue-50 {
-  background-color: #1e2a4a !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-indigo-50 {
-  background-color: #282345 !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-cyan-50 {
-  background-color: #1e3a45 !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-sky-50 {
-  background-color: #1e3545 !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-fuchsia-50 {
-  background-color: #3d2345 !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-teal-50 {
-  background-color: #1e3a38 !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-emerald-50 {
-  background-color: #1e3a2e !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-rose-50 {
-  background-color: #3e1e2e !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-orange-50 {
-  background-color: #3e2e1e !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-amber-50 {
-  background-color: #3e321e !important;
+  background-color: #2a2a2a !important;
 }
 
 html.fresho-dark .bg-amber-100 {
-  background-color: #4a3c24 !important;
+  background-color: #333333 !important;
 }
 
 html.fresho-dark .bg-emerald-100 {
-  background-color: #2e4a32 !important;
+  background-color: #333333 !important;
 }
 
 html.fresho-dark .bg-blue-100 {
-  background-color: #243a4a !important;
+  background-color: #333333 !important;
 }
 
 html.fresho-dark .bg-violet-100 {
-  background-color: #3d2f4a !important;
+  background-color: #333333 !important;
 }
 
 html.fresho-dark .text-emerald-700,
 html.fresho-dark .text-emerald-800 {
-  color: #86efac !important;
+  color: #4ade80 !important;
 }
 
 html.fresho-dark .text-amber-700,
 html.fresho-dark .text-amber-800 {
-  color: #fde047 !important;
+  color: #fbbf24 !important;
 }
 
 html.fresho-dark .text-slate-900,
 html.fresho-dark .text-slate-800,
 html.fresho-dark .text-slate-700 {
-  color: #f8fafc !important;
+  color: #ffffff !important;
 }
 
 html.fresho-dark .text-slate-600,
 html.fresho-dark .text-slate-500 {
-  color: #cbd5e1 !important;
+  color: #aaaaaa !important;
 }
 
 html.fresho-dark .text-slate-400,
 html.fresho-dark .text-slate-300 {
-  color: #94a3b8 !important;
+  color: #888888 !important;
 }
 
 html.fresho-dark .border-slate-100,
 html.fresho-dark .border-slate-200,
 html.fresho-dark .border-slate-300 {
-  border-color: #3b4255 !important;
+  border-color: #333333 !important;
 }
 
 html.fresho-dark input:not([type="checkbox"]):not([type="radio"]),
 html.fresho-dark textarea,
 html.fresho-dark select {
   color-scheme: dark;
-  background-color: #1f2338;
-  color: #e2e8f0;
-  border-color: #3b4255;
+  background-color: #272727;
+  color: #ffffff;
+  border-color: #404040;
 }
 
 html.fresho-dark input::placeholder,
 html.fresho-dark textarea::placeholder {
-  color: #94a3b8;
+  color: #888888;
 }
 
 html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #4b5563;
+  background: #404040;
 }
 
 * {
@@ -171,7 +172,7 @@ html.fresho-dark .custom-scrollbar::-webkit-scrollbar-thumb {
   }
 
   html.fresho-dark body:has(.tma-desktop-shell) {
-    background-color: #1a1d2d;
+    background-color: #0f0f0f;
   }
 }
 
