@@ -58,6 +58,7 @@ SUBJECT_LABELS = {
 }
 
 active_quizzes = {}
+chapter_university_selections = {}
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -240,8 +241,74 @@ def supported_quiz_questions(raw_questions):
             "text": question_text[:3500],
             "options": [clean_question_text(option) for option in options],
             "answer": answer,
+            "university": question_metadata(raw, ("university", "university_name", "source_university")),
+            "subject": question_metadata(raw, ("subject", "subject_name")),
         })
     return questions, skipped
+
+
+def question_metadata(raw, keys):
+    for key in keys:
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def question_universities(raw_questions):
+    names = {}
+    for raw in raw_questions:
+        if not isinstance(raw, dict):
+            continue
+        name = question_metadata(raw, ("university", "university_name", "source_university"))
+        if name:
+            names.setdefault(name.casefold(), name)
+    return sorted(names.values(), key=str.casefold)
+
+
+def question_matches_subject(question_subject, subject):
+    if not question_subject:
+        return True
+    normalize = lambda value: re.sub(r"[^a-z0-9]", "", value.casefold())
+    accepted = {
+        normalize(subject),
+        normalize(subject.replace("_", " ")),
+        normalize(SUBJECT_LABELS.get(subject, subject)),
+    }
+    return normalize(question_subject) in accepted
+
+
+def filter_chapter_questions(questions, subject, selected_universities):
+    filtered = [
+        question for question in questions
+        if question_matches_subject(question["subject"], subject)
+    ]
+    if selected_universities:
+        filtered = [
+            question for question in filtered
+            if question["university"] is not None
+            and question["university"].casefold() in selected_universities
+        ]
+    return filtered
+
+
+def university_selection_keyboard(exam_id, universities, selected):
+    rows = []
+    for index, university in enumerate(universities):
+        prefix = "✅" if university.casefold() in selected else "▫️"
+        label = f"{prefix} {university}"
+        if len(label) > 60:
+            label = label[:57].rstrip() + "..."
+        rows.append([InlineKeyboardButton(
+            text=label,
+            callback_data=f"quiz:uni-toggle:{exam_id}:{index}",
+        )])
+    rows.append([
+        InlineKeyboardButton(text="Select all", callback_data=f"quiz:uni-all:{exam_id}"),
+        InlineKeyboardButton(text="Clear", callback_data=f"quiz:uni-clear:{exam_id}"),
+    ])
+    rows.append([InlineKeyboardButton(text="▶️ Start selected questions", callback_data=f"quiz:uni-start:{exam_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def quiz_answer_keyboard(user_id: int, question_index: int, options, selected=None, correct=None):
@@ -458,7 +525,7 @@ async def exams_navigation(callback: CallbackQuery):
                 callback_data = f"quiz:start:e:{material.id}"
             else:
                 title = f"Chapter {material.chapter_number} · {material.title}"
-                callback_data = f"quiz:start:c:{material.id}"
+                callback_data = f"quiz:universities:{material.id}"
             if len(title) > 58:
                 title = title[:55].rstrip() + "..."
             rows.append([InlineKeyboardButton(text=title, callback_data=callback_data)])
@@ -488,6 +555,224 @@ async def exams_navigation(callback: CallbackQuery):
     await callback.answer("This menu has expired. Please open Exams again.", show_alert=True)
 
 
+@dp.callback_query(lambda c: c.data and c.data.startswith("quiz:universities:"))
+async def choose_chapter_universities(callback: CallbackQuery):
+    if not callback.message:
+        await callback.answer()
+        return
+    if callback.message.chat.type != "private":
+        await callback.answer("Chat quizzes are available in a private chat with Fresho.", show_alert=True)
+        return
+    try:
+        student, is_premium, premium_error = await get_student_access(callback.from_user.id)
+    except RuntimeError as error:
+        await callback.answer(str(error), show_alert=True)
+        return
+    if not student:
+        await callback.answer("Register in the Fresho study app before using quizzes.", show_alert=True)
+        return
+
+    exam_id_text = (callback.data or "").rsplit(":", 1)[-1]
+    if not exam_id_text.isdigit():
+        await callback.answer("Invalid chapter selection.", show_alert=True)
+        return
+    exam_id = int(exam_id_text)
+    try:
+        async with AsyncSessionLocal() as session:
+            material = await session.get(ChapterExam, exam_id)
+            if not material or not material.is_published:
+                await callback.answer("This chapter quiz is not available.", show_alert=True)
+                return
+            if material.chapter_number != 1 and not is_premium:
+                if premium_error:
+                    await callback.answer(premium_error, show_alert=True)
+                    return
+                await callback.answer("Only Chapter 1 is free. Other chapters require Premium.", show_alert=True)
+                return
+            if material.subject.value not in subject_options(student.stream):
+                await callback.answer("This subject is not available for your stream.", show_alert=True)
+                return
+            material_stream = material.stream
+            if material_stream is None and material.note_id is not None:
+                linked_note = await session.get(Note, material.note_id)
+                material_stream = linked_note.stream if linked_note else None
+            if material_stream and material_stream != student.stream:
+                await callback.answer("This quiz is for another science stream.", show_alert=True)
+                return
+            raw_questions = quiz_question_data(material.content_data) if material.content_type == "html" else []
+            universities = question_universities(raw_questions)
+    except Exception as error:
+        print(f"Could not load chapter university options: {error}")
+        await callback.answer("Could not load this chapter quiz right now. Please try again.", show_alert=True)
+        return
+
+    if not universities:
+        await callback.message.edit_text(
+            f"Chapter {material.chapter_number} · {material.title}\n\n"
+            "This chapter’s HTML does not identify a university for each question, "
+            "so there is nothing to filter yet. Open it in the study app or ask the content producer "
+            "to add university metadata to each question.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="▶️ Start all supported questions", callback_data=f"quiz:uni-start:{exam_id}")],
+                [InlineKeyboardButton(text="📚 Open Fresho", web_app=WebAppInfo(url=MINI_APP_URL))],
+                [InlineKeyboardButton(text="⬅️ Back to exams", callback_data="exams:home")],
+            ]),
+        )
+        chapter_university_selections[(callback.message.chat.id, callback.from_user.id, exam_id)] = {
+            "universities": [],
+            "selected": set(),
+            "subject": material.subject.value,
+            "title": f"Chapter {material.chapter_number} · {material.title}",
+        }
+        await callback.answer()
+        return
+
+    key = (callback.message.chat.id, callback.from_user.id, exam_id)
+    selected = {name.casefold() for name in universities}
+    chapter_university_selections[key] = {
+        "universities": universities,
+        "selected": selected,
+        "subject": material.subject.value,
+        "title": f"Chapter {material.chapter_number} · {material.title}",
+    }
+    await callback.message.edit_text(
+        f"Chapter {material.chapter_number} · {material.title}\n"
+        f"Subject: {SUBJECT_LABELS.get(material.subject.value, material.subject.value.title())}\n\n"
+        "Choose which universities to include. Questions from other universities will be left out. "
+        "All listed universities are selected by default.",
+        reply_markup=university_selection_keyboard(exam_id, universities, selected),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("quiz:uni-"))
+async def update_chapter_university_selection(callback: CallbackQuery):
+    if not callback.message:
+        await callback.answer()
+        return
+    if callback.message.chat.type != "private":
+        await callback.answer("Chat quizzes are available in a private chat with Fresho.", show_alert=True)
+        return
+    parts = (callback.data or "").split(":")
+    if len(parts) < 3 or not parts[2].isdigit():
+        await callback.answer("Invalid university selection.", show_alert=True)
+        return
+    exam_id = int(parts[2])
+    key = (callback.message.chat.id, callback.from_user.id, exam_id)
+    selection = chapter_university_selections.get(key)
+    if selection is None:
+        await callback.answer("This selection expired. Open the chapter again.", show_alert=True)
+        return
+
+    action = parts[1]
+    if action == "uni-toggle":
+        if len(parts) != 4 or not parts[3].isdigit():
+            await callback.answer("Invalid university selection.", show_alert=True)
+            return
+        index = int(parts[3])
+        if index >= len(selection["universities"]):
+            await callback.answer("That university option is unavailable.", show_alert=True)
+            return
+        name = selection["universities"][index]
+        if name.casefold() in selection["selected"]:
+            selection["selected"].remove(name.casefold())
+        else:
+            selection["selected"].add(name.casefold())
+    elif action == "uni-all":
+        selection["selected"] = {name.casefold() for name in selection["universities"]}
+    elif action == "uni-clear":
+        selection["selected"].clear()
+    elif action == "uni-start":
+        await start_selected_chapter_quiz(callback, exam_id, selection)
+        return
+    else:
+        await callback.answer("Unknown selection action.", show_alert=True)
+        return
+
+    await callback.message.edit_reply_markup(
+        reply_markup=university_selection_keyboard(
+            exam_id, selection["universities"], selection["selected"],
+        )
+    )
+    await callback.answer("Selection updated.")
+
+
+async def start_selected_chapter_quiz(callback: CallbackQuery, exam_id: int, selection):
+    if not callback.message:
+        await callback.answer()
+        return
+    try:
+        student, is_premium, premium_error = await get_student_access(callback.from_user.id)
+    except RuntimeError as error:
+        await callback.answer(str(error), show_alert=True)
+        return
+    if not student:
+        await callback.answer("Register in the Fresho study app before using quizzes.", show_alert=True)
+        return
+    try:
+        async with AsyncSessionLocal() as session:
+            material = await session.get(ChapterExam, exam_id)
+            if not material or not material.is_published:
+                await callback.answer("This chapter quiz is no longer available.", show_alert=True)
+                return
+            if material.chapter_number != 1 and not is_premium:
+                await callback.answer(
+                    premium_error or "Only Chapter 1 is free. Other chapters require Premium.",
+                    show_alert=True,
+                )
+                return
+            if material.subject.value not in subject_options(student.stream):
+                await callback.answer("This subject is not available for your stream.", show_alert=True)
+                return
+            material_stream = material.stream
+            if material_stream is None and material.note_id is not None:
+                linked_note = await session.get(Note, material.note_id)
+                material_stream = linked_note.stream if linked_note else None
+            if material_stream and material_stream != student.stream:
+                await callback.answer("This quiz is for another science stream.", show_alert=True)
+                return
+            content = material.content_data if material.content_type == "html" else ""
+            title = selection["title"]
+            subject = material.subject.value
+    except Exception as error:
+        print(f"Could not start chapter quiz: {error}")
+        await callback.answer("Could not start this quiz right now. Please try again.", show_alert=True)
+        return
+
+    if selection["universities"] and not selection["selected"]:
+        await callback.answer("Select at least one university.", show_alert=True)
+        return
+    raw_questions = quiz_question_data(content)
+    questions, skipped = supported_quiz_questions(raw_questions)
+    questions = filter_chapter_questions(questions, subject, selection["selected"])
+    if not questions:
+        await callback.message.edit_text(
+            "No supported multiple-choice questions match that university and subject selection. "
+            "Matching and fill-in-the-blank questions are not run as chat quizzes. Open the chapter "
+            "in the study app to view its full content.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📚 Open Fresho", web_app=WebAppInfo(url=MINI_APP_URL))],
+                [InlineKeyboardButton(text="⬅️ Back to exams", callback_data="exams:home")],
+            ]),
+        )
+        await callback.answer()
+        return
+
+    key = (callback.message.chat.id, callback.from_user.id)
+    active_quizzes[key] = {
+        "title": f"{title} · {len(selection['selected'])} university"
+        f"{'ies' if len(selection['selected']) != 1 else ''}",
+        "questions": questions,
+        "index": 0,
+        "score": 0,
+        "answered": False,
+        "skipped": skipped,
+    }
+    chapter_university_selections.pop((callback.message.chat.id, callback.from_user.id, exam_id), None)
+    await callback.answer()
+    await show_quiz_question(callback.message, callback.from_user.id, active_quizzes[key])
+
+
 @dp.callback_query(lambda c: c.data and c.data.startswith("quiz:start:"))
 async def start_chat_quiz(callback: CallbackQuery):
     if not callback.message:
@@ -506,52 +791,26 @@ async def start_chat_quiz(callback: CallbackQuery):
         return
 
     parts = (callback.data or "").split(":")
-    if len(parts) != 4 or parts[2] not in {"e", "c"} or not parts[3].isdigit():
+    if len(parts) != 4 or parts[2] != "e" or not parts[3].isdigit():
         await callback.answer("Invalid quiz selection.", show_alert=True)
         return
-    kind, material_id = parts[2], int(parts[3])
+    material_id = int(parts[3])
     async with AsyncSessionLocal() as session:
-        if kind == "e":
-            if premium_error:
-                await callback.answer(premium_error, show_alert=True)
-                return
-            if not is_premium:
-                await callback.answer("Yearly exam quizzes require Premium.", show_alert=True)
-                return
-            material = await session.get(EueeExam, material_id)
-            if not material or not material.is_published:
-                await callback.answer("This exam is not available.", show_alert=True)
-                return
-            if material.subject.value not in subject_options(student.stream):
-                await callback.answer("This subject is not available for your stream.", show_alert=True)
-                return
-            title = f"{material.title} · {material.year}"
-            content = material.content_data if material.content_type == "html" else ""
-        else:
-            material = await session.get(ChapterExam, material_id)
-            if not material or not material.is_published:
-                await callback.answer("This chapter quiz is not available.", show_alert=True)
-                return
-            if material.chapter_number != 1 and not is_premium:
-                if premium_error:
-                    await callback.answer(premium_error, show_alert=True)
-                    return
-                await callback.answer("Only Chapter 1 is free. Other chapters require Premium.", show_alert=True)
-                return
-            if material.subject.value not in subject_options(student.stream):
-                await callback.answer("This subject is not available for your stream.", show_alert=True)
-                return
-            material_stream = material.stream
-            if material_stream and material_stream != student.stream:
-                await callback.answer("This quiz is for another science stream.", show_alert=True)
-                return
-            if material_stream is None and material.note_id is not None:
-                linked_note = await session.get(Note, material.note_id)
-                if linked_note and linked_note.stream and linked_note.stream != student.stream:
-                    await callback.answer("This quiz is for another science stream.", show_alert=True)
-                    return
-            title = f"Chapter {material.chapter_number} · {material.title}"
-            content = material.content_data
+        if premium_error:
+            await callback.answer(premium_error, show_alert=True)
+            return
+        if not is_premium:
+            await callback.answer("Yearly exam quizzes require Premium.", show_alert=True)
+            return
+        material = await session.get(EueeExam, material_id)
+        if not material or not material.is_published:
+            await callback.answer("This exam is not available.", show_alert=True)
+            return
+        if material.subject.value not in subject_options(student.stream):
+            await callback.answer("This subject is not available for your stream.", show_alert=True)
+            return
+        title = f"{material.title} · {material.year}"
+        content = material.content_data if material.content_type == "html" else ""
 
     raw_questions = quiz_question_data(content)
     questions, skipped = supported_quiz_questions(raw_questions)
