@@ -449,12 +449,16 @@ export default function ExamRunner({
     if (pendingSubmission.current) void persistSubmission(pendingSubmission.current);
   };
 
-  const filteredQuestions = useMemo(
-    () => questions
-      ? filterQuestionsForUniversities(questions, availableUniversities, selectedUniversities, includeGeneral)
-      : null,
-    [availableUniversities, includeGeneral, questions, selectedUniversities],
-  );
+  const filteredQuestions = useMemo(() => {
+    if (!questions) return null;
+    if (chapterExamId === undefined) return questions;
+    return filterQuestionsForUniversities(
+      questions,
+      availableUniversities,
+      selectedUniversities,
+      includeGeneral,
+    );
+  }, [availableUniversities, chapterExamId, includeGeneral, questions, selectedUniversities]);
   const generalQuestionCount = questions?.filter((question) => !question.university).length ?? 0;
   const hasGeneralQuestions = generalQuestionCount > 0;
   const hasSourceOptions = availableUniversities.length > 0 || hasGeneralQuestions;
@@ -467,6 +471,11 @@ export default function ExamRunner({
   useEffect(() => {
     const saved = chapterExamId === undefined ? getSavedExamProgress(exam.id) : null;
     if (saved && questions) {
+      if (saved.answers.length !== questions.length) {
+        clearExamProgress(exam.id);
+        setRestoring(false);
+        return;
+      }
       const savedUniversities = Array.isArray(saved.selectedUniversities)
         ? saved.selectedUniversities.filter((university) => availableUniversities.includes(university))
         : availableUniversities;
@@ -1070,7 +1079,7 @@ export default function ExamRunner({
             </div>
           </div>
 
-          {interactive && hasSourceOptions && (
+          {chapterExamId !== undefined && interactive && hasSourceOptions && (
             <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-start justify-between gap-3">
                 <div>
