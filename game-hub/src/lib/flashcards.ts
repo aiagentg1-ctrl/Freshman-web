@@ -23,31 +23,151 @@ function extractLegacyDeck(html: string): unknown {
   if (!assignment) return null;
 
   const arrayStart = html.indexOf("[", assignment.index);
-  let depth = 0;
-  let quote: "'" | '"' | "`" | null = null;
-  let escaped = false;
+  let index = arrayStart;
 
-  for (let index = arrayStart; index < html.length; index += 1) {
-    const character = html[index];
-    if (quote) {
-      if (escaped) escaped = false;
-      else if (character === "\\") escaped = true;
-      else if (character === quote) quote = null;
-      continue;
-    }
-    if (character === '"' || character === "'" || character === "`") {
-      quote = character;
-    } else if (character === "[") {
-      depth += 1;
-    } else if (character === "]") {
-      depth -= 1;
-      if (depth === 0) {
-        return JSON.parse(html.slice(arrayStart, index + 1)) as unknown;
+  const skipWhitespaceAndComments = () => {
+    while (index < html.length) {
+      if (/\s/.test(html[index])) {
+        index += 1;
+      } else if (html.startsWith("//", index)) {
+        const lineEnd = html.indexOf("\n", index + 2);
+        index = lineEnd < 0 ? html.length : lineEnd + 1;
+      } else if (html.startsWith("/*", index)) {
+        const commentEnd = html.indexOf("*/", index + 2);
+        if (commentEnd < 0) throw new Error("The VOCAB_DATA contains an incomplete comment.");
+        index = commentEnd + 2;
+      } else {
+        return;
       }
     }
-  }
+  };
 
-  throw new Error("The VOCAB_DATA array is incomplete.");
+  const readString = (): string => {
+    const quote = html[index];
+    index += 1;
+    let value = "";
+    while (index < html.length) {
+      const character = html[index];
+      index += 1;
+      if (character === quote) return value;
+      if (character !== "\\") {
+        value += character;
+        continue;
+      }
+      if (index >= html.length) break;
+      const escaped = html[index];
+      index += 1;
+      const simpleEscapes: Record<string, string> = {
+        "0": "\0",
+        b: "\b",
+        f: "\f",
+        n: "\n",
+        r: "\r",
+        t: "\t",
+        v: "\v",
+        "\\": "\\",
+        "'": "'",
+        '"': '"',
+        "/": "/",
+      };
+      if (escaped in simpleEscapes) {
+        value += simpleEscapes[escaped];
+      } else if (escaped === "u" || escaped === "x") {
+        const digits = escaped === "u" ? 4 : 2;
+        const code = html.slice(index, index + digits);
+        if (!new RegExp(`^[0-9a-f]{${digits}}$`, "i").test(code)) {
+          throw new Error("The VOCAB_DATA contains an invalid string escape.");
+        }
+        value += String.fromCharCode(parseInt(code, 16));
+        index += digits;
+      } else if (escaped === "\n") {
+        continue;
+      } else {
+        value += escaped;
+      }
+    }
+    throw new Error("The VOCAB_DATA contains an unterminated string.");
+  };
+
+  const readIdentifier = (): string => {
+    const start = index;
+    if (!/[A-Za-z_$]/.test(html[index] || "")) {
+      throw new Error(`Unexpected character in VOCAB_DATA at position ${index}.`);
+    }
+    while (index < html.length && /[A-Za-z0-9_$]/.test(html[index])) index += 1;
+    if (start === index) throw new Error(`Unexpected character in VOCAB_DATA at position ${index}.`);
+    return html.slice(start, index);
+  };
+
+  const expect = (character: string) => {
+    skipWhitespaceAndComments();
+    if (html[index] !== character) {
+      throw new Error(`Expected "${character}" in VOCAB_DATA at position ${index}.`);
+    }
+    index += 1;
+  };
+
+  const parseValue = (): unknown => {
+    skipWhitespaceAndComments();
+    const character = html[index];
+
+    if (character === "[" ) {
+      index += 1;
+      const values: unknown[] = [];
+      skipWhitespaceAndComments();
+      while (html[index] !== "]") {
+        if (index >= html.length) throw new Error("The VOCAB_DATA array is incomplete.");
+        values.push(parseValue());
+        skipWhitespaceAndComments();
+        if (html[index] === "]") break;
+        expect(",");
+        skipWhitespaceAndComments();
+        if (html[index] === "]") break;
+      }
+      expect("]");
+      return values;
+    }
+
+    if (character === "{") {
+      index += 1;
+      const record: Record<string, unknown> = {};
+      skipWhitespaceAndComments();
+      while (html[index] !== "}") {
+        if (index >= html.length) throw new Error("A VOCAB_DATA object is incomplete.");
+        const keyCharacter = html[index];
+        const key = keyCharacter === "'" || keyCharacter === '"' || keyCharacter === "`"
+          ? readString()
+          : readIdentifier();
+        expect(":");
+        record[key] = parseValue();
+        skipWhitespaceAndComments();
+        if (html[index] === "}") break;
+        expect(",");
+        skipWhitespaceAndComments();
+        if (html[index] === "}") break;
+      }
+      expect("}");
+      return record;
+    }
+
+    if (character === "'" || character === '"' || character === "`") return readString();
+    const numericLiteral = html.slice(index).match(/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
+    if (numericLiteral) {
+      index += numericLiteral[0].length;
+      return Number(numericLiteral[0]);
+    }
+    const literal = readIdentifier();
+    if (literal === "true") return true;
+    if (literal === "false") return false;
+    if (literal === "null") return null;
+    if (literal === "undefined") return undefined;
+    throw new Error(`Unsupported value "${literal}" in VOCAB_DATA.`);
+  };
+
+  if (arrayStart < 0) throw new Error("The VOCAB_DATA array is incomplete.");
+  const parsed = parseValue();
+  if (!Array.isArray(parsed)) throw new Error("VOCAB_DATA must be an array.");
+  return parsed;
 }
 
 function readCardList(value: unknown): unknown[] | null {
