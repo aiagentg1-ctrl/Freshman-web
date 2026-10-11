@@ -52,7 +52,7 @@ import {
   type Broadcast,
 } from "@/lib/api";
 import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
-import { getExamMetadata, getExamQuestionCount, getSuggestedExamDuration } from "@/lib/examMetadata";
+import { getExamMetadata, getExamQuestionCount, getNoteMetadata, getSuggestedExamDuration, normalizeExamYear } from "@/lib/examMetadata";
 import { migrateLegacyStorage } from "@/lib/legacyStorage";
 
 type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing" | "broadcasts";
@@ -81,22 +81,22 @@ const examPayload = {
   question_count: "" as number | "",
   duration_minutes: "" as number | "",
   content_type: "html" as "html" | "pdf",
-  content_data: "<p>Exam content</p>",
+  content_data: "",
   semester: "all",
   exam_type: "" as "final" | "mid" | "",
-  is_premium: false,
-  is_published: false,
+  is_premium: true,
+  is_published: true,
 };
 
 const notePayload = {
-  subject: "mathematics",
-  stream: "natural",
-  chapter_number: 1,
+  subject: "",
+  stream: "" as "natural" | "social" | "",
+  chapter_number: 0,
   title: "",
-  html_content: "<p>Note content</p>",
+  html_content: "",
   semester: "all",
-  is_premium: false,
-  is_published: false,
+  is_premium: true,
+  is_published: true,
 };
 
 function readLocalFile(file: File, contentType: "html" | "pdf"): Promise<string> {
@@ -110,7 +110,9 @@ function readLocalFile(file: File, contentType: "html" | "pdf"): Promise<string>
 }
 
 function subjectOptions(stream: string): string[] {
-  return stream === "social" ? [...SOCIAL_SUBJECTS] : [...NATURAL_SUBJECTS];
+  if (stream === "social") return [...SOCIAL_SUBJECTS];
+  if (stream === "natural") return [...NATURAL_SUBJECTS];
+  return [];
 }
 
 const allStudentSubjects = [...new Set([
@@ -211,6 +213,28 @@ function ExamsManager() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [questionCountEdited, setQuestionCountEdited] = useState(false);
   const [durationEdited, setDurationEdited] = useState(false);
+  const detectedExamMetadata = form.content_type === "html" ? getExamMetadata(form.content_data) : null;
+  const effectiveExamSubject = form.subject || detectedExamMetadata?.subject || "";
+  const effectiveExamType = form.exam_type || detectedExamMetadata?.examType || "";
+  const effectiveExamYear = form.year.trim()
+    ? normalizeExamYear(form.year)
+    : detectedExamMetadata?.year ?? null;
+  const generatedTitlePreview = (() => {
+    if (!effectiveExamSubject || !effectiveExamType) return null;
+    const escapedSubject = effectiveExamSubject.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/_/g, "[ _]");
+    const pattern = new RegExp(`^${effectiveExamType} exam (\\d+) \\(${escapedSubject}\\)(?:\\s|$)`, "i");
+    let number = items.filter(
+      (item) => item.subject === effectiveExamSubject && item.exam_type.toLowerCase() === effectiveExamType
+    ).length + 1;
+    while (items.some((item) =>
+      item.subject === effectiveExamSubject
+      && item.exam_type.toLowerCase() === effectiveExamType
+      && pattern.test(item.title)
+      && Number(item.title.match(pattern)?.[1]) === number
+    )) number += 1;
+    const label = effectiveExamSubject.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+    return `${effectiveExamType === "mid" ? "Mid" : "Final"} Exam ${number} (${label})`;
+  })();
   const load = () => { setLoading(true); setError(""); adminGetExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
   function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); setQuestionCountEdited(false); setDurationEdited(false); }
@@ -218,15 +242,15 @@ function ExamsManager() {
     const detected = getExamMetadata(content);
     const detectedCount = getExamQuestionCount(content);
     setForm((current) => {
-      const subject = detected.subject || current.subject || "";
+      const subject = force ? detected.subject ?? "" : detected.subject || current.subject || "";
       const questionCount = !force && questionCountEdited ? current.question_count : (detectedCount ?? "");
       const numericCount = typeof questionCount === "number" ? questionCount : detectedCount;
       return {
         ...current,
         subject,
-        university: (force ? detected.university : null) || current.university || detected.university || "",
+        university: force ? detected.university ?? "" : detected.university || current.university || "",
         year: force ? detected.year ?? "" : current.year || detected.year || "",
-        exam_type: (force ? detected.examType : null) || current.exam_type || detected.examType || "",
+        exam_type: force ? detected.examType ?? "" : detected.examType || current.exam_type || "",
         question_count: questionCount,
         duration_minutes: !force && durationEdited
           ? current.duration_minutes
@@ -281,7 +305,7 @@ function ExamsManager() {
         subject,
         exam_type: examType,
         university: form.university,
-        year: form.year,
+        year: normalizeExamYear(form.year || detectedMetadata?.year || "") ?? "",
         question_count: questionCount,
         duration_minutes: durationMinutes,
         content_data: contentData,
@@ -372,6 +396,16 @@ function ExamsManager() {
             <span className="mb-1 block text-xs font-bold text-slate-600">University (optional; auto-detected)</span>
             <UniversitySelect value={form.university} onChange={(value) => setForm({ ...form, university: value })} allowCustom />
           </label>
+          {detectedExamMetadata && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 md:col-span-2">
+              <p className="font-bold">HTML detection</p>
+              <p>{effectiveExamSubject ? `Subject: ${SUBJECTS[effectiveExamSubject]?.label ?? effectiveExamSubject}` : "Could not detect the subject; choose it above."}</p>
+              <p>{effectiveExamType ? `Type: ${effectiveExamType === "mid" ? "Mid" : "Final"}` : "Could not detect mid/final type; select it above."}</p>
+              <p>{form.university || detectedExamMetadata.university ? `University: ${form.university || detectedExamMetadata.university}` : "Could not detect one university; choose it above if applicable."}</p>
+              <p>{effectiveExamYear ? `Year: ${effectiveExamYear}` : form.year ? "Year is outside 2010–2027; it will be saved under General." : "No valid year detected; it will be saved under General."}</p>
+              <p>{form.title.trim() || generatedTitlePreview ? `Title: ${form.title.trim() || generatedTitlePreview}` : "Could not generate a title until subject and type are selected."}</p>
+            </div>
+          )}
           <select
             className="rounded-xl border border-slate-200 px-3 py-2"
             value={form.exam_type}
@@ -480,6 +514,11 @@ function NotesManager() {
   const [form, setForm] = useState(notePayload);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [editing, setEditing] = useState<NoteMeta | null>(null);
+  const detectedNoteMetadata = getNoteMetadata(form.html_content);
+  const effectiveNoteSubject = form.subject || detectedNoteMetadata.subject || "";
+  const effectiveNoteStream = form.stream || detectedNoteMetadata.stream || "";
+  const effectiveNoteChapter = form.chapter_number || detectedNoteMetadata.chapterNumber;
+  const effectiveNoteTitle = form.title.trim() || detectedNoteMetadata.title || "";
   const load = () => { setLoading(true); setError(""); adminGetNotes().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
   function reset() { setEditing(null); setForm({ ...notePayload }); setUploadedFile(null); }
@@ -502,14 +541,33 @@ function NotesManager() {
     } catch (value) { setError(message(value)); }
   }
   function changeStream(stream: "natural" | "social") {
-    setForm({ ...form, stream, subject: subjectOptions(stream)[0] });
+    setForm({ ...form, stream, subject: "" });
+  }
+  function applyNoteMetadata(html: string, force = false) {
+    const metadata = getNoteMetadata(html);
+    setForm((current) => ({
+      ...current,
+      subject: metadata.subject || (force ? "" : current.subject),
+      stream: metadata.stream || (force ? "" : current.stream),
+      chapter_number: metadata.chapterNumber ?? (force ? 0 : current.chapter_number),
+      title: metadata.title || (force ? "" : current.title),
+      html_content: html,
+    }));
   }
   async function save(event: FormEvent) {
     event.preventDefault();
     setError("");
     try {
       const html_content = uploadedFile ? await readLocalFile(uploadedFile, "html") : form.html_content;
-      const payload = { ...form, html_content };
+      const subject = form.subject || getNoteMetadata(html_content).subject || "";
+      const stream = form.stream || getNoteMetadata(html_content).stream || "";
+      const title = form.title.trim() || getNoteMetadata(html_content).title || "";
+      const chapter_number = form.chapter_number || getNoteMetadata(html_content).chapterNumber || 0;
+      if (!subject) { setError("Could not detect the subject. Please choose one."); return; }
+      if (!stream) { setError("Could not detect the stream. Please choose Natural or Social Science."); return; }
+      if (!chapter_number) { setError("Could not detect the chapter number. Please enter it."); return; }
+      if (!title || title.trim().length < 2) { setError("Could not detect the note title. Please enter one."); return; }
+      const payload = { ...form, subject, stream, title, chapter_number, html_content };
       if (editing) await adminUpdateNote(editing.id, payload);
       else await adminCreateNote(payload);
       reset();
@@ -527,12 +585,19 @@ function NotesManager() {
     onDelete={(id) => adminDeleteNote(id).then(load).catch((value) => setError(message(value)))}
     onTogglePremium={(id) => adminToggleNotePremium(id).then(load).catch((value) => setError(message(value)))}
     form={<form onSubmit={save} className="grid gap-3 md:grid-cols-2">
-      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Stream</span><select className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.stream} onChange={(event) => changeStream(event.target.value as "natural" | "social")}><option value="natural">Natural Science</option><option value="social">Social Science</option></select></label>
-      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Subject</span><select className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}>{subjectOptions(form.stream).map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}</select></label>
+      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Stream</span><select required className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.stream} onChange={(event) => changeStream(event.target.value as "natural" | "social" | "")}><option value="">Auto-detect or choose stream</option><option value="natural">Natural Science</option><option value="social">Social Science</option></select></label>
+      <label className="block"><span className="mb-1 block text-xs font-bold text-slate-600">Subject</span><select required className="w-full rounded-xl border border-slate-200 px-3 py-2" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })}><option value="">Auto-detect or choose subject</option>{subjectOptions(form.stream).map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}</select></label>
       <Field label="Chapter" type="number" value={form.chapter_number} onChange={(value) => setForm({ ...form, chapter_number: Number(value) })} />
       <Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
-      <label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">Upload an HTML file from your device</span><input type="file" accept=".html,.htm,text/html" onChange={(event) => setUploadedFile(event.target.files?.[0] || null)} className="block w-full rounded-xl border border-slate-200 p-3 text-sm" />{uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}</label>
-      <textarea aria-label="Note HTML content" placeholder="Or paste note HTML" className="min-h-32 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.html_content} onChange={(event) => { setUploadedFile(null); setForm({ ...form, html_content: event.target.value }); }} />
+      <label className="block md:col-span-2"><span className="mb-1 block text-xs font-bold text-slate-600">Upload an HTML file from your device</span><input type="file" accept=".html,.htm,text/html" onChange={(event) => { const file = event.target.files?.[0] || null; setUploadedFile(file); if (file) void readLocalFile(file, "html").then((html) => applyNoteMetadata(html, true)).catch((value) => setError(message(value))); }} className="block w-full rounded-xl border border-slate-200 p-3 text-sm" />{uploadedFile && <span className="mt-1 block text-xs text-slate-500">{uploadedFile.name}</span>}</label>
+      <textarea aria-label="Note HTML content" placeholder="Or paste note HTML" className="min-h-32 rounded-xl border border-slate-200 p-3 md:col-span-2" value={form.html_content} onChange={(event) => { setUploadedFile(null); applyNoteMetadata(event.target.value); }} />
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700 md:col-span-2">
+        <p className="font-bold">HTML detection</p>
+        <p>{effectiveNoteSubject ? `Subject: ${SUBJECTS[effectiveNoteSubject]?.label ?? effectiveNoteSubject}` : "Could not detect the subject; choose it above."}</p>
+        <p>{effectiveNoteStream ? `Stream: ${effectiveNoteStream === "natural" ? "Natural Science" : "Social Science"}` : "Could not detect the stream; choose it above."}</p>
+        <p>{effectiveNoteChapter ? `Chapter: ${effectiveNoteChapter}` : "Could not detect a chapter number; enter it above."}</p>
+        <p>{effectiveNoteTitle ? `Title: ${effectiveNoteTitle}` : "Could not detect a title; enter it above."}</p>
+      </div>
       <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /><Crown className="h-4 w-4 text-amber-500" /> Premium access</label>
       <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publish immediately</label>
       <div className="flex gap-2"><button className="rounded-xl bg-blue-600 px-4 py-2 font-bold text-white">{editing ? "Save changes" : "Save note"}</button>{editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}</div>
@@ -554,8 +619,8 @@ function ChapterExamsManager() {
     question_count: 10,
     content_type: "html" as "html" | "pdf",
     content_data: "",
-    is_premium: false,
-    is_published: false,
+    is_premium: true,
+    is_published: true,
   });
   const load = () => { setLoading(true); setError(""); adminGetChapterExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
@@ -569,8 +634,8 @@ function ChapterExamsManager() {
       question_count: 10,
       content_type: "html",
       content_data: "",
-      is_premium: false,
-      is_published: false,
+      is_premium: true,
+      is_published: true,
     });
     setUploadedFile(null);
   }

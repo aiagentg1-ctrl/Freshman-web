@@ -1,3 +1,6 @@
+import { universities } from "./universities";
+import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS } from "./subjects";
+
 type ExamMetadata = {
   subject: string | null;
   university: string | null;
@@ -5,31 +8,45 @@ type ExamMetadata = {
   examType: "mid" | "final" | null;
 };
 
+export type NoteMetadata = {
+  subject: string | null;
+  stream: "natural" | "social" | null;
+  chapterNumber: number | null;
+  title: string | null;
+};
+
+export function normalizeExamYear(value: string | null): string | null {
+  if (!value) return null;
+  const match = value.match(/\b\d{4}\b/);
+  if (!match) return null;
+  const year = Number(match[0]);
+  return year >= 2010 && year <= 2027 ? value.trim() : null;
+}
+
 function getEmbeddedExamData(html: string): unknown[] {
   const script = html.match(
     /<script\b[^>]*(?:id=["']exam-questions["']|data-exam-questions)[^>]*>([\s\S]*?)<\/script>/i,
   );
   const candidates = script ? [script[1]] : [];
-  if (candidates.length === 0) {
-    const assignment = /(?:window\.)?(?:__)?EXAM_QUESTIONS(?:__)?\s*=/i.exec(html);
-    if (assignment?.index !== undefined) {
-      const arrayStart = html.indexOf("[", assignment.index + assignment[0].length);
-      if (arrayStart >= 0) {
-        let depth = 0;
-        let quote = false;
-        let escaped = false;
-        for (let index = arrayStart; index < html.length; index += 1) {
-          const character = html[index];
-          if (escaped) escaped = false;
-          else if (character === "\\" && quote) escaped = true;
-          else if (character === '"') quote = !quote;
-          else if (!quote && character === "[") depth += 1;
-          else if (!quote && character === "]") {
-            depth -= 1;
-            if (depth === 0) {
-              candidates.push(html.slice(arrayStart, index + 1));
-              break;
-            }
+  const assignment = /(?:window\.)?(?:__)?EXAM_QUESTIONS(?:__)?\s*=/i.exec(html);
+  if (assignment?.index !== undefined) {
+    const valueStart = html.slice(assignment.index + assignment[0].length).search(/[\[{]/);
+    if (valueStart >= 0) {
+      const jsonStart = assignment.index + assignment[0].length + valueStart;
+      let depth = 0;
+      let quote = false;
+      let escaped = false;
+      for (let index = jsonStart; index < html.length; index += 1) {
+        const character = html[index];
+        if (escaped) escaped = false;
+        else if (character === "\\" && quote) escaped = true;
+        else if (character === '"') quote = !quote;
+        else if (!quote && (character === "[" || character === "{")) depth += 1;
+        else if (!quote && (character === "]" || character === "}")) {
+          depth -= 1;
+          if (depth === 0) {
+            candidates.push(html.slice(jsonStart, index + 1));
+            break;
           }
         }
       }
@@ -64,6 +81,7 @@ function metadataValue(data: Record<string, unknown>, ...keys: string[]): string
   for (const key of keys) {
     const value = data[key];
     if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   return null;
 }
@@ -106,14 +124,24 @@ function getHtmlMetadataValue(html: string, name: string): string | null {
   }
   const dataAttribute = html.match(new RegExp(`\\bdata-${name}\\s*=\\s*["']([^"']+)["']`, "i"));
   if (dataAttribute?.[1]) return dataAttribute[1].trim();
-  const tagName = name === "title" ? "title" : name === "subject" || name === "exam-type" ? "h1" : "";
-  if (!tagName) return null;
-  const content = html.match(new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i"))?.[1];
-  return content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() || null;
+  const tagNames = name === "title" ? ["title", "h1"] : name === "chapter" ? ["h1", "h2"] : ["h1"];
+  for (const tagName of tagNames) {
+    const content = html.match(new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i"))?.[1];
+    const text = content?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (text) return text;
+  }
+  return null;
+}
+
+function getHtmlHeadings(html: string): string[] {
+  return [...html.matchAll(/<(?:title|h1|h2|h3)\b[^>]*>([\s\S]*?)<\/(?:title|h1|h2|h3)\s*>/gi)]
+    .map(([, content]) => content.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 }
 
 export function getExamMetadata(html: string): ExamMetadata {
   const embedded = getEmbeddedExamData(html);
+  const headingText = getHtmlHeadings(html).join(" ");
   const records = embedded.flatMap((value) => {
     if (!value || typeof value !== "object") return [];
     const record = value as Record<string, unknown>;
@@ -138,26 +166,48 @@ export function getExamMetadata(html: string): ExamMetadata {
     .join(" ");
   const questionSubjects = [...new Set(
     questions
-      .map((question) => metadataValue(question, "subject", "subject_name"))
+      .map((question) => metadataValue(question, "subject", "subject_name", "subjectName"))
       .filter((value): value is string => value !== null),
   )];
-  const subjectText = readEmbedded("subject", "subject_name")
+  const subjectText = readEmbedded("subject", "subject_name", "subjectName")
     ?? getHtmlMetadataValue(html, "subject")
     ?? (questionSubjects.length === 1 ? questionSubjects[0] : null)
-    ?? title;
-  const subject = (subjectText ? normalizeSubject(subjectText) : null) ?? normalizeSubject(title);
+    ?? `${title} ${headingText}`;
+  const subject = (subjectText ? normalizeSubject(subjectText) : null)
+    ?? normalizeSubject(`${title} ${headingText}`);
   const universityValues = questions
-    .map((question) => metadataValue(question, "university", "university_name"))
+    .map((question) => metadataValue(question, "university", "university_name", "universityName"))
     .filter((value): value is string => value !== null);
   const uniqueUniversities = [...new Set(universityValues)];
-  const university = readEmbedded("university", "university_name")
+  const explicitUniversity = readEmbedded("university", "university_name", "universityName")
     ?? getHtmlMetadataValue(html, "university")
     ?? (uniqueUniversities.length === 1 ? uniqueUniversities[0] : null);
-  const year = readEmbedded("year", "exam_year")
+  const textUniversityMatches = universities.filter((universityOption) =>
+    html.toLocaleLowerCase().includes(universityOption.name.toLocaleLowerCase())
+  );
+  const university = explicitUniversity
+    ? universities.find((option) =>
+        option.name.toLocaleLowerCase() === explicitUniversity.toLocaleLowerCase()
+        || option.abbreviation.toLocaleLowerCase() === explicitUniversity.toLocaleLowerCase()
+      )?.name ?? explicitUniversity
+    : textUniversityMatches.length === 1 ? textUniversityMatches[0].name : null;
+  const questionYears = [...new Set(questions
+    .map((question) => metadataValue(question, "year", "exam_year", "examYear"))
+    .filter((value): value is string => value !== null))];
+  const rawYear = readEmbedded("year", "exam_year", "examYear")
+    ?? (questionYears.length === 1 ? questionYears[0] : null)
     ?? getHtmlMetadataValue(html, "year")
+    ?? headingText.match(/\b\d{3,4}(?:\s*(?:E\.?C\.?|G\.?C\.?))?\b/i)?.[0]
     ?? title.match(/\b\d{3,4}(?:\s*(?:E\.?C\.?|G\.?C\.?))?\b/i)?.[0]
     ?? null;
-  const rawType = readEmbedded("exam_type", "examType", "type") ?? getHtmlMetadataValue(html, "exam-type") ?? title;
+  const year = normalizeExamYear(rawYear);
+  const questionTypes = [...new Set(questions
+    .map((question) => metadataValue(question, "exam_type", "examType", "type"))
+    .filter((value): value is string => value !== null))];
+  const rawType = readEmbedded("exam_type", "examType", "type")
+    ?? (questionTypes.length === 1 ? questionTypes[0] : null)
+    ?? getHtmlMetadataValue(html, "exam-type")
+    ?? (headingText || title);
   const normalizedType = rawType?.toLowerCase() ?? "";
   const examType = /\bmid(?:term)?\b/.test(normalizedType)
     ? "mid"
@@ -165,6 +215,63 @@ export function getExamMetadata(html: string): ExamMetadata {
       ? "final"
       : null;
   return { subject, university, year, examType };
+}
+
+export function getNoteMetadata(html: string): NoteMetadata {
+  const embedded = getEmbeddedExamData(html);
+  const records = embedded.flatMap((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+    const record = value as Record<string, unknown>;
+    return [
+      record,
+      ...(record.metadata && typeof record.metadata === "object"
+        ? [record.metadata as Record<string, unknown>]
+        : []),
+    ];
+  });
+  const readEmbedded = (...keys: string[]) => records
+    .map((record) => metadataValue(record, ...keys))
+    .find((value): value is string => value !== null) ?? null;
+  const title = readEmbedded("title", "note_title")
+    ?? getHtmlMetadataValue(html, "title")
+    ?? getHtmlMetadataValue(html, "subject");
+  const headings = getHtmlHeadings(html);
+  const subjectText = readEmbedded("subject", "subject_name", "note_subject")
+    ?? getHtmlMetadataValue(html, "subject")
+    ?? title;
+  const subject = (subjectText ? normalizeSubject(subjectText) : null)
+    ?? headings.map(normalizeSubject).find((value): value is string => value !== null)
+    ?? null;
+  const embeddedStream = readEmbedded("stream", "course_stream")?.toLowerCase();
+  const textStream = getHtmlMetadataValue(html, "stream")?.toLowerCase() ?? title?.toLowerCase() ?? "";
+  const isNaturalSubject = subject !== null
+    && NATURAL_SUBJECTS.includes(subject as (typeof NATURAL_SUBJECTS)[number]);
+  const isSocialSubject = subject !== null
+    && SOCIAL_SUBJECTS.includes(subject as (typeof SOCIAL_SUBJECTS)[number]);
+  const stream = embeddedStream === "natural" || embeddedStream === "social"
+    ? embeddedStream
+    : /\bsocial\b/.test(textStream)
+      ? "social"
+      : /\bnatural\b/.test(textStream)
+        ? "natural"
+        : isNaturalSubject && !isSocialSubject
+          ? "natural"
+          : isSocialSubject && !isNaturalSubject
+            ? "social"
+            : null;
+  const chapterText = readEmbedded("chapter_number", "chapterNumber", "chapter")
+    ?? getHtmlMetadataValue(html, "chapter");
+  const chapterMatch = chapterText?.match(/\b(?:chapter|unit|lesson|module)\s*(?:no\.?\s*)?(\d{1,2})\b/i)
+    ?? chapterText?.match(/^\s*(\d{1,2})\s*(?:[:.\-–]|$)/)
+    ?? title?.match(/\bchapter\s*(\d{1,2})\b/i);
+  const chapterNumber = chapterMatch ? Number(chapterMatch[1]) : NaN;
+  const explicitTitle = getHtmlMetadataValue(html, "note-title");
+  return {
+    subject,
+    stream,
+    chapterNumber: Number.isInteger(chapterNumber) && chapterNumber > 0 ? chapterNumber : null,
+    title: explicitTitle ?? title,
+  };
 }
 
 const CALCULATION_SUBJECTS = new Set(["mathematics", "physics", "chemistry"]);

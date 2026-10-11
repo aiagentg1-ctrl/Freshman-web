@@ -960,7 +960,7 @@ class ExamCreate(BaseModel):
     content_data: str
     semester: str = "all"
     exam_type: Optional[str] = None
-    is_premium: bool = False
+    is_premium: bool = True
     is_published: bool = True
 
     @validator('subject')
@@ -976,6 +976,9 @@ class ExamCreate(BaseModel):
         if v is None:
             return ""
         v = v.strip()
+        match = re.search(r"\b(\d{4})\b", v)
+        if not match or not 2010 <= int(match.group(1)) <= 2027:
+            return ""
         return v
 
     @validator('question_count')
@@ -1045,7 +1048,7 @@ class UniversityLogoCreate(BaseModel):
 class FlashCardCreate(BaseModel):
     title: str
     html_content: str
-    is_premium: bool = False
+    is_premium: bool = True
     is_published: bool = True
 
     @validator('title')
@@ -1821,11 +1824,10 @@ def exam_html_payloads(content_data: str) -> list[Any]:
         re.IGNORECASE,
     )
     if assignment:
-        remaining = content_data[assignment.end():]
-        array_start = remaining.find("[")
-        if array_start >= 0:
+        remaining = content_data[assignment.end():].lstrip()
+        if remaining.startswith(("[", "{")):
             try:
-                parsed, _ = json.JSONDecoder().raw_decode(remaining[array_start:])
+                parsed, _ = json.JSONDecoder().raw_decode(remaining)
                 candidates.append(json.dumps(parsed))
             except json.JSONDecodeError:
                 pass
@@ -1857,12 +1859,17 @@ def exam_payload_metadata(content_data: str) -> dict[str, Optional[str]]:
         for record in records:
             for key in keys:
                 value = record.get(key)
+                if value is None:
+                    camel_key = re.sub(r"_([a-z])", lambda match: match.group(1).upper(), key)
+                    value = record.get(camel_key)
                 if isinstance(value, str) and value.strip():
                     return value.strip()
+                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                    return str(value)
         return None
 
     head_text = " ".join(
-        re.findall(r"<(?:title|h1)\b[^>]*>([\s\S]*?)</(?:title|h1)\s*>", content_data, re.IGNORECASE)
+        re.findall(r"<(?:title|h1|h2|h3)\b[^>]*>([\s\S]*?)</(?:title|h1|h2|h3)\s*>", content_data, re.IGNORECASE)
     )
     meta_values: dict[str, str] = {}
     for tag in re.findall(r"<meta\b[^>]*>", content_data, re.IGNORECASE):
@@ -1888,11 +1895,11 @@ def exam_payload_metadata(content_data: str) -> dict[str, Optional[str]]:
     question_subjects = {
         value.strip()
         for question in questions
-        for key in ("subject", "subject_name")
+        for key in ("subject", "subject_name", "subjectName")
         if isinstance((value := question.get(key)), str) and value.strip()
     }
     raw_subject = (
-        embedded_value("subject", "subject_name")
+        embedded_value("subject", "subject_name", "subjectName")
         or meta_values.get("subject")
         or (next(iter(question_subjects)) if len(question_subjects) == 1 else None)
     )
@@ -1930,7 +1937,18 @@ def exam_payload_metadata(content_data: str) -> dict[str, Optional[str]]:
         if detected_subject:
             break
 
-    raw_type = embedded_value("exam_type", "examType", "type") or meta_values.get("exam-type") or searchable_text
+    question_types = {
+        value.strip()
+        for question in questions
+        for key in ("exam_type", "examType", "type")
+        if isinstance((value := question.get(key)), str) and value.strip()
+    }
+    raw_type = (
+        embedded_value("exam_type", "examType", "type")
+        or (next(iter(question_types)) if len(question_types) == 1 else None)
+        or meta_values.get("exam-type")
+        or searchable_text
+    )
     normalized_type = raw_type.lower()
     exam_type = "mid" if re.search(r"\bmid(?:term)?\b", normalized_type) else (
         "final" if re.search(r"\bfinal\b", normalized_type) else None
@@ -1938,16 +1956,30 @@ def exam_payload_metadata(content_data: str) -> dict[str, Optional[str]]:
     university_values = {
         value.strip()
         for question in questions
-        for key in ("university", "university_name")
+        for key in ("university", "university_name", "universityName")
         if isinstance((value := question.get(key)), str) and value.strip()
     }
-    year = embedded_value("year", "exam_year") or meta_values.get("year")
+    question_years = {
+        str(value).strip()
+        for question in questions
+        for key in ("year", "exam_year", "examYear")
+        if isinstance((value := question.get(key)), (str, int))
+        and str(value).strip()
+    }
+    year = (
+        embedded_value("year", "exam_year", "examYear")
+        or (next(iter(question_years)) if len(question_years) == 1 else None)
+        or meta_values.get("year")
+    )
     if not year:
         year_match = re.search(r"\b\d{3,4}(?:\s*(?:E\.?C\.?|G\.?C\.?))?\b", searchable_text, re.IGNORECASE)
         year = year_match.group(0).strip() if year_match else None
+    year_match = re.search(r"\b(\d{4})\b", year or "")
+    if not year_match or not 2010 <= int(year_match.group(1)) <= 2027:
+        year = None
     return {
         "subject": detected_subject,
-        "university": embedded_value("university", "university_name")
+        "university": embedded_value("university", "university_name", "universityName")
         or meta_values.get("university")
         or (next(iter(university_values)) if len(university_values) == 1 else None),
         "year": year,
@@ -2046,6 +2078,8 @@ async def get_exam(
 async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_admin_secret)):
     subject = resolve_exam_subject(exam)
     exam_type = resolve_exam_type(exam)
+    detected_metadata = exam_payload_metadata(exam.content_data) if exam.content_type == "html" else {}
+    exam_year = exam.year or detected_metadata.get("year") or ""
     question_count = exam.question_count
     if question_count is None and exam.content_type == "html":
         question_count = infer_exam_question_count(exam.content_data)
@@ -2069,8 +2103,8 @@ async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_ad
             title_prefix = f"{exam_type.capitalize()} Exam"
             while True:
                 candidate_title = f"{title_prefix} {exam_number} ({subject.replace('_', ' ').title()})"
-                if exam.year:
-                    candidate_title += f" {exam.year}"
+                if exam_year:
+                    candidate_title += f" {exam_year}"
                 duplicate_result = await session.execute(
                     select(EueeExam.id).where(
                         EueeExam.subject == subject_enum,
@@ -2097,12 +2131,12 @@ async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_ad
                 )
         new_exam = EueeExam(
             subject=subject_enum,
-            year=exam.year or "",
+            year=exam_year,
             title=title,
             university=(
                 exam.university.strip()
                 if exam.university
-                else exam_payload_metadata(exam.content_data)["university"] or ""
+                else detected_metadata.get("university") or ""
             ),
             custom_tag=(exam.custom_tag or "").strip(),
             question_count=question_count,
@@ -2131,8 +2165,9 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
         if not db_exam:
             raise HTTPException(status_code=404, detail="Exam not found")
 
-        subject = exam.subject or exam_payload_metadata(exam.content_data)["subject"] or db_exam.subject.value
-        exam_type = exam.exam_type or exam_payload_metadata(exam.content_data)["exam_type"] or db_exam.exam_type
+        detected_metadata = exam_payload_metadata(exam.content_data) if exam.content_type == "html" else {}
+        subject = exam.subject or detected_metadata.get("subject") or db_exam.subject.value
+        exam_type = exam.exam_type or detected_metadata.get("exam_type") or db_exam.exam_type
         title = exam.title.strip() if exam.title and exam.title.strip() else db_exam.title
         duplicate_result = await session.execute(
             select(EueeExam.id).where(
@@ -2150,11 +2185,11 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
         question_count = question_count or db_exam.question_count
         duration_minutes = exam.duration_minutes or suggested_exam_duration(subject, question_count)
         db_exam.subject = SubjectEnum[subject.upper()]
-        db_exam.year = exam.year or ""
+        db_exam.year = exam.year or detected_metadata.get("year") or ""
         db_exam.university = (
             exam.university.strip()
             if exam.university
-            else exam_payload_metadata(exam.content_data)["university"] or ""
+            else detected_metadata.get("university") or ""
         )
         db_exam.is_premium = exam.is_premium
         db_exam.is_published = exam.is_published
@@ -2575,7 +2610,7 @@ class ChapterExamCreate(BaseModel):
     content_type: str = "html"
     content_data: str
     semester: str = "all"
-    is_premium: bool = False
+    is_premium: bool = True
     is_published: bool = True
 
     @validator('question_count')
