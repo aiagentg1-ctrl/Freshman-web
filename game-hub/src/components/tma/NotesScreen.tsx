@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { BookMarked, ChevronLeft, ChevronRight, CheckCircle2, Circle, Crown } from "lucide-react";
+import { BookMarked, ChevronLeft, ChevronRight, CheckCircle2, Crown } from "lucide-react";
 import { ChapterExam, ChapterExamMeta, Exam, getChapterExam, getChapterExams, getNote, getNotes, isPremiumAccessRequired, Note, NoteMeta, StreamKey } from "../../lib/api";
 import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects";
 import NotesReader from "./NotesReader";
@@ -12,8 +12,8 @@ import PremiumBanner from "./PremiumBanner";
 type View =
   | { kind: "subjects" }
   | { kind: "chapters"; subject: string; chapters: NoteMeta[] }
-  | { kind: "reader"; note: Note; chapterExams: ChapterExamMeta[] }
-  | { kind: "chapterExam"; note: Note; chapterExam: ChapterExam; chapterExams: ChapterExamMeta[] };
+  | { kind: "reader"; note: Note; chapterExams: ChapterExamMeta[]; chapters: NoteMeta[] }
+  | { kind: "chapterExam"; note: Note; chapterExam: ChapterExam; chapterExams: ChapterExamMeta[]; chapters: NoteMeta[] };
 
 export default function NotesScreen({
   stream,
@@ -83,7 +83,12 @@ export default function NotesScreen({
         "freshoLastNote",
         JSON.stringify({ id: note.id, title: note.title, subject: note.subject })
       );
-      setView({ kind: "reader", note, chapterExams });
+      setView({
+        kind: "reader",
+        note,
+        chapterExams,
+        chapters: view.kind === "chapters" ? view.chapters : [],
+      });
     } catch (error) {
       if (isPremiumAccessRequired(error)) {
         onGetPremium();
@@ -100,7 +105,13 @@ export default function NotesScreen({
     setLoading(true);
     try {
       const chapterExam = await getChapterExam(chapterExamId);
-      setView({ kind: "chapterExam", note, chapterExam, chapterExams });
+      setView({
+        kind: "chapterExam",
+        note,
+        chapterExam,
+        chapterExams,
+        chapters: view.kind === "reader" ? view.chapters : [],
+      });
     } catch (error) {
       console.error("Could not load chapter exam:", error);
       if (isPremiumAccessRequired(error)) {
@@ -135,7 +146,12 @@ export default function NotesScreen({
         exam={exam}
         chapterExamId={view.chapterExam.id}
         telegramUserId={telegramUserId}
-        onExit={() => setView({ kind: "reader", note: view.note, chapterExams: view.chapterExams })}
+        onExit={() => setView({
+          kind: "reader",
+          note: view.note,
+          chapterExams: view.chapterExams,
+          chapters: view.chapters,
+        })}
       />
     );
   }
@@ -147,7 +163,7 @@ export default function NotesScreen({
         note={note}
         chapterExams={view.chapterExams}
         onTakeChapterExam={(chapterExamId) => openChapterExam(note, chapterExamId, view.chapterExams)}
-        onBack={() => setView({ kind: "chapters", subject: note.subject })}
+        onBack={() => setView({ kind: "chapters", subject: note.subject, chapters: view.chapters })}
       />
     );
   }
@@ -247,55 +263,6 @@ export default function NotesScreen({
       </div>
     );
   }
-              const isCompleted = completedNotes.has(chapter.id);
-              return (
-                <button
-                  key={chapter.id}
-                  onClick={() => openChapter(chapter.id)}
-                  className={`w-full rounded-2xl p-4 shadow-sm border flex items-center gap-3 text-left active:scale-[0.98] transition-transform ${
-                    chapter.is_premium
-                      ? "border-amber-300 bg-gradient-to-br from-amber-50 via-white to-violet-50 ring-1 ring-amber-200"
-                      : isCompleted ? "bg-emerald-50 border-emerald-200" : "bg-white border-slate-100"
-                  }`}
-                >
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                    chapter.is_premium ? "bg-gradient-to-br from-amber-200 to-amber-400 text-amber-950 shadow-md shadow-amber-200" : isCompleted ? "bg-emerald-100" : "bg-violet-50"
-                  }`}>
-                    {chapter.is_premium ? (
-                      <Crown className="h-5 w-5" />
-                    ) : isCompleted ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                    ) : (
-                      <span className="text-sm font-bold text-violet-600">{chapter.chapter_number}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className={`font-semibold truncate ${isCompleted ? "text-emerald-900" : "text-slate-900"}`}>
-                      {chapter.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                      Chapter {chapter.chapter_number}
-                      {isCompleted && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 font-semibold text-[10px]">
-                          Completed
-                        </span>
-                      )}
-                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold text-[10px] ${chapter.is_premium ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
-                        {chapter.is_premium && <Crown className="h-3 w-3" />}
-                        {chapter.is_premium ? "Premium" : "Free"}
-                      </span>
-                    </p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col flex-1">
       <div className="px-4 md:px-8 lg:px-12 pt-5 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
