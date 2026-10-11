@@ -17,14 +17,12 @@ export default function PremiumDialog({
   university,
   stream,
   price,
-  currency,
   onClose,
 }: {
   fullName: string;
   university: string;
   stream: string;
   price: number | null;
-  currency: string | null;
   onClose: () => void;
 }) {
   const streamName = stream.toLowerCase() === "natural"
@@ -64,10 +62,10 @@ export default function PremiumDialog({
 
         <div className="p-5">
           <div className="rounded-2xl bg-amber-50 p-4 text-center ring-1 ring-amber-200">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Price per month</p>
-            {price !== null && currency ? (
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Price for 5 months</p>
+            {price !== null ? (
               <p className="mt-1 text-4xl font-black text-slate-900">
-                {new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(price)} {currency}
+                {new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(price)} ETB
               </p>
             ) : (
               <p className="mt-1 text-sm font-bold text-slate-700">Contact support for the current price</p>

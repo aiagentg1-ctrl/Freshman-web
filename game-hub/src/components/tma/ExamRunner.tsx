@@ -477,6 +477,7 @@ export default function ExamRunner({
   const sourceOptionCount = availableUniversities.length + (hasGeneralQuestions ? 1 : 0);
   const total = filteredQuestions?.length ?? exam.question_count;
   const interactive = filteredQuestions !== null;
+  const requiresSourceSelection = chapterExamId !== undefined && interactive && hasSourceOptions;
   const isHtmlExam = exam.content_type === "html" && !interactive;
 
   useEffect(() => {
@@ -693,7 +694,7 @@ export default function ExamRunner({
   }, [chapterExamId, exam, persistSubmission, telegramFirstName]);
 
   const startExam = () => {
-    if (hasSourceOptions && selectedSourceCount === 0) return;
+    if (requiresSourceSelection && selectedSourceCount === 0) return;
     if (interactive && total === 0) return;
     startedAt.current = Date.now();
     submitted.current = false;
@@ -1236,7 +1237,7 @@ export default function ExamRunner({
         <div className="px-4 pb-4">
           <button
             onClick={startExam}
-            disabled={(hasSourceOptions && selectedSourceCount === 0) || (interactive && total === 0)}
+            disabled={(requiresSourceSelection && selectedSourceCount === 0) || (interactive && total === 0)}
             className="w-full rounded-2xl bg-[#1D70F5] py-3.5 font-semibold text-white shadow-md shadow-blue-200 transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Start Exam

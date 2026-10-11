@@ -367,6 +367,7 @@ export default function TMAPage() {
               stream={profile.stream}
               selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}
+              premiumPrice={subscriptionPricing?.price ?? null}
               onProfileChange={handleProfileChange}
               onSignOut={handleDeviceSignOut}
             />
@@ -380,7 +381,6 @@ export default function TMAPage() {
           university={profile.university}
           stream={profile.stream}
           price={subscriptionPricing?.price ?? null}
-          currency={subscriptionPricing?.currency ?? null}
           onClose={() => setShowPremiumDialog(false)}
         />
       )}

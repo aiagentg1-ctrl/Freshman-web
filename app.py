@@ -1061,7 +1061,7 @@ class FlashCardCreate(BaseModel):
 
 class SubscriptionConfigUpdate(BaseModel):
     price: int
-    currency: str = 'USD'
+    currency: str = 'ETB'
     monthly_operating_cost: int = 0
 
     @validator('price', 'monthly_operating_cost')
@@ -1072,10 +1072,7 @@ class SubscriptionConfigUpdate(BaseModel):
 
     @validator('currency')
     def validate_currency(cls, v):
-        v = v.strip().upper()
-        if len(v) > 8:
-            raise ValueError('Currency must be a valid three-letter code')
-        return v
+        return 'ETB'
 
 
 class ExamAttemptCreate(BaseModel):
@@ -3224,7 +3221,7 @@ async def admin_get_subscription_config(admin_verified: bool = Depends(verify_ad
         )
         config = result.scalar_one_or_none()
         if config is None:
-            config = SubscriptionConfig(price=0, currency="USD", monthly_operating_cost=0)
+            config = SubscriptionConfig(price=0, currency="ETB", monthly_operating_cost=0)
         return {
             "price": config.price,
             "currency": config.currency,
@@ -3241,7 +3238,7 @@ async def get_subscription_pricing():
         config = result.scalar_one_or_none()
         return {
             "price": config.price if config else None,
-            "currency": config.currency if config else None,
+            "currency": "ETB",
         }
 
 
@@ -3258,7 +3255,7 @@ async def admin_update_subscription_config(
         if config is None:
             config = SubscriptionConfig()
         config.price = payload.price
-        config.currency = payload.currency
+        config.currency = "ETB"
         config.monthly_operating_cost = payload.monthly_operating_cost
         config.updated_at = datetime.utcnow()
         session.add(config)
@@ -3266,7 +3263,7 @@ async def admin_update_subscription_config(
         await session.refresh(config)
         return {
             "price": config.price,
-            "currency": config.currency,
+            "currency": "ETB",
             "monthly_operating_cost": config.monthly_operating_cost,
         }
 

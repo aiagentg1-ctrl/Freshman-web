@@ -21,6 +21,7 @@ export default function ProfileScreen({
   stream,
   selectedSubjects,
   isPremium,
+  premiumPrice,
   onProfileChange,
   onSignOut,
 }: {
@@ -34,6 +35,7 @@ export default function ProfileScreen({
   stream: StreamKey;
   selectedSubjects: string[];
   isPremium: boolean;
+  premiumPrice: number | null;
   onProfileChange: (profile: {
     full_name: string;
     custom_name?: string;
@@ -331,7 +333,9 @@ export default function ProfileScreen({
             </div>
           </div>
           <p className="relative mt-3 text-xs leading-5 text-white/85">
-            {isPremium ? "Your all-access pass is active. Premium exams, notes, chapter questions, and flashcards are unlocked." : "199 ETB for 5 months. Includes daily plans, detailed notes, exams, AAU resources, and videos."}
+            {isPremium
+              ? "Your all-access pass is active. Premium exams, notes, chapter questions, and flashcards are unlocked."
+              : `${premiumPrice === null ? "See the Premium offer for the current price" : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(premiumPrice)} ETB`} for 5 months. Includes daily plans, detailed notes, exams, AAU resources, and videos.`}
           </p>
         </div>
 
