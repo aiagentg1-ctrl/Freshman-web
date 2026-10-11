@@ -79,40 +79,6 @@ export default function NotesReader({
             </button>
           </div>
         </div>
-        <div
-          className="shrink-0 border-t border-slate-200 bg-white/95 px-3 pt-2 backdrop-blur"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 10px)" }}
-        >
-          {chapterExams.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {chapterExams.map((chapterExam) => (
-                <button
-                  key={chapterExam.id}
-                  type="button"
-                  onClick={() => onTakeChapterExam(chapterExam.id)}
-                  className="flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1D70F5] px-4 py-2 text-sm font-semibold text-white"
-                >
-                  <FileQuestion className="h-4 w-4" /> {chapterExam.title}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <p className="min-w-0 flex-1 truncate text-xs text-slate-500">
-              Chapter {note.chapter_number}: {note.title}
-            </p>
-            <button
-              type="button"
-              onClick={markComplete}
-              disabled={!telegramUserId || completing}
-              className="flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 disabled:opacity-60"
-            >
-              {completed ? <CheckCircle2 className="h-4 w-4" /> : null}
-              {completing ? "Saving..." : completed ? "Read again" : "Mark complete · +20 XP"}
-            </button>
-          </div>
-          {completionMessage && <p role="status" className="pt-1 text-center text-xs text-slate-600">{completionMessage}</p>}
-        </div>
       </div>
     );
   }

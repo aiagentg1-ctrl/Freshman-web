@@ -677,6 +677,60 @@ function ChapterExamsManager() {
     const content_type = file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "html";
     setUploadedFile(file);
     setForm({ ...form, content_type });
+
+    // Auto-detect metadata from filename and HTML content
+    if (content_type === "html") {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const html = e.target?.result as string;
+        if (!html) return;
+
+        // Try to extract title from <title> tag or first <h1>
+        const titleMatch = html.match(/<title>(.*?)<\/title>/i) || html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+        if (titleMatch && titleMatch[1]) {
+          const extractedTitle = titleMatch[1].trim();
+          if (!form.title || form.title === "") {
+            setForm(prev => ({ ...prev, title: extractedTitle }));
+          }
+        }
+
+        // Count questions by looking for common question patterns
+        const questionPatterns = [
+          /<question/gi,
+          /<h[1-6][^>]*>\s*\d+\./gi,
+          /Q\s*\d+/gi,
+          /Question\s*\d+/gi,
+          /class="question"/gi,
+          /data-question/gi,
+        ];
+        let maxCount = 0;
+        questionPatterns.forEach(pattern => {
+          const matches = html.match(pattern);
+          if (matches && matches.length > maxCount) {
+            maxCount = matches.length;
+          }
+        });
+        if (maxCount > 0) {
+          setForm(prev => ({ ...prev, question_count: maxCount }));
+        }
+
+        // Try to extract chapter number from filename
+        const chapterMatch = file.name.match(/chapter\s*(\d+)/i) || file.name.match(/ch\s*(\d+)/i);
+        if (chapterMatch && chapterMatch[1]) {
+          setForm(prev => ({ ...prev, chapter_number: parseInt(chapterMatch[1], 10) }));
+        }
+
+        // Auto-detect subject from HTML content using the same logic as notes
+        const metadata = getNoteMetadata(html);
+        if (metadata.subject && !form.subject) {
+          setForm(prev => ({ ...prev, subject: metadata.subject }));
+        }
+        if (metadata.stream && !form.stream) {
+          setForm(prev => ({ ...prev, stream: metadata.stream as "natural" | "social" }));
+        }
+      };
+      reader.readAsText(file);
+    }
   }
   return <ResourcePanel
     title="Chapter question sets"
