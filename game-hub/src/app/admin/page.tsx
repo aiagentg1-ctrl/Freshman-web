@@ -891,16 +891,16 @@ function ResourcePanel({
 }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
-      <section className="rounded-2xl bg-white p-5 shadow-sm">
+      <section className="rounded-2xl bg-white p-5 shadow-sm flex flex-col max-h-[calc(100vh-250px)]">
         <h2 className="text-xl font-black">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
         {loading ? <p className="mt-5 text-sm text-slate-500">Loading...</p> : error ? <ErrorBanner error={error} /> : (
-          <div className="mt-5 space-y-2">
+          <div className="mt-5 space-y-2 overflow-y-auto flex-1 custom-scrollbar">
             {items.map((item) => (
-              <div key={item.id} className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="truncate font-bold">{item.name}</p>
-                  <p className="flex items-center gap-2 text-xs text-slate-500">
+              <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between border border-slate-100">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-sm">{item.name}</p>
+                  <p className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                     {item.status}
                     {item.is_premium !== undefined && (
                       <span className={`rounded-full px-2 py-0.5 font-bold ${item.is_premium ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
@@ -909,11 +909,11 @@ function ResourcePanel({
                     )}
                   </p>
                 </div>
-                <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end">
-                  {onEdit && <button type="button" onClick={() => onEdit(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-2 text-xs font-bold text-blue-700"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
-                  {onTogglePublish && <button type="button" onClick={() => onTogglePublish(item.id)} className="rounded-lg bg-slate-200 px-2.5 py-2 text-xs font-bold text-slate-700">{item.is_published ? "Unpublish" : "Publish"}</button>}
-                  {onTogglePremium && <button type="button" onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-2.5 py-2 text-xs font-bold text-violet-700">Make {item.is_premium ? "Free" : "Premium"}</button>}
-                  {onDelete && <button type="button" onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700">Delete</button>}
+                <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end mt-2 sm:mt-0">
+                  {onEdit && <button type="button" onClick={() => onEdit(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
+                  {onTogglePublish && <button type="button" onClick={() => onTogglePublish(item.id)} className="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700">{item.is_published ? "Unpublish" : "Publish"}</button>}
+                  {onTogglePremium && <button type="button" onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-700">Make {item.is_premium ? "Free" : "Premium"}</button>}
+                  {onDelete && <button type="button" onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">Delete</button>}
                 </div>
               </div>
             ))}

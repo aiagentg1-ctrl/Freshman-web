@@ -806,6 +806,26 @@ export default function PracticeScreen({
           />
         ) : (
           <div className="space-y-3">
+            {generalExams.length > 0 && (
+              <button
+                onClick={() => setView({ kind: "yearExams", year: "", examType: defaultExamType(generalExams) })}
+                className="w-full rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 p-4 text-left transition-transform active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white">
+                    <CalendarDays className="h-5 w-5 text-[#1D70F5]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-slate-900">General</h3>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+                      <ListChecks className="h-3.5 w-3.5" />
+                      {getExamTypeCounts(generalExams).final} final · {getExamTypeCounts(generalExams).mid} mid
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
+                </div>
+              </button>
+            )}
             {sortedYears.map((year) => {
               const list = examsByYear.get(year) ?? [];
               return (
@@ -831,26 +851,6 @@ export default function PracticeScreen({
                 </button>
               );
             })}
-            {generalExams.length > 0 && (
-              <button
-                onClick={() => setView({ kind: "yearExams", year: "", examType: defaultExamType(generalExams) })}
-                className="w-full rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 p-4 text-left transition-transform active:scale-[0.98]"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white">
-                    <CalendarDays className="h-5 w-5 text-[#1D70F5]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-slate-900">General</h3>
-                    <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-                      <ListChecks className="h-3.5 w-3.5" />
-                      {getExamTypeCounts(generalExams).final} final · {getExamTypeCounts(generalExams).mid} mid
-                    </p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-slate-400" />
-                </div>
-              </button>
-            )}
           </div>
         )}
       </div>
