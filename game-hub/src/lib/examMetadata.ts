@@ -6,6 +6,7 @@ type ExamMetadata = {
   university: string | null;
   year: string | null;
   examType: "mid" | "final" | null;
+  durationMinutes: number | null;
 };
 
 export type NoteMetadata = {
@@ -75,6 +76,14 @@ export function getExamQuestionCount(html: string): number | null {
     if (Array.isArray(questions) && questions.length > 0) return questions.length;
   }
   return null;
+}
+
+function normalizeDurationMinutes(value: string | null): number | null {
+  if (!value) return null;
+  const match = value.match(/^\s*(\d{1,4})(?:\s*(?:minutes?|mins?))?\s*$/i);
+  if (!match) return null;
+  const duration = Number(match[1]);
+  return Number.isInteger(duration) && duration >= 1 && duration <= 1200 ? duration : null;
 }
 
 function metadataValue(data: Record<string, unknown>, ...keys: string[]): string | null {
@@ -214,7 +223,14 @@ export function getExamMetadata(html: string): ExamMetadata {
     : /\bfinal\b/.test(normalizedType)
       ? "final"
       : null;
-  return { subject, university, year, examType };
+  const durationMinutes = normalizeDurationMinutes(
+    readEmbedded("duration_minutes", "time_limit_minutes", "timer_minutes", "exam_duration_minutes")
+      ?? getHtmlMetadataValue(html, "duration_minutes")
+      ?? getHtmlMetadataValue(html, "time_limit_minutes")
+      ?? getHtmlMetadataValue(html, "duration-minutes")
+      ?? getHtmlMetadataValue(html, "time-limit-minutes"),
+  );
+  return { subject, university, year, examType, durationMinutes };
 }
 
 export function getNoteMetadata(html: string): NoteMetadata {

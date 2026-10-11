@@ -254,9 +254,8 @@ function ExamsManager() {
         question_count: questionCount,
         duration_minutes: !force && durationEdited
           ? current.duration_minutes
-          : numericCount
-            ? getSuggestedExamDuration(subject, numericCount)
-            : "",
+          : detected.durationMinutes
+            ?? (numericCount ? getSuggestedExamDuration(subject, numericCount) : "")
       };
     });
   }
@@ -299,7 +298,7 @@ function ExamsManager() {
       }
       const durationMinutes = typeof form.duration_minutes === "number" && form.duration_minutes > 0
         ? form.duration_minutes
-        : getSuggestedExamDuration(subject, questionCount);
+        : detectedMetadata?.durationMinutes ?? getSuggestedExamDuration(subject, questionCount);
       const payload = {
         ...form,
         subject,
@@ -328,7 +327,7 @@ function ExamsManager() {
           setForm((current) => ({ ...current, content_type: "html", content_data: content }));
           autoFillExamMetadata(content, true);
           setQuestionCountEdited(false);
-          setDurationEdited(false);
+          setDurationEdited(Boolean(getExamMetadata(content).durationMinutes));
         } catch (value) {
           setError(message(value));
         }
@@ -404,6 +403,7 @@ function ExamsManager() {
               <p>{form.university || detectedExamMetadata.university ? `University: ${form.university || detectedExamMetadata.university}` : "Could not detect one university; choose it above if applicable."}</p>
               <p>{effectiveExamYear ? `Year: ${effectiveExamYear}` : form.year ? "Year is outside 2010–2027; it will be saved under General." : "No valid year detected; it will be saved under General."}</p>
               <p>{form.title.trim() || generatedTitlePreview ? `Title: ${form.title.trim() || generatedTitlePreview}` : "Could not generate a title until subject and type are selected."}</p>
+              <p>{detectedExamMetadata.durationMinutes ? `Timer detected in HTML: ${detectedExamMetadata.durationMinutes} minutes.` : typeof form.question_count === "number" && form.question_count > 0 ? `No timer detected; the system estimates ${getSuggestedExamDuration(effectiveExamSubject || form.subject, form.question_count)} minutes from the question count.` : "No timer detected; enter a question count to calculate the suggested timer."}</p>
             </div>
           )}
           <select
@@ -484,7 +484,7 @@ function ExamsManager() {
               const content = event.target.value;
               setUploadedFile(null);
               setQuestionCountEdited(false);
-              setDurationEdited(false);
+              setDurationEdited(Boolean(form.content_type === "html" && getExamMetadata(content).durationMinutes));
               setForm((current) => ({ ...current, content_data: content }));
               if (form.content_type === "html") autoFillExamMetadata(content, true);
             }}

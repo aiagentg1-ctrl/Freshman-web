@@ -1883,7 +1883,7 @@ def exam_payload_metadata(content_data: str) -> dict[str, Optional[str]]:
         if key and attrs.get("content"):
             meta_values[key.lower()] = attrs["content"].strip()
     for name, value in re.findall(
-        r"\bdata-(subject|university|year|exam-type)\s*=\s*[\"']([^\"']+)['\"]",
+        r"\bdata-(subject|university|year|exam-type|duration-minutes|time-limit-minutes)\s*=\s*[\"']([^\"']+)['\"]",
         content_data,
         re.IGNORECASE,
     ):
@@ -1977,6 +1977,17 @@ def exam_payload_metadata(content_data: str) -> dict[str, Optional[str]]:
     year_match = re.search(r"\b(\d{4})\b", year or "")
     if not year_match or not 2010 <= int(year_match.group(1)) <= 2027:
         year = None
+    duration_minutes = embedded_value(
+        "duration_minutes",
+        "time_limit_minutes",
+        "timer_minutes",
+        "exam_duration_minutes",
+    ) or meta_values.get("duration-minutes") or meta_values.get("time-limit-minutes")
+    duration_match = re.fullmatch(r"\s*(\d{1,4})(?:\s*(?:minutes?|mins?))?\s*", duration_minutes or "", re.IGNORECASE)
+    if not duration_match or not 1 <= int(duration_match.group(1)) <= 1200:
+        duration_minutes = None
+    else:
+        duration_minutes = str(int(duration_match.group(1)))
     return {
         "subject": detected_subject,
         "university": embedded_value("university", "university_name", "universityName")
@@ -1984,6 +1995,7 @@ def exam_payload_metadata(content_data: str) -> dict[str, Optional[str]]:
         or (next(iter(university_values)) if len(university_values) == 1 else None),
         "year": year,
         "exam_type": exam_type,
+        "duration_minutes": duration_minutes,
     }
 
 
@@ -2088,7 +2100,11 @@ async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_ad
             status_code=422,
             detail="Question count is required when it cannot be detected from the exam HTML.",
         )
-    duration_minutes = exam.duration_minutes or suggested_exam_duration(subject, question_count)
+    duration_minutes = exam.duration_minutes or (
+        int(detected_metadata["duration_minutes"])
+        if detected_metadata.get("duration_minutes")
+        else suggested_exam_duration(subject, question_count)
+    )
     async with AsyncSessionLocal() as session:
         subject_enum = SubjectEnum[subject.upper()]
         title = exam.title.strip() if exam.title and exam.title.strip() else None
@@ -2183,7 +2199,11 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
                 detail=f"An exam titled '{title}' already exists for {subject.replace('_', ' ')} {exam_type} exams.",
             )
         question_count = question_count or db_exam.question_count
-        duration_minutes = exam.duration_minutes or suggested_exam_duration(subject, question_count)
+        duration_minutes = exam.duration_minutes or (
+            int(detected_metadata["duration_minutes"])
+            if detected_metadata.get("duration_minutes")
+            else suggested_exam_duration(subject, question_count)
+        )
         db_exam.subject = SubjectEnum[subject.upper()]
         db_exam.year = exam.year or detected_metadata.get("year") or ""
         db_exam.university = (
