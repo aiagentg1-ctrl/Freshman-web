@@ -432,11 +432,12 @@ export async function submitExamAttempt(
   });
 }
 
-export async function getNotes(subject: string, stream?: string): Promise<NoteMeta[]> {
-  const streamParam = stream ? `&stream=${encodeURIComponent(stream)}` : "";
-  return request<NoteMeta[]>(
-    `/api/notes?subject=${encodeURIComponent(subject)}${streamParam}`
-  );
+export async function getNotes(subject?: string, stream?: string): Promise<NoteMeta[]> {
+  const params = new URLSearchParams();
+  if (subject) params.set("subject", subject);
+  if (stream) params.set("stream", stream);
+  const query = params.toString();
+  return request<NoteMeta[]>(`/api/notes${query ? `?${query}` : ""}`);
 }
 
 export async function getNote(id: number): Promise<Note> {
