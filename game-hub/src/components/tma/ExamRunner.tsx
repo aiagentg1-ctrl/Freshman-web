@@ -161,7 +161,11 @@ export function parseExamQuestions(html: string): ExamQuestion[] | null {
       let defaultUniversity: string | undefined;
       if (parsed && !Array.isArray(parsed) && typeof parsed === "object") {
         const payload = parsed as Record<string, unknown>;
-        defaultUniversity = typeof payload.university === "string" ? payload.university.trim() : undefined;
+        const metadata = payload.metadata && typeof payload.metadata === "object"
+          ? payload.metadata as Record<string, unknown>
+          : undefined;
+        const university = payload.university ?? metadata?.university;
+        defaultUniversity = typeof university === "string" ? university.trim() : undefined;
         parsed = payload.questions;
       }
       if (Array.isArray(parsed)) {
