@@ -17,7 +17,7 @@ import {
 import { ChapterExam, ChapterExamMeta, Exam, ExamMeta, getChapterExam, getChapterExams, getExam, getExams, getUniversityLogo, isPremiumAccessRequired, StreamKey } from "../../lib/api";
 import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects";
 import { universities } from "../../lib/universities";
-import ExamRunner, { HtmlExamView, parseExamQuestions, PdfExamView } from "./ExamRunner";
+import ExamRunner, { HtmlExamView, PdfExamView } from "./ExamRunner";
 import PremiumBanner from "./PremiumBanner";
 import UniversityLogo from "./UniversityLogo";
 
@@ -334,7 +334,9 @@ export default function PracticeScreen({
       );
     }
     if (view.exam.content_type === "html") {
-      if (!parseExamQuestions(view.exam.content_data)) {
+      const content = view.exam.content_data;
+      const hasExamScript = /<script\b/i.test(content) || /EXAM_QUESTIONS/i.test(content);
+      if (!hasExamScript) {
         return (
           <HtmlExamView
             exam={view.exam}
