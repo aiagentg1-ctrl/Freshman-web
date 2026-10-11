@@ -225,7 +225,7 @@ function ExamsManager() {
         ...current,
         subject,
         university: (force ? detected.university : null) || current.university || detected.university || "",
-        year: (force ? detected.year : null) || current.year || detected.year || "",
+        year: force ? detected.year ?? "" : current.year || detected.year || "",
         exam_type: (force ? detected.examType : null) || current.exam_type || detected.examType || "",
         question_count: questionCount,
         duration_minutes: !force && durationEdited

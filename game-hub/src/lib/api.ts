@@ -825,6 +825,15 @@ export interface SubscriptionConfig {
   monthly_operating_cost: number;
 }
 
+export interface SubscriptionPricing {
+  price: number | null;
+  currency: string | null;
+}
+
+export async function getSubscriptionPricing(): Promise<SubscriptionPricing> {
+  return request<SubscriptionPricing>("/api/subscription-pricing");
+}
+
 export async function adminGetSubscriptionConfig(): Promise<SubscriptionConfig> {
   return request<SubscriptionConfig>("/api/admin/subscription-config", {
     headers: getAdminHeaders(),

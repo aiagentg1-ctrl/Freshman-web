@@ -2056,20 +2056,47 @@ async def create_exam(exam: ExamCreate, admin_verified: bool = Depends(verify_ad
         )
     duration_minutes = exam.duration_minutes or suggested_exam_duration(subject, question_count)
     async with AsyncSessionLocal() as session:
+        subject_enum = SubjectEnum[subject.upper()]
         title = exam.title.strip() if exam.title and exam.title.strip() else None
         if not title:
             exam_number_result = await session.execute(
                 select(func.count(EueeExam.id)).where(
-                    EueeExam.subject == SubjectEnum[subject.upper()],
+                    EueeExam.subject == subject_enum,
                     EueeExam.exam_type == exam_type,
                 )
             )
             exam_number = (exam_number_result.scalar() or 0) + 1
-            title = f"{subject.replace('_', ' ').title()} {exam_type.capitalize()} Exam {exam_number}"
-            if exam.year:
-                title += f" {exam.year}"
+            title_prefix = f"{exam_type.capitalize()} Exam"
+            while True:
+                candidate_title = f"{title_prefix} {exam_number} ({subject.replace('_', ' ').title()})"
+                if exam.year:
+                    candidate_title += f" {exam.year}"
+                duplicate_result = await session.execute(
+                    select(EueeExam.id).where(
+                        EueeExam.subject == subject_enum,
+                        EueeExam.exam_type == exam_type,
+                        func.lower(EueeExam.title) == candidate_title.lower(),
+                    ).limit(1)
+                )
+                if duplicate_result.scalar_one_or_none() is None:
+                    title = candidate_title
+                    break
+                exam_number += 1
+        else:
+            duplicate_result = await session.execute(
+                select(EueeExam.id).where(
+                    EueeExam.subject == subject_enum,
+                    EueeExam.exam_type == exam_type,
+                    func.lower(EueeExam.title) == title.lower(),
+                ).limit(1)
+            )
+            if duplicate_result.scalar_one_or_none() is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"An exam titled '{title}' already exists for {subject.replace('_', ' ')} {exam_type} exams.",
+                )
         new_exam = EueeExam(
-            subject=SubjectEnum[subject.upper()],
+            subject=subject_enum,
             year=exam.year or "",
             title=title,
             university=(
@@ -2106,6 +2133,20 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
 
         subject = exam.subject or exam_payload_metadata(exam.content_data)["subject"] or db_exam.subject.value
         exam_type = exam.exam_type or exam_payload_metadata(exam.content_data)["exam_type"] or db_exam.exam_type
+        title = exam.title.strip() if exam.title and exam.title.strip() else db_exam.title
+        duplicate_result = await session.execute(
+            select(EueeExam.id).where(
+                EueeExam.subject == SubjectEnum[subject.upper()],
+                EueeExam.exam_type == exam_type,
+                func.lower(EueeExam.title) == title.lower(),
+                EueeExam.id != exam_id,
+            ).limit(1)
+        )
+        if duplicate_result.scalar_one_or_none() is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"An exam titled '{title}' already exists for {subject.replace('_', ' ')} {exam_type} exams.",
+            )
         question_count = question_count or db_exam.question_count
         duration_minutes = exam.duration_minutes or suggested_exam_duration(subject, question_count)
         db_exam.subject = SubjectEnum[subject.upper()]
@@ -2117,7 +2158,7 @@ async def update_exam(exam_id: int, exam: ExamCreate, admin_verified: bool = Dep
         )
         db_exam.is_premium = exam.is_premium
         db_exam.is_published = exam.is_published
-        db_exam.title = exam.title or db_exam.title
+        db_exam.title = title
         db_exam.custom_tag = (exam.custom_tag or "").strip()
         db_exam.question_count = question_count
         db_exam.duration_minutes = duration_minutes
@@ -3133,6 +3174,19 @@ async def admin_get_subscription_config(admin_verified: bool = Depends(verify_ad
             "price": config.price,
             "currency": config.currency,
             "monthly_operating_cost": config.monthly_operating_cost,
+        }
+
+
+@app.get("/api/subscription-pricing")
+async def get_subscription_pricing():
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(SubscriptionConfig).order_by(SubscriptionConfig.id).limit(1)
+        )
+        config = result.scalar_one_or_none()
+        return {
+            "price": config.price if config else None,
+            "currency": config.currency if config else None,
         }
 
 

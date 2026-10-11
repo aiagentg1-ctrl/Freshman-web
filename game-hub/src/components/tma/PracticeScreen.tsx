@@ -422,8 +422,8 @@ export default function PracticeScreen({
         </div>
         {exam.content_type === "html" && (
           <button
-            onClick={() => openExam(exam.id)}
-            disabled={loadingExam || isLocked}
+            onClick={() => isLocked ? onGetPremium() : openExam(exam.id)}
+            disabled={loadingExam}
             className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-[0.97] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
           >
             {isLocked ? "🔒 Premium" : "Start"}
@@ -433,15 +433,15 @@ export default function PracticeScreen({
       {exam.content_type === "pdf" && (
         <div className="flex gap-2 mt-3">
           <button
-            onClick={() => downloadPdf(exam.id, exam.title)}
-            disabled={loadingExam || isLocked}
+            onClick={() => isLocked ? onGetPremium() : downloadPdf(exam.id, exam.title)}
+            disabled={loadingExam}
             className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
           >
             <Download className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Download PDF"}
           </button>
           <button
-            onClick={() => openExam(exam.id)}
-            disabled={loadingExam || isLocked}
+            onClick={() => isLocked ? onGetPremium() : openExam(exam.id)}
+            disabled={loadingExam}
             className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-slate-200 text-slate-700"}`}
           >
             <FileText className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Open in Viewer"}
@@ -590,8 +590,8 @@ export default function PracticeScreen({
                     </div>
                     {exam.content_type === "html" && (
                       <button
-                        onClick={() => openExam(exam.id)}
-                        disabled={loadingExam || isLocked}
+                        onClick={() => isLocked ? onGetPremium() : openExam(exam.id)}
+                        disabled={loadingExam}
                         className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-semibold active:scale-[0.97] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
                       >
                         {isLocked ? "🔒 Premium" : "Start"}
@@ -601,15 +601,15 @@ export default function PracticeScreen({
                   {exam.content_type === "pdf" && (
                     <div className="flex gap-2 mt-3">
                       <button
-                        onClick={() => downloadPdf(exam.id, exam.title)}
-                        disabled={loadingExam || isLocked}
+                        onClick={() => isLocked ? onGetPremium() : downloadPdf(exam.id, exam.title)}
+                        disabled={loadingExam}
                         className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-[#1D70F5] text-white"}`}
                       >
                         <Download className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Download PDF"}
                       </button>
                       <button
-                        onClick={() => openExam(exam.id)}
-                        disabled={loadingExam || isLocked}
+                        onClick={() => isLocked ? onGetPremium() : openExam(exam.id)}
+                        disabled={loadingExam}
                         className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform ${isLocked ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-slate-200 text-slate-700"}`}
                       >
                         <FileText className="w-4 h-4" /> {isLocked ? "🔒 Premium" : "Open in Viewer"}
@@ -762,8 +762,8 @@ export default function PracticeScreen({
                         </span>
                         <button
                           type="button"
-                          onClick={() => openChapterExam(chapter.id)}
-                          disabled={loadingExam || isLocked}
+                         onClick={() => isLocked ? onGetPremium() : openChapterExam(chapter.id)}
+                         disabled={loadingExam}
                           className={`mt-3 min-h-10 w-full rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 ${isLocked ? "bg-slate-300 cursor-not-allowed" : chapter.is_premium ? "bg-gradient-to-r from-amber-500 via-amber-600 to-violet-700 shadow-md shadow-amber-200" : "bg-violet-600"}`}
                         >
                           {isLocked ? "🔒 Upgrade to Premium" : "Practice questions"}

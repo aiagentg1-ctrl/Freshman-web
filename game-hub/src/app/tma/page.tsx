@@ -10,7 +10,7 @@ import PracticeScreen from "../../components/tma/PracticeScreen";
 import ProfileScreen from "../../components/tma/ProfileScreen";
 import GameScreen from "../../components/tma/GameScreen";
 import { DevUserSetup } from "../../components/DevUserSetup";
-import { dailyCheckIn, DailyCheckIn, ExamMeta, getUser, releaseDeviceSession, startDeviceSession, StreamKey, updateUser } from "../../lib/api";
+import { dailyCheckIn, DailyCheckIn, ExamMeta, getSubscriptionPricing, getUser, releaseDeviceSession, startDeviceSession, StreamKey, SubscriptionPricing, updateUser } from "../../lib/api";
 import { expandTelegramApp, getTelegramInitData, getTelegramUser, TelegramUser } from "../../lib/telegram";
 import { migrateLegacyStorage } from "../../lib/legacyStorage";
 import PremiumDialog from "../../components/tma/PremiumDialog";
@@ -58,10 +58,17 @@ export default function TMAPage() {
   const [deviceError, setDeviceError] = useState("");
   const [sessionRetry, setSessionRetry] = useState(0);
   const [showPremiumDialog, setShowPremiumDialog] = useState(false);
+  const [subscriptionPricing, setSubscriptionPricing] = useState<SubscriptionPricing | null>(null);
   const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     setDarkMode(localStorage.getItem("freshoTheme") === "dark");
+  }, []);
+
+  useEffect(() => {
+    getSubscriptionPricing()
+      .then(setSubscriptionPricing)
+      .catch((error) => console.error("Could not load premium subscription price:", error));
   }, []);
 
   useEffect(() => {
@@ -372,6 +379,8 @@ export default function TMAPage() {
           fullName={profile.full_name}
           university={profile.university}
           stream={profile.stream}
+          price={subscriptionPricing?.price ?? null}
+          currency={subscriptionPricing?.currency ?? null}
           onClose={() => setShowPremiumDialog(false)}
         />
       )}

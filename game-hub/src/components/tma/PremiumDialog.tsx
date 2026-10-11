@@ -16,11 +16,15 @@ export default function PremiumDialog({
   fullName,
   university,
   stream,
+  price,
+  currency,
   onClose,
 }: {
   fullName: string;
   university: string;
   stream: string;
+  price: number | null;
+  currency: string | null;
   onClose: () => void;
 }) {
   const streamName = stream.toLowerCase() === "natural"
@@ -60,12 +64,14 @@ export default function PremiumDialog({
 
         <div className="p-5">
           <div className="rounded-2xl bg-amber-50 p-4 text-center ring-1 ring-amber-200">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">5 month subscription</p>
-            <div className="mt-1 flex items-end justify-center gap-2">
-              <span className="text-4xl font-black text-slate-900">199 ETB</span>
-              <span className="pb-1 text-sm font-bold text-slate-400 line-through decoration-2">300 ETB</span>
-            </div>
-            <p className="mt-1 text-xs text-slate-500">The 300 ETB price is crossed out. Only 199 ETB is available.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Price per month</p>
+            {price !== null && currency ? (
+              <p className="mt-1 text-4xl font-black text-slate-900">
+                {new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(price)} {currency}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm font-bold text-slate-700">Contact support for the current price</p>
+            )}
           </div>
 
           <ul className="mt-5 space-y-3">
