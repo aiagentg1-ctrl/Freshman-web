@@ -723,7 +723,7 @@ function ChapterExamsManager() {
         // Auto-detect subject from HTML content using the same logic as notes
         const metadata = getNoteMetadata(html);
         if (metadata.subject && !form.subject) {
-          setForm(prev => ({ ...prev, subject: metadata.subject }));
+          setForm(prev => ({ ...prev, subject: metadata.subject! }));
         }
         if (metadata.stream && !form.stream) {
           setForm(prev => ({ ...prev, stream: metadata.stream as "natural" | "social" }));

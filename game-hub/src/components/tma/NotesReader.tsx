@@ -1,56 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronLeft, FileQuestion, Maximize2, Minimize2 } from "lucide-react";
-import { ChapterExamMeta, completeNote, Note } from "../../lib/api";
+import { useState } from "react";
+import { ChevronLeft, FileQuestion, Maximize2, Minimize2 } from "lucide-react";
+import { ChapterExamMeta, Note } from "../../lib/api";
 import { subjectLabel } from "../../lib/subjects";
 import HtmlViewer from "./HtmlViewer";
 
 export default function NotesReader({
   note,
   chapterExams,
-  telegramUserId,
   onTakeChapterExam,
   onBack,
-  onNoteCompleted,
 }: {
   note: Note;
   chapterExams: ChapterExamMeta[];
-  telegramUserId?: number;
   onTakeChapterExam: (examId: number) => void;
   onBack: () => void;
-  onNoteCompleted?: () => void;
 }) {
   const [fullscreen, setFullscreen] = useState(true);
-  const [completed, setCompleted] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const [completionMessage, setCompletionMessage] = useState("");
-
-  useEffect(() => {
-    if (telegramUserId) {
-      setCompleted(localStorage.getItem(`freshoNoteComplete:${telegramUserId}:${note.id}`) === "1");
-    }
-  }, [note.id, telegramUserId]);
-
-  const markComplete = async () => {
-    if (!telegramUserId || completing) return;
-    setCompleting(true);
-    try {
-      const result = await completeNote(telegramUserId, note.id);
-      localStorage.setItem(`freshoNoteComplete:${telegramUserId}:${note.id}`, "1");
-      setCompleted(true);
-      setCompletionMessage(result.xp_awarded > 0
-        ? `Chapter completed. +${result.xp_awarded} XP`
-        : "Chapter completed again. No XP on this repeat.");
-      window.dispatchEvent(new Event("fresho:progress-updated"));
-      onNoteCompleted?.();
-    } catch (error) {
-      console.error("Failed to complete note:", error);
-      setCompletionMessage("Could not save completion. Please try again.");
-    } finally {
-      setCompleting(false);
-    }
-  };
 
   if (fullscreen) {
     return (
@@ -79,6 +46,23 @@ export default function NotesReader({
             </button>
           </div>
         </div>
+        {chapterExams.length > 0 && (
+          <div
+            className="shrink-0 border-t border-slate-200 bg-white/95 px-3 py-3 backdrop-blur flex gap-2 overflow-x-auto"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+          >
+            {chapterExams.map((chapterExam) => (
+              <button
+                key={chapterExam.id}
+                type="button"
+                onClick={() => onTakeChapterExam(chapterExam.id)}
+                className="flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1D70F5] px-4 py-2 text-sm font-semibold text-white"
+              >
+                <FileQuestion className="h-4 w-4" /> {chapterExam.title}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -116,28 +100,21 @@ export default function NotesReader({
         />
       </div>
 
-      <div className="space-y-2 px-4 py-4">
-        {chapterExams.map((chapterExam) => (
-          <button
-            key={chapterExam.id}
-            type="button"
-            onClick={() => onTakeChapterExam(chapterExam.id)}
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#1D70F5] px-4 py-2 text-sm font-semibold text-white"
-          >
-            <FileQuestion className="h-4 w-4" /> {chapterExam.title}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={markComplete}
-          disabled={!telegramUserId || completing}
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 disabled:opacity-60"
-        >
-          {completed ? <CheckCircle2 className="h-4 w-4" /> : null}
-          {completing ? "Saving completion..." : completed ? "Read chapter again" : "Mark chapter complete · +20 XP"}
-        </button>
-        {completionMessage && <p role="status" className="text-center text-xs text-slate-600">{completionMessage}</p>}
-      </div>
+      {chapterExams.length > 0 && (
+        <div className="space-y-2 px-4 py-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase">Practice Questions</p>
+          {chapterExams.map((chapterExam) => (
+            <button
+              key={chapterExam.id}
+              type="button"
+              onClick={() => onTakeChapterExam(chapterExam.id)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#1D70F5] px-4 py-2 text-sm font-semibold text-white"
+            >
+              <FileQuestion className="h-4 w-4" /> {chapterExam.title}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
