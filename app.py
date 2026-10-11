@@ -43,6 +43,14 @@ SOCIAL_ONLY_SUBJECTS = {
     SubjectEnum.ENTREPRENEURSHIP,
     SubjectEnum.ECONOMICS,
 }
+SHARED_SUBJECTS = {
+    SubjectEnum.ANTHROPOLOGY,
+    SubjectEnum.COMMUNICATIVE_ENGLISH,
+    SubjectEnum.E_SHE,
+    SubjectEnum.EMERGING_TECHNOLOGY,
+    SubjectEnum.GEOGRAPHY,
+    SubjectEnum.MATHEMATICS,
+}
 
 
 @asynccontextmanager
@@ -314,9 +322,12 @@ async def require_premium_membership(session, user_id: int) -> None:
 
 
 async def require_material_stream_access(
-    session, user_id: int, material_stream: StreamEnum | None
+    session,
+    user_id: int,
+    material_stream: StreamEnum | None,
+    material_subject: SubjectEnum | None = None,
 ) -> None:
-    if material_stream is None:
+    if material_stream is None or material_subject in SHARED_SUBJECTS:
         return
     result = await session.execute(select(User.stream).where(User.user_id == user_id))
     user_stream = result.scalar_one_or_none()
@@ -668,7 +679,11 @@ async def award_subject_milestones(session, user: User, subject: SubjectEnum) ->
     note_query = select(Note.id).where(
         Note.subject == subject,
         Note.is_published == True,
-        or_(Note.stream == user.stream, Note.stream.is_(None)),
+        or_(
+            Note.subject.in_(SHARED_SUBJECTS),
+            Note.stream == user.stream,
+            Note.stream.is_(None),
+        ),
     )
 
     note_rows = await session.execute(note_query)
@@ -692,7 +707,11 @@ async def award_subject_milestones(session, user: User, subject: SubjectEnum) ->
     chapter_query = select(ChapterExam.id).where(
         ChapterExam.subject == subject,
         ChapterExam.is_published == True,
-        or_(ChapterExam.stream == user.stream, ChapterExam.stream.is_(None)),
+        or_(
+            ChapterExam.subject.in_(SHARED_SUBJECTS),
+            ChapterExam.stream == user.stream,
+            ChapterExam.stream.is_(None),
+        ),
     )
     chapter_rows = await session.execute(chapter_query)
     chapter_exam_ids = set(chapter_rows.scalars().all())
@@ -2492,7 +2511,13 @@ async def get_notes(subject: Optional[str] = None, stream: Optional[str] = None,
             query = query.where(Note.subject == SubjectEnum[subject.upper()])
         if stream:
             selected_stream = StreamEnum[stream.upper()]
-            query = query.where(or_(Note.stream == selected_stream, Note.stream.is_(None)))
+            query = query.where(
+                or_(
+                    Note.subject.in_(SHARED_SUBJECTS),
+                    Note.stream == selected_stream,
+                    Note.stream.is_(None),
+                )
+            )
         if not include_drafts:
             query = query.where(Note.is_published == True)
 
@@ -2524,7 +2549,9 @@ async def get_note(
                 session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
             )
             await require_premium_membership(session, user_id)
-            await require_material_stream_access(session, user_id, note.stream)
+            await require_material_stream_access(
+                session, user_id, note.stream, note.subject
+            )
         return serialize_note(note, include_content=True)
 
 
@@ -2712,7 +2739,13 @@ async def get_chapter_exams(
                 query = query.where(ChapterExam.subject == SubjectEnum[subject.upper()])
             if stream:
                 selected_stream = StreamEnum[stream.upper()]
-                query = query.where(or_(ChapterExam.stream == selected_stream, ChapterExam.stream.is_(None)))
+                query = query.where(
+                    or_(
+                        ChapterExam.subject.in_(SHARED_SUBJECTS),
+                        ChapterExam.stream == selected_stream,
+                        ChapterExam.stream.is_(None),
+                    )
+                )
             if note_id:
                 query = query.where(ChapterExam.note_id == note_id)
             if not include_drafts:
@@ -2753,7 +2786,12 @@ async def get_chapter_exam(
                         session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
                     )
                     await require_premium_membership(session, user_id)
-                    await require_material_stream_access(session, user_id, await chapter_exam_stream(session, exam))
+                    await require_material_stream_access(
+                        session,
+                        user_id,
+                        await chapter_exam_stream(session, exam),
+                        exam.subject,
+                    )
             return serialize_chapter_exam(exam, include_content=True)
     except HTTPException:
         raise
@@ -2892,7 +2930,12 @@ async def submit_chapter_exam_attempt(
             raise HTTPException(status_code=404, detail="Chapter exam not found")
         if exam.is_premium:
             await require_premium_membership(session, attempt.user_id)
-            await require_material_stream_access(session, attempt.user_id, await chapter_exam_stream(session, exam))
+            await require_material_stream_access(
+                session,
+                attempt.user_id,
+                await chapter_exam_stream(session, exam),
+                exam.subject,
+            )
 
         user_result = await session.execute(select(User).where(User.user_id == attempt.user_id))
         user = user_result.scalar_one_or_none()
