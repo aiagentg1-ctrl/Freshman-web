@@ -52,7 +52,7 @@ import {
   type Broadcast,
 } from "@/lib/api";
 import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
-import { getExamQuestionCount, getSuggestedExamDuration } from "@/lib/examMetadata";
+import { getExamMetadata, getExamQuestionCount, getSuggestedExamDuration } from "@/lib/examMetadata";
 import { migrateLegacyStorage } from "@/lib/legacyStorage";
 
 type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing" | "broadcasts";
@@ -83,7 +83,7 @@ const examPayload = {
   content_type: "html" as "html" | "pdf",
   content_data: "<p>Exam content</p>",
   semester: "all",
-  exam_type: "final" as "final" | "mid",
+  exam_type: "" as "final" | "mid" | "",
   is_premium: false,
   is_published: false,
 };
@@ -113,7 +113,14 @@ function subjectOptions(stream: string): string[] {
   return stream === "social" ? [...SOCIAL_SUBJECTS] : [...NATURAL_SUBJECTS];
 }
 
-const allStudentSubjects = [...new Set([...NATURAL_SUBJECTS, ...SOCIAL_SUBJECTS])];
+const allStudentSubjects = [...new Set([
+  ...NATURAL_SUBJECTS,
+  ...SOCIAL_SUBJECTS,
+  "chemistry",
+  "biology",
+  "english",
+  "aptitude",
+])];
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "The admin API returned an unknown error.";
@@ -207,13 +214,19 @@ function ExamsManager() {
   const load = () => { setLoading(true); setError(""); adminGetExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
   function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); setQuestionCountEdited(false); setDurationEdited(false); }
-  function autoFillExamMetadata(content: string, subject: string, force = false) {
+  function autoFillExamMetadata(content: string, force = false) {
+    const detected = getExamMetadata(content);
     const detectedCount = getExamQuestionCount(content);
     setForm((current) => {
+      const subject = detected.subject || current.subject || "";
       const questionCount = !force && questionCountEdited ? current.question_count : (detectedCount ?? "");
       const numericCount = typeof questionCount === "number" ? questionCount : detectedCount;
       return {
         ...current,
+        subject,
+        university: (force ? detected.university : null) || current.university || detected.university || "",
+        year: (force ? detected.year : null) || current.year || detected.year || "",
+        exam_type: (force ? detected.examType : null) || current.exam_type || detected.examType || "",
         question_count: questionCount,
         duration_minutes: !force && durationEdited
           ? current.duration_minutes
@@ -236,13 +249,23 @@ function ExamsManager() {
   }
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!form.university) { setError("Select a university."); return; }
     setError("");
     try {
       const contentData = uploadedFile
         ? await readLocalFile(uploadedFile, form.content_type)
         : form.content_data;
       const detectedCount = form.content_type === "html" ? getExamQuestionCount(contentData) : null;
+      const detectedMetadata = form.content_type === "html" ? getExamMetadata(contentData) : null;
+      const subject = form.subject || detectedMetadata?.subject || "";
+      const examType = form.exam_type || detectedMetadata?.examType || "";
+      if (!subject) {
+        setError("Select a subject, or upload HTML that identifies its subject.");
+        return;
+      }
+      if (!examType) {
+        setError("Select mid or final, or upload HTML that identifies the exam type.");
+        return;
+      }
       const questionCount = typeof form.question_count === "number" && form.question_count > 0
         ? form.question_count
         : detectedCount;
@@ -252,10 +275,17 @@ function ExamsManager() {
       }
       const durationMinutes = typeof form.duration_minutes === "number" && form.duration_minutes > 0
         ? form.duration_minutes
-        : getSuggestedExamDuration(form.subject, questionCount);
-      const payload = uploadedFile
-        ? { ...form, question_count: questionCount, duration_minutes: durationMinutes, content_data: contentData }
-        : { ...form, question_count: questionCount, duration_minutes: durationMinutes };
+        : getSuggestedExamDuration(subject, questionCount);
+      const payload = {
+        ...form,
+        subject,
+        exam_type: examType,
+        university: form.university,
+        year: form.year,
+        question_count: questionCount,
+        duration_minutes: durationMinutes,
+        content_data: contentData,
+      };
       if (editing) await adminUpdateExam(editing.id, payload);
       else await adminCreateExam(payload);
       reset();
@@ -272,7 +302,7 @@ function ExamsManager() {
           const content = await readLocalFile(file, "html");
           setUploadedFile(null);
           setForm((current) => ({ ...current, content_type: "html", content_data: content }));
-          autoFillExamMetadata(content, form.subject, true);
+          autoFillExamMetadata(content, true);
           setQuestionCountEdited(false);
           setDurationEdited(false);
         } catch (value) {
@@ -307,7 +337,6 @@ function ExamsManager() {
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-slate-600">Subject</span>
             <select
-              required
               className="w-full rounded-xl border border-slate-200 px-3 py-2"
               value={form.subject}
               onChange={(event) => {
@@ -321,12 +350,16 @@ function ExamsManager() {
                 }));
               }}
             >
-              <option value="">Select a subject</option>
-              {allStudentSubjects.map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject].label}</option>)}
+              <option value="">Auto-detect or select a subject</option>
+              {allStudentSubjects.map((subject) => (
+                <option key={subject} value={subject}>
+                  {SUBJECTS[subject]?.label ?? subject.replace(/_/g, " ")}
+                </option>
+              ))}
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-bold text-slate-600">Year (optional)</span>
+            <span className="mb-1 block text-xs font-bold text-slate-600">Year (optional; auto-detected)</span>
             <input
               className="w-full rounded-xl border border-slate-200 px-3 py-2"
               placeholder="Leave blank to place in General"
@@ -334,16 +367,17 @@ function ExamsManager() {
               onChange={(event) => setForm({ ...form, year: event.target.value })}
             />
           </label>
-          <Field label="Title" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" />
+          <Field label="Title (optional; generated automatically)" value={form.title} onChange={(value) => setForm({ ...form, title: value })} className="md:col-span-2" />
           <label className="block md:col-span-2">
-            <span className="mb-1 block text-xs font-bold text-slate-600">University</span>
-            <UniversitySelect value={form.university} onChange={(value) => setForm({ ...form, university: value })} allowCustom={false} />
+            <span className="mb-1 block text-xs font-bold text-slate-600">University (optional; auto-detected)</span>
+            <UniversitySelect value={form.university} onChange={(value) => setForm({ ...form, university: value })} allowCustom />
           </label>
           <select
             className="rounded-xl border border-slate-200 px-3 py-2"
             value={form.exam_type}
-            onChange={(event) => setForm({ ...form, exam_type: event.target.value as "final" | "mid" })}
+            onChange={(event) => setForm({ ...form, exam_type: event.target.value as "final" | "mid" | "" })}
           >
+            <option value="">Auto-detect exam type</option>
             <option value="final">Final exam</option>
             <option value="mid">Mid exam</option>
           </select>
@@ -418,7 +452,7 @@ function ExamsManager() {
               setQuestionCountEdited(false);
               setDurationEdited(false);
               setForm((current) => ({ ...current, content_data: content }));
-              if (form.content_type === "html") autoFillExamMetadata(content, form.subject, true);
+              if (form.content_type === "html") autoFillExamMetadata(content, true);
             }}
           />
           <label className="flex items-center gap-2 text-sm font-semibold">
