@@ -129,7 +129,7 @@ export default function GPACalculatorScreen({
   return (
     <div className="flex flex-col flex-1 bg-slate-50">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
+      <div className="px-4 md:px-8 lg:px-12 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
@@ -177,7 +177,7 @@ export default function GPACalculatorScreen({
         </div>
       )}
 
-      <div className="flex-1 px-4 py-4 space-y-4 overflow-y-auto">
+      <div className="flex-1 px-4 md:px-8 lg:px-12 py-4 space-y-4 overflow-y-auto">
         {/* Course List */}
         <div className="space-y-3">
           {courses.map((course) => (

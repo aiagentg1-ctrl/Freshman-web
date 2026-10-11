@@ -118,7 +118,7 @@ export default function GameScreen({
   if (view === "leaderboard") {
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <header className="sticky top-0 z-10 border-b border-slate-100 bg-white px-4 py-4">
+        <header className="sticky top-0 z-10 border-b border-slate-100 bg-white px-4 md:px-8 lg:px-12 py-4">
           <button
             type="button"
             onClick={() => setView("tools")}
@@ -128,7 +128,7 @@ export default function GameScreen({
           </button>
           <h1 className="mt-2 text-xl font-bold text-slate-900">University Leaderboard</h1>
         </header>
-        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
+        <div className="flex-1 space-y-4 overflow-y-auto px-4 md:px-8 lg:px-12 py-5">
           <Leaderboard stream={stream} university={university} />
         </div>
       </div>
@@ -143,7 +143,7 @@ export default function GameScreen({
 
     return (
       <div className="flex flex-col flex-1 min-h-0">
-        <header className="sticky top-0 z-10 border-b border-slate-100 bg-white px-4 py-4">
+        <header className="sticky top-0 z-10 border-b border-slate-100 bg-white px-4 md:px-8 lg:px-12 py-4">
           <button
             type="button"
             onClick={() => {
@@ -163,7 +163,7 @@ export default function GameScreen({
           </button>
           <h1 className="mt-2 text-xl font-bold text-slate-900">{activeDeck?.title || "Flash Cards"}</h1>
         </header>
-        <div className="flex-1 space-y-4 px-4 py-5">
+        <div className="flex-1 space-y-4 px-4 md:px-8 lg:px-12 py-5">
           <section className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-sm">
             <div className="flex items-center justify-between bg-violet-500 px-5 py-4 text-white">
               <div className="flex items-center gap-3">
@@ -363,9 +363,9 @@ export default function GameScreen({
         <p className="mt-3 text-sm leading-5 text-violet-100">GPA calculator, flash cards, and more tools to help you succeed.</p>
       </div>
 
-      <div className="flex-1 space-y-4 px-4 py-5">
+      <div className="flex-1 space-y-4 px-4 md:px-8 lg:px-12 py-5">
         {/* Tools Grid */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <button
             type="button"
             onClick={() => setView("gpa")}

@@ -20,7 +20,7 @@ export default function BottomNav({
   onTabChange: (tab: Tab) => void;
 }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-100 py-2.5 px-6 flex justify-around items-center z-50">
+    <nav className="fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-md border-t border-slate-100 py-2.5 px-6 flex justify-around items-center z-50">
       {TABS.map(({ key, label, icon: Icon }) => {
         const active = activeTab === key;
         return (

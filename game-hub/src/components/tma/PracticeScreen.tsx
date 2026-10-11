@@ -458,7 +458,7 @@ export default function PracticeScreen({
     const subjectExams = examsBySubject.get(subject) ?? [];
     return (
       <div className="flex flex-col flex-1">
-        <div className="px-4 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="px-4 md:px-8 lg:px-12 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
           <button
             onClick={() => setView({ kind: "subjectList" })}
             className="flex items-center gap-1 text-slate-500 text-sm font-medium mb-2"
@@ -469,7 +469,7 @@ export default function PracticeScreen({
           <p className="text-xs text-slate-500 mt-0.5">Freshman practice exams</p>
         </div>
 
-        <div className="flex-1 px-4 py-4 space-y-3">
+        <div className="flex-1 px-4 md:px-8 lg:px-12 py-4 space-y-3">
           {subjectExams.length === 0 ? (
             <EmptyState
               title="No exams yet"
@@ -493,7 +493,7 @@ export default function PracticeScreen({
 
     return (
       <div className="flex flex-col flex-1">
-        <div className="px-4 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="px-4 md:px-8 lg:px-12 pt-4 pb-3 bg-white border-b border-slate-100 sticky top-0 z-10">
           <button
             onClick={() => setView({ kind: "yearList" })}
             className="flex items-center gap-1 text-slate-500 text-sm font-medium mb-2"
@@ -526,7 +526,7 @@ export default function PracticeScreen({
           </div>
         </div>
 
-        <div className="flex-1 px-4 py-4 space-y-3">
+        <div className="flex-1 px-4 md:px-8 lg:px-12 py-4 space-y-3">
           {filteredExams.length === 0 ? (
             <EmptyState
               title={`No ${examType} exams yet`}
@@ -628,7 +628,7 @@ export default function PracticeScreen({
   // ---------- Root: segmented hub ----------
   return (
     <div className="flex flex-col flex-1">
-      <div className="px-4 pt-3 pb-2.5 bg-white border-b border-slate-100 sticky top-0 z-10">
+      <div className="px-4 md:px-8 lg:px-12 pt-3 pb-2.5 bg-white border-b border-slate-100 sticky top-0 z-10">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#1D70F5] shadow-md shadow-blue-200">
             <GraduationCap className="h-4 w-4 text-white" />
@@ -670,7 +670,7 @@ export default function PracticeScreen({
 
         {/* Subject filter pills (By Subject mode only) */}
         {mode === "subject" && (
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-4 px-4 custom-scrollbar">
+          <div className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-4 px-4 md:-mx-8 md:px-8 lg:-mx-12 lg:px-12 custom-scrollbar">
             <button
               onClick={() => setSubjectFilter(null)}
               className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
@@ -700,7 +700,7 @@ export default function PracticeScreen({
         )}
       </div>
 
-      <div className="flex-1 px-4 py-4">
+      <div className="flex-1 px-4 md:px-8 lg:px-12 py-4">
         {loading || (mode === "chapter" && loadingChapterExams) ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1D70F5]" />
