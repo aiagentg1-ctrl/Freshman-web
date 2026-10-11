@@ -34,11 +34,13 @@ export interface ExamQuestion {
   university?: string;
 }
 
-function extractJsonArray(source: string, openBracket: number): string | null {
-  let depth = 0;
+function extractJsonValue(source: string, openIndex: number): string | null {
+  const openToClose: Record<string, string> = { "[": "]", "{": "}" };
+  const closing = new Map<string, string>();
+  const stack: string[] = [];
   let inStr = false;
   let esc = false;
-  for (let i = openBracket; i < source.length; i++) {
+  for (let i = openIndex; i < source.length; i++) {
     const c = source[i];
     if (esc) {
       esc = false;
@@ -53,10 +55,13 @@ function extractJsonArray(source: string, openBracket: number): string | null {
       continue;
     }
     if (inStr) continue;
-    if (c === "[") depth++;
-    else if (c === "]") {
-      depth--;
-      if (depth === 0) return source.slice(openBracket, i + 1);
+    if (c === "[" || c === "{") {
+      stack.push(c);
+      closing.set(c, openToClose[c]);
+    } else if (c === "]" || c === "}") {
+      const open = stack.pop();
+      if (!open || closing.get(open) !== c) return null;
+      if (stack.length === 0) return source.slice(openIndex, i + 1);
     }
   }
   return null;
@@ -125,7 +130,7 @@ function normalizeQuestions(raw: unknown[], defaultUniversity?: string): ExamQue
  * Supported shapes:
  *  - <script type="application/json" id="exam-questions">[...]</script>
  *  - <script data-exam-questions>[...]</script>
- *  - window.__EXAM_QUESTIONS__ = [...] / window.EXAM_QUESTIONS = [...]
+ *  - EXAM_QUESTIONS = [...], window.__EXAM_QUESTIONS__ = [...], or object payloads
  *  - the entire content being a JSON array or {"questions": [...]}
  */
 export function parseExamQuestions(html: string): ExamQuestion[] | null {
@@ -136,12 +141,14 @@ export function parseExamQuestions(html: string): ExamQuestion[] | null {
   );
   if (block) candidates.push(block[1]);
 
-  const assign = html.match(/(?:window\.)?__?EXAM_QUESTIONS__?\s*=/i);
+  const assign = html.match(/(?:window\.)?(?:__)?EXAM_QUESTIONS(?:__)?\s*=/i);
   if (assign && assign.index !== undefined) {
-    const open = html.indexOf("[", assign.index);
-    if (open >= 0) {
-      const arr = extractJsonArray(html, open);
-      if (arr) candidates.push(arr);
+    const assignmentEnd = assign.index + assign[0].length;
+    const valueOffset = html.slice(assignmentEnd).search(/[\[{]/);
+    if (valueOffset >= 0) {
+      const open = assignmentEnd + valueOffset;
+      const value = extractJsonValue(html, open);
+      if (value) candidates.push(value);
     }
   }
 
