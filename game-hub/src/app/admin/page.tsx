@@ -540,7 +540,7 @@ function NotesManager() {
       setUploadedFile(null);
     } catch (value) { setError(message(value)); }
   }
-  function changeStream(stream: "natural" | "social") {
+  function changeStream(stream: "natural" | "social" | "") {
     setForm({ ...form, stream, subject: "" });
   }
   function applyNoteMetadata(html: string, force = false) {
