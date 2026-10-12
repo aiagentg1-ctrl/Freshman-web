@@ -269,6 +269,38 @@ export default function TMAPage() {
     setDeviceStatus("signed_out");
   };
 
+  const handleDeviceTakeover = async () => {
+    const initData = getTelegramInitData();
+    if (!initData || !telegramUser?.id) {
+      setDeviceError("Open Fresho from your Telegram account before moving the session to this device.");
+      return;
+    }
+
+    setBooting(true);
+    setDeviceError("");
+    try {
+      let deviceId = localStorage.getItem("freshoDeviceId");
+      if (!deviceId) {
+        deviceId = typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem("freshoDeviceId", deviceId);
+      }
+
+      const session = await startDeviceSession({
+        init_data: initData,
+        device_id: deviceId,
+        take_over: true,
+      });
+      localStorage.setItem("freshoDeviceSessionToken", session.session_token);
+      localStorage.setItem("freshoTelegramUserId", String(session.user_id));
+      setSessionRetry((retry) => retry + 1);
+    } catch (error) {
+      setDeviceError(error instanceof Error ? error.message : "Could not move the Fresho session to this device.");
+      setBooting(false);
+    }
+  };
+
   const handleContinueExam = (exam: ExamMeta) => {
     setResumeExam(exam);
     setActiveTab("practice");
@@ -292,9 +324,21 @@ export default function TMAPage() {
             <Lock className="h-7 w-7" />
           </div>
           <h1 className="mt-4 text-xl font-bold text-slate-900">
-            {deviceStatus === "locked" ? "Fresho is active elsewhere" : deviceStatus === "signed_out" ? "Signed out" : "Fresho needs Telegram"}
+            {deviceStatus === "locked" ? "Fresho session needs recovery" : deviceStatus === "signed_out" ? "Signed out" : "Fresho needs Telegram"}
           </h1>
           <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">{deviceStatus === "signed_out" ? "This device has released the active Fresho session." : deviceError}</p>
+          {deviceStatus === "locked" && (
+            <div className="mt-5 max-w-sm rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-sm text-amber-900">
+              <p>If you are not using Fresho on another device, move your account session here. This will sign out any other active Fresho session.</p>
+              <button
+                type="button"
+                onClick={() => void handleDeviceTakeover()}
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-amber-700 px-4 py-2 font-semibold text-white"
+              >
+                Use this device instead
+              </button>
+            </div>
+          )}
           {(deviceStatus === "locked" || deviceStatus === "signed_out" || deviceStatus === "error") && (
             <button
               type="button"

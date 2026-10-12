@@ -357,6 +357,7 @@ export async function startDeviceSession(payload: {
   init_data: string;
   device_id: string;
   session_token?: string;
+  take_over?: boolean;
 }): Promise<DeviceSessionResponse> {
   return request<DeviceSessionResponse>("/api/auth/device-session", {
     method: "POST",

@@ -360,6 +360,7 @@ class DeviceSessionRequest(BaseModel):
     init_data: str
     device_id: str
     session_token: Optional[str] = None
+    take_over: bool = False
 
 
 class DeviceSessionReleaseRequest(BaseModel):
@@ -398,13 +399,20 @@ async def start_device_session(request: DeviceSessionRequest):
         active_session = result.scalar_one_or_none()
         if active_session is None:
             raise HTTPException(status_code=503, detail="Could not create Fresho device session")
-        if active_session and active_session.device_id != request.device_id:
+        taking_over = active_session.device_id != request.device_id and request.take_over
+        if active_session.device_id != request.device_id and not taking_over:
             raise HTTPException(
                 status_code=409,
                 detail="FRESHO_DEVICE_ACTIVE_ON_ANOTHER_DEVICE",
             )
 
         if inserted_user_id is not None:
+            session_token = new_token
+        elif taking_over:
+            active_session.device_id = request.device_id
+            active_session.token_hash = hash_device_session(new_token)
+            active_session.created_at = now
+            active_session.last_seen_at = now
             session_token = new_token
         elif (
             active_session
