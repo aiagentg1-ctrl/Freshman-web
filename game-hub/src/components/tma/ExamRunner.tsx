@@ -29,9 +29,54 @@ export interface ExamQuestion {
   id: number;
   questionText: string;
   options: string[];
-  correctAnswer: number; // index into options
+  type: "mcq" | "true_false" | "matching" | "blank" | "workout";
+  correctAnswer?: number;
   explanation?: string;
   university?: string;
+  points: number;
+  modelAnswer?: string;
+  formatRule?: string;
+  subjectCategory?: string;
+  rubric?: Array<{ step: string; points: number }>;
+  matchingPairs?: Array<{ left: string; right: string }>;
+}
+
+function questionPoints(question: ExamQuestion): number {
+  return question.points;
+}
+
+function isManuallyGraded(question: ExamQuestion): boolean {
+  return question.type === "blank" || question.type === "workout";
+}
+
+function normalizeMatchingValue(value: string): string {
+  return value.replace(/<[^>]*>/g, "").trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function questionTypeLabelFor(type: ExamQuestion["type"]): string {
+  switch (type) {
+    case "true_false": return "True / False";
+    case "matching": return "Matching";
+    case "blank": return "Written answer";
+    case "workout": return "Workout";
+    default: return "Multiple choice";
+  }
+}
+
+function manualGradeOptions(question: ExamQuestion): number[] {
+  const possibleScores = new Set<number>([0, question.points]);
+  if (question.type === "workout" && question.rubric?.length) {
+    let cumulative = 0;
+    for (const criterion of question.rubric) {
+      cumulative += criterion.points;
+      if (cumulative > 0 && cumulative < question.points) {
+        possibleScores.add(Number(cumulative.toFixed(2)));
+      }
+    }
+  } else {
+    possibleScores.add(Number((question.points / 2).toFixed(2)));
+  }
+  return [...possibleScores].sort((a, b) => a - b);
 }
 
 function extractJsonValue(source: string, openIndex: number): string | null {
@@ -70,14 +115,78 @@ function extractJsonValue(source: string, openIndex: number): string | null {
 function normalizeQuestions(raw: unknown[], defaultUniversity?: string): ExamQuestion[] {
   const out: ExamQuestion[] = [];
   raw.forEach((item, i) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return;
     const q = item as Record<string, unknown>;
     const text = q.questionText ?? q.question_text ?? q.question ?? q.text;
-    const options = q.options ?? q.choices ?? q.answers;
-    if (typeof text !== "string" || !text.trim() || !Array.isArray(options) || options.length < 2) return;
+    if (typeof text !== "string" || !text.trim()) return;
+    const rawOptions = q.options ?? q.choices;
+    const options = Array.isArray(rawOptions) ? rawOptions : [];
+
+    const rawType = typeof q.type === "string" ? q.type.toLowerCase().replace(/[\s-]+/g, "_") : "";
+    const matchingType = ["matching", "match", "match_the_following"].includes(rawType);
+    const trueFalseType = ["true_false", "truefalse", "tf"].includes(rawType);
+    const workoutType = ["workout", "long_answer", "essay", "proof"].includes(rawType);
+    const blankType = ["blank", "fill_blank", "fill_in_the_blank", "short_answer", "written"].includes(rawType);
+    const pairsValue = q.matchingPairs ?? q.matching_pairs ?? q.pairs ?? q.matches;
+    let matchingPairs = matchingType && Array.isArray(pairsValue)
+      ? pairsValue.flatMap((pair) => {
+          if (Array.isArray(pair) && typeof pair[0] === "string" && typeof pair[1] === "string") {
+            return [{ left: pair[0], right: pair[1] }];
+          }
+          if (!pair || typeof pair !== "object" || Array.isArray(pair)) return [];
+          const value = pair as Record<string, unknown>;
+          const left = value.left ?? value.prompt ?? value.term ?? value.item ?? value.question;
+          const right = value.right ?? value.match ?? value.definition ?? value.answer;
+          return typeof left === "string" && typeof right === "string"
+            ? [{ left, right }]
+            : [];
+        })
+      : [];
+    if (matchingType && matchingPairs.length === 0) {
+      const leftItems = q.leftItems ?? q.left_items ?? q.columnA ?? q.column_a;
+      const rightItems = q.rightItems ?? q.right_items ?? q.columnB ?? q.column_b;
+      if (Array.isArray(leftItems) && Array.isArray(rightItems)) {
+        const lefts = leftItems.map(String);
+        const rights = rightItems.map(String);
+        const rawMatches = q.correctMatches ?? q.correct_matches ?? q.correctAnswer
+          ?? q.correct_answer ?? q.matches;
+        if (rawMatches && typeof rawMatches === "object" && !Array.isArray(rawMatches)) {
+          const matchMap = rawMatches as Record<string, unknown>;
+          matchingPairs = lefts.flatMap((left, index) => {
+            const match = matchMap[left] ?? matchMap[String(index)];
+            if (typeof match === "number" && rights[match] !== undefined) {
+              return [{ left, right: rights[match] }];
+            }
+            return typeof match === "string" ? [{ left, right: match }] : [];
+          });
+        } else if (Array.isArray(rawMatches) && rawMatches.length === lefts.length) {
+          matchingPairs = lefts.flatMap((left, index) => {
+            const match = rawMatches[index];
+            if (typeof match === "number" && rights[match] !== undefined) {
+              return [{ left, right: rights[match] }];
+            }
+            return typeof match === "string" ? [{ left, right: match }] : [];
+          });
+        } else if (lefts.length === rights.length) {
+          matchingPairs = lefts.map((left, index) => ({ left, right: rights[index] }));
+        }
+      }
+    }
+
+    let type: ExamQuestion["type"] = matchingType
+      ? "matching"
+      : trueFalseType
+        ? "true_false"
+        : workoutType
+          ? "workout"
+          : blankType
+            ? "blank"
+            : "mcq";
 
     let correct =
       q.correctAnswer ?? q.correct_answer ?? q.correctIndex ?? q.correct_index ??
       q.answerIndex ?? q.answer_index ?? q.correctOption ?? q.correct_option ?? q.answer ?? q.correct;
+    if (typeof correct === "boolean") correct = String(correct);
     if (typeof correct === "string") {
       const answerText = correct.trim();
       const letter = answerText.match(/^(?:OPTION\s*)?([A-F])(?:[.)])?$/i);
@@ -91,9 +200,34 @@ function normalizeQuestions(raw: unknown[], defaultUniversity?: string): ExamQue
         );
       }
     }
-    if (typeof correct !== "number" || !Number.isInteger(correct) || correct < 0 || correct >= options.length) return;
+    const hasValidCorrect = typeof correct === "number"
+      && Number.isInteger(correct)
+      && correct >= 0
+      && correct < options.length;
+    if (type === "mcq" && !hasValidCorrect) {
+      if (options.length < 2) type = "blank";
+      else return;
+    }
+    if (type === "true_false" && !hasValidCorrect) {
+      if (options.length < 2) return;
+      type = "mcq";
+    }
+    if (type === "matching" && matchingPairs.length === 0) return;
 
     const explanation = q.explanation ?? q.solution ?? q.rationale ?? q.answerExplanation ?? q.answer_explanation;
+    const rawPoints = q.points ?? q.marks ?? q.score;
+    const points = typeof rawPoints === "number" && Number.isFinite(rawPoints) && rawPoints > 0
+      ? rawPoints
+      : 1;
+    const rubric = Array.isArray(q.rubric)
+      ? q.rubric.flatMap((entry) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+          const row = entry as Record<string, unknown>;
+          return typeof row.step === "string"
+            ? [{ step: row.step, points: typeof row.points === "number" ? row.points : 0 }]
+            : [];
+        })
+      : undefined;
 
     const rawUniversity = typeof q.university === "string" && q.university.trim()
       ? q.university.trim()
@@ -117,9 +251,30 @@ function normalizeQuestions(raw: unknown[], defaultUniversity?: string): ExamQue
       id: typeof q.id === "number" ? q.id : i + 1,
       questionText: text,
       options: options.map((o) => String(o)),
-      correctAnswer: correct,
+      type,
+      correctAnswer: hasValidCorrect ? correct as number : undefined,
       explanation: typeof explanation === "string" ? explanation : explanation == null ? undefined : JSON.stringify(explanation),
       university,
+      points,
+      modelAnswer: typeof (
+        q.modelAnswer ?? q.model_answer ?? q.sampleAnswer ?? q.sample_answer ??
+        q.expectedAnswer ?? q.expected_answer ??
+        (type === "blank" || type === "workout" ? q.answer ?? q.correctAnswer ?? q.correct_answer : undefined)
+      ) === "string"
+        ? String(
+            q.modelAnswer ?? q.model_answer ?? q.sampleAnswer ?? q.sample_answer ??
+            q.expectedAnswer ?? q.expected_answer ??
+            (type === "blank" || type === "workout" ? q.answer ?? q.correctAnswer ?? q.correct_answer : ""),
+          )
+        : undefined,
+      formatRule: typeof (q.formatRule ?? q.format_rule) === "string"
+        ? String(q.formatRule ?? q.format_rule)
+        : undefined,
+      subjectCategory: typeof (q.subjectCategory ?? q.subject_category) === "string"
+        ? String(q.subjectCategory ?? q.subject_category)
+        : undefined,
+      rubric,
+      matchingPairs,
     });
   });
   return out;
@@ -372,6 +527,10 @@ export default function ExamRunner({
   const [timed, setTimed] = useState(chapterExamId === undefined);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [writtenAnswers, setWrittenAnswers] = useState<string[]>([]);
+  const [matchingAnswers, setMatchingAnswers] = useState<string[][]>([]);
+  const [manualGrades, setManualGrades] = useState<(number | null)[]>([]);
+  const [manualGradingConfirmed, setManualGradingConfirmed] = useState(false);
   const [flags, setFlags] = useState<number[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(exam.duration_minutes * 60);
   const [elapsed, setElapsed] = useState(0);
@@ -383,6 +542,7 @@ export default function ExamRunner({
   const startedAt = useRef(0);
   const answersRef = useRef<(number | null)[]>([]);
   const submitted = useRef(false);
+  const finalized = useRef(false);
   const pendingSubmission = useRef<AttemptSubmission | null>(null);
 
   const persistSubmission = useCallback(async (attempt: AttemptSubmission) => {
@@ -479,6 +639,18 @@ export default function ExamRunner({
   const interactive = filteredQuestions !== null;
   const requiresSourceSelection = chapterExamId !== undefined && interactive && hasSourceOptions;
   const isHtmlExam = exam.content_type === "html" && !interactive;
+  const questionTypes = [...new Set(filteredQuestions?.map((question) => question.type) ?? [])];
+  const questionTypeLabel = questionTypes.length > 1
+    ? "Multiple formats"
+    : questionTypes[0] === "true_false"
+      ? "True / False"
+      : questionTypes[0] === "matching"
+        ? "Matching"
+        : questionTypes[0] === "blank"
+          ? "Written answers"
+          : questionTypes[0] === "workout"
+            ? "Workouts"
+            : "Multiple Choice";
 
   useEffect(() => {
     const saved = chapterExamId === undefined ? getSavedExamProgress(exam.id) : null;
@@ -507,6 +679,16 @@ export default function ExamRunner({
           ? answer
           : null;
       });
+      const restoredWrittenAnswers = Array.from(
+        { length: restoredQuestions.length },
+        (_, index) => saved.writtenAnswers?.[index] ?? "",
+      );
+      const restoredMatchingAnswers = Array.from(
+        { length: restoredQuestions.length },
+        (_, index) => restoredQuestions[index]?.matchingPairs?.map(
+          (_, pairIndex) => saved.matchingAnswers?.[index]?.[pairIndex] ?? "",
+        ) ?? [],
+      );
       const restoredCurrent = Math.min(Math.max(saved.currentQuestion, 0), Math.max(0, restoredQuestions.length - 1));
       const restoredSecondsLeft = Math.max(0, Math.min(saved.secondsLeft, exam.duration_minutes * 60));
       const restoredElapsed = Math.max(0, saved.elapsed);
@@ -522,6 +704,8 @@ export default function ExamRunner({
       submitted.current = false;
       setTimed(saved.timed);
       setAnswers(restoredAnswers);
+      setWrittenAnswers(restoredWrittenAnswers);
+      setMatchingAnswers(restoredMatchingAnswers);
       setFlags(saved.flags.filter((flag) => flag >= 0 && flag < restoredQuestions.length));
       setCurrent(restoredCurrent);
       setSecondsLeft(restoredSecondsLeft);
@@ -603,6 +787,8 @@ export default function ExamRunner({
       exam: examMeta,
       currentQuestion: current,
       answers,
+      writtenAnswers,
+      matchingAnswers,
       flags,
       timed,
       secondsLeft,
@@ -610,7 +796,7 @@ export default function ExamRunner({
       selectedUniversities,
       selectedGeneral: includeGeneral,
     });
-  }, [answers, chapterExamId, current, elapsed, exam, flags, includeGeneral, questions, restoring, secondsLeft, selectedUniversities, stage, timed]);
+  }, [answers, chapterExamId, current, elapsed, exam, flags, includeGeneral, matchingAnswers, questions, restoring, secondsLeft, selectedUniversities, stage, timed, writtenAnswers]);
 
   useEffect(() => {
     if (stage !== "running") return;
@@ -698,13 +884,22 @@ export default function ExamRunner({
     if (interactive && total === 0) return;
     startedAt.current = Date.now();
     submitted.current = false;
-    const emptyAnswers = new Array<(number | null)>(total).fill(null);
+    finalized.current = false;
+    const examQuestions = filteredQuestions ?? [];
+    const emptyAnswers = new Array<(number | null)>(examQuestions.length).fill(null);
     answersRef.current = emptyAnswers;
     setAnswers(emptyAnswers);
+    setWrittenAnswers(new Array<string>(examQuestions.length).fill(""));
+    setMatchingAnswers(examQuestions.map((question) => (
+      question.matchingPairs?.map(() => "") ?? []
+    )));
+    setManualGrades(new Array<number | null>(examQuestions.length).fill(null));
+    setManualGradingConfirmed(false);
     setFlags([]);
     setCurrent(0);
     setSecondsLeft(exam.duration_minutes * 60);
     setElapsed(0);
+    setShowAnswers(false);
     setStage("running");
   };
 
@@ -713,29 +908,127 @@ export default function ExamRunner({
     submitted.current = true;
     if (chapterExamId === undefined) clearExamProgress(exam.id);
     setStage("result");
-    const finalAnswers = answersRef.current;
+  };
 
-    const correctCount = filteredQuestions
-      ? filteredQuestions.reduce((acc, q, i) => (finalAnswers[i] === q.correctAnswer ? acc + 1 : acc), 0)
-      : 0;
-    const totalQuestions = filteredQuestions?.length ?? exam.question_count;
-    const scorePercentage =
-      totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+  const manualQuestions = filteredQuestions?.filter(isManuallyGraded) ?? [];
+  const manualGradingComplete = manualQuestions.every((question) => (
+    manualGrades[filteredQuestions?.indexOf(question) ?? -1] !== null
+  ));
+  const finalScoreReady = manualGradingComplete
+    && (manualQuestions.length === 0 || manualGradingConfirmed);
+  const totalPoints = filteredQuestions?.reduce((sum, question) => sum + questionPoints(question), 0) ?? 0;
+  const objectivelyEarnedPoints = filteredQuestions?.reduce((sum, question, index) => {
+    if (question.type === "matching") {
+      const pairs = question.matchingPairs ?? [];
+      const responses = matchingAnswers[index] ?? [];
+      const correctPairs = pairs.reduce((count, pair, pairIndex) => (
+        normalizeMatchingValue(responses[pairIndex] ?? "") === normalizeMatchingValue(pair.right)
+          ? count + 1
+          : count
+      ), 0);
+      return sum + (pairs.length ? questionPoints(question) * correctPairs / pairs.length : 0);
+    }
+    if ((question.type === "mcq" || question.type === "true_false")
+      && question.correctAnswer !== undefined
+      && answers[index] === question.correctAnswer) {
+      return sum + questionPoints(question);
+    }
+    return sum;
+  }, 0) ?? 0;
+  const manualEarnedPoints = filteredQuestions?.reduce((sum, question, index) => (
+    isManuallyGraded(question) ? sum + (manualGrades[index] ?? 0) : sum
+  ), 0) ?? 0;
+  const earnedPoints = objectivelyEarnedPoints + manualEarnedPoints;
+  const scorePercentage = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+  const correctCount = filteredQuestions?.reduce((count, question, index) => {
+    const earned = isManuallyGraded(question)
+      ? manualGrades[index] ?? 0
+      : question.type === "matching"
+        ? (questionPoints(question) * (question.matchingPairs ?? []).reduce((pairs, pair, pairIndex) => (
+            normalizeMatchingValue(matchingAnswers[index]?.[pairIndex] ?? "") === normalizeMatchingValue(pair.right)
+              ? pairs + 1
+              : pairs
+          ), 0) / Math.max(1, question.matchingPairs?.length ?? 0))
+        : question.correctAnswer !== undefined && answers[index] === question.correctAnswer
+          ? questionPoints(question)
+          : 0;
+    return earned >= questionPoints(question) ? count + 1 : count;
+  }, 0) ?? 0;
+  const answeredCount = filteredQuestions?.reduce((count, question, index) => {
+    if (isManuallyGraded(question)) return count + (writtenAnswers[index]?.trim() ? 1 : 0);
+    if (question.type === "matching") {
+      return count + ((matchingAnswers[index] ?? []).every((answer) => answer.length > 0) ? 1 : 0);
+    }
+    return count + (answers[index] !== null ? 1 : 0);
+  }, 0) ?? 0;
+  const incorrect = total - correctCount;
+  const unanswered = total - answeredCount;
+  const timeSpentSoFar = timed
+    ? exam.duration_minutes * 60 - secondsLeft
+    : elapsed;
+  const questionAnswered = (question: ExamQuestion, index: number) => {
+    if (isManuallyGraded(question)) return Boolean(writtenAnswers[index]?.trim());
+    if (question.type === "matching") {
+      return Boolean(matchingAnswers[index]?.length)
+        && matchingAnswers[index].every((answer) => answer.length > 0);
+    }
+    return answers[index] !== null && answers[index] !== undefined;
+  };
+
+  useEffect(() => {
+    if (
+      stage !== "result"
+      || !interactive
+      || !filteredQuestions
+      || !manualGradingComplete
+      || !finalScoreReady
+      || finalized.current
+    ) return;
+
+    finalized.current = true;
+    const totalQuestions = filteredQuestions.length;
     const timeSpent = Math.round((Date.now() - (startedAt.current || Date.now())) / 1000);
-    const wrongQuestions = filteredQuestions
-      ? filteredQuestions
-          .map((q, i) => ({
-            id: q.id,
-            question: q.questionText,
-            selectedOption: finalAnswers[i] !== null ? q.options[finalAnswers[i] as number] : null,
-            correctOption: q.options[q.correctAnswer],
-            explanation: q.explanation || "",
-            wasCorrect: finalAnswers[i] === q.correctAnswer,
-          }))
-          .filter((item) => !item.wasCorrect)
-      : [];
-
     const completedAt = new Date().toISOString();
+    const results = filteredQuestions.map((question, index) => {
+      const isManual = isManuallyGraded(question);
+      const selectedOption = answers[index] !== null && answers[index] !== undefined
+        ? question.options[answers[index] as number]
+        : null;
+      const correct = question.correctAnswer !== undefined
+        ? question.options[question.correctAnswer]
+        : question.modelAnswer ?? null;
+      const questionEarned = isManual
+        ? manualGrades[index] ?? 0
+        : question.type === "matching"
+          ? questionPoints(question) * (question.matchingPairs ?? []).reduce((count, pair, pairIndex) => (
+              normalizeMatchingValue(matchingAnswers[index]?.[pairIndex] ?? "") === normalizeMatchingValue(pair.right)
+                ? count + 1
+                : count
+            ), 0) / Math.max(1, question.matchingPairs?.length ?? 0)
+          : selectedOption === correct ? questionPoints(question) : 0;
+      return {
+        id: question.id,
+        type: question.type,
+        question: question.questionText,
+        selected: isManual
+          ? writtenAnswers[index] || null
+          : question.type === "matching"
+            ? matchingAnswers[index]
+            : selectedOption,
+        correct,
+        matchingPairs: question.matchingPairs,
+        isCorrect: questionEarned >= questionPoints(question),
+        earnedPoints: questionEarned,
+        points: questionPoints(question),
+        selfGrade: isManual ? manualGrades[index] : undefined,
+        explanation: question.explanation || "",
+      };
+    });
+    const wrongQuestions = results
+      .filter((result) => result.earnedPoints < result.points)
+      .map(({ id, question, selected, correct, explanation, ...grading }) => ({
+        id, question, selectedOption: selected, correctOption: correct, explanation, ...grading,
+      }));
     const reviewAttempt: RecentExamAttempt = {
       id: `${exam.id}-${completedAt}`,
       examId: exam.id,
@@ -747,25 +1040,24 @@ export default function ExamRunner({
       totalQuestions,
       timeSpent,
       completedAt,
-      answers: filteredQuestions?.map((q, i) => ({
-        id: q.id,
-        questionText: q.questionText,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        selectedAnswer: finalAnswers[i],
-        explanation: q.explanation,
-      })) ?? [],
+      answers: filteredQuestions.flatMap((question, index) => (
+        question.correctAnswer === undefined
+          ? []
+          : [{
+              id: question.id,
+              questionText: question.questionText,
+              options: question.options,
+              correctAnswer: question.correctAnswer,
+              selectedAnswer: answers[index],
+              explanation: question.explanation,
+            }]
+      )),
     };
+
     if (chapterExamId === undefined) {
       saveRecentExamAttempt(reviewAttempt);
       localStorage.setItem("freshoWeaknesses", JSON.stringify(wrongQuestions));
-    }
-
-    // Standardized score bridge → Home "Recent Exam Performance" card.
-    // Only written for scored (standardized) exams — a legacy reader run must
-    // not overwrite a real score with 0%.
-    if (filteredQuestions && chapterExamId === undefined) {
-      const payload = {
+      localStorage.setItem("freshoLastResult", JSON.stringify({
         examId: exam.id,
         subject: exam.subject,
         year: exam.year,
@@ -773,53 +1065,48 @@ export default function ExamRunner({
         correctCount,
         totalQuestions,
         timeSpent,
-      };
-      localStorage.setItem("freshoLastResult", JSON.stringify(payload));
-    }
-    if (chapterExamId === undefined) {
-      localStorage.setItem(
-        "freshoLastExam",
-        JSON.stringify({
-          id: exam.id,
-          title: exam.title,
-          subject: exam.subject,
-          year: exam.year,
-          custom_tag: exam.custom_tag,
-          question_count: exam.question_count,
-          duration_minutes: exam.duration_minutes,
-          content_type: exam.content_type,
-          is_premium: exam.is_premium,
-          is_published: exam.is_published,
-        })
-      );
+      }));
+      localStorage.setItem("freshoLastExam", JSON.stringify({
+        id: exam.id,
+        title: exam.title,
+        subject: exam.subject,
+        year: exam.year,
+        custom_tag: exam.custom_tag,
+        question_count: exam.question_count,
+        duration_minutes: exam.duration_minutes,
+        content_type: exam.content_type,
+        is_premium: exam.is_premium,
+        is_published: exam.is_published,
+      }));
     }
 
-    const answersJson = JSON.stringify(
-      filteredQuestions?.map((q, i) => ({
-        id: q.id,
-        question: q.questionText,
-        selected: finalAnswers[i] !== null ? q.options[finalAnswers[i] as number] : null,
-        correct: q.options[q.correctAnswer],
-        isCorrect: finalAnswers[i] === q.correctAnswer,
-        explanation: q.explanation || "",
-      })) || []
-    );
     void persistSubmission({
       score: scorePercentage,
       total_questions: totalQuestions,
       time_spent: timed ? timeSpent : undefined,
-      answers_json: answersJson,
+      answers_json: JSON.stringify(results),
       completed_at: completedAt,
       first_name: telegramFirstName || getTelegramUser()?.first_name,
     });
-  };
-
-  const correctCount =
-    filteredQuestions?.reduce((acc, q, i) => (answers[i] === q.correctAnswer ? acc + 1 : acc), 0) ?? 0;
-  const answeredCount = answers.filter((a) => a !== null).length;
-  const timeSpentSoFar = timed
-    ? exam.duration_minutes * 60 - secondsLeft
-    : elapsed;
+  }, [
+    answers,
+    chapterExamId,
+    correctCount,
+    exam,
+    filteredQuestions,
+    interactive,
+    manualGrades,
+    manualGradingComplete,
+    manualGradingConfirmed,
+    matchingAnswers,
+    persistSubmission,
+    scorePercentage,
+    stage,
+    timed,
+    telegramFirstName,
+    writtenAnswers,
+    finalScoreReady,
+  ]);
 
   // ---------- Stage 3: Result ----------
   if (restoring) {
@@ -889,9 +1176,6 @@ export default function ExamRunner({
     }
 
     // Original interactive exam result
-    const scorePercentage = total > 0 ? Math.round((correctCount / total) * 100) : 0;
-    const unanswered = total - answeredCount;
-    const incorrect = answeredCount - correctCount;
     const radius = 52;
     const circumference = 2 * Math.PI * radius;
 
@@ -899,58 +1183,173 @@ export default function ExamRunner({
       <div className="flex flex-col flex-1 overflow-y-auto">
         <div className="px-4 pt-6 pb-6 bg-gradient-to-br from-[#1D70F5] to-[#4C8DFF] text-white text-center rounded-b-3xl">
           <p className="text-blue-100 text-xs mb-1">{exam.title}</p>
-          <div className="relative w-36 h-36 mx-auto mt-3">
-            <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-              <circle cx="60" cy="60" r={radius} stroke="rgba(255,255,255,0.25)" strokeWidth="10" fill="none" />
-              <circle
-                cx="60"
-                cy="60"
-                r={radius}
-                stroke="#fff"
-                strokeWidth="10"
-                fill="none"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={circumference * (1 - scorePercentage / 100)}
-                className="transition-all duration-700"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-bold">{scorePercentage}%</span>
-              <span className="text-[11px] text-blue-100">Your Score</span>
+          {finalScoreReady ? (
+            <>
+              <div className="relative w-36 h-36 mx-auto mt-3">
+                <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                  <circle cx="60" cy="60" r={radius} stroke="rgba(255,255,255,0.25)" strokeWidth="10" fill="none" />
+                  <circle
+                    cx="60"
+                    cy="60"
+                    r={radius}
+                    stroke="#fff"
+                    strokeWidth="10"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference * (1 - scorePercentage / 100)}
+                    className="transition-all duration-700"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold">{scorePercentage}%</span>
+                  <span className="text-[11px] text-blue-100">Final Score</span>
+                </div>
+              </div>
+              <p className="mt-3 font-semibold">
+                {earnedPoints} / {totalPoints} marks • {correctCount} / {total} full-credit questions
+              </p>
+            </>
+          ) : (
+            <div className="mx-auto mt-4 max-w-sm rounded-xl bg-white/15 p-4">
+              <p className="font-semibold">Self-grade your written answers to calculate the final score.</p>
+              <p className="mt-1 text-sm text-blue-100">
+                Objective questions have been checked. Written-answer scores will be added after grading.
+              </p>
             </div>
-          </div>
-          <p className="mt-3 font-semibold">
-            {correctCount} / {total} correct
-          </p>
+          )}
         </div>
 
         <div className="px-4 py-4 space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-slate-900">{correctCount}</p>
-              <p className="text-[10px] text-slate-500 font-medium">Correct</p>
+          {!finalScoreReady && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-center">
+              <p className="text-sm font-semibold text-blue-900">
+                Automatically scored: {objectivelyEarnedPoints} marks. Final score is waiting for your self-grading.
+              </p>
             </div>
-            <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
-              <XCircle className="w-5 h-5 text-red-500 mx-auto mb-1" />
-              <p className="text-lg font-bold text-slate-900">{incorrect}</p>
-              <p className="text-[10px] text-slate-500 font-medium">Incorrect</p>
+          )}
+
+          {finalScoreReady && (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{correctCount}</p>
+                <p className="text-[10px] text-slate-500 font-medium">Full credit</p>
+              </div>
+              <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
+                <XCircle className="w-5 h-5 text-red-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{incorrect}</p>
+                <p className="text-[10px] text-slate-500 font-medium">Not full credit</p>
+              </div>
+              <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
+                <Circle className="w-5 h-5 text-slate-400 mx-auto mb-1" />
+                <p className="text-lg font-bold text-slate-900">{unanswered}</p>
+                <p className="text-[10px] text-slate-500 font-medium">Unanswered</p>
+              </div>
             </div>
-            <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
-              <Circle className="w-5 h-5 text-slate-400 mx-auto mb-1" />
-              <p className="text-lg font-bold text-slate-900">{unanswered}</p>
-              <p className="text-[10px] text-slate-500 font-medium">Unanswered</p>
-            </div>
-          </div>
+          )}
+
+          {manualQuestions.length > 0 && filteredQuestions && (
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Self-grade written answers</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Compare your completed responses with the model answer and rubric, then award yourself marks.
+                </p>
+              </div>
+              {manualQuestions.map((question) => {
+                const index = filteredQuestions.indexOf(question);
+                const points = questionPoints(question);
+                const gradeOptions = manualGradeOptions(question);
+                const answer = writtenAnswers[index]?.trim();
+                return (
+                  <article key={question.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase text-blue-600">
+                        Question {index + 1} · {questionTypeLabelFor(question.type)} · {points} {points === 1 ? "mark" : "marks"}
+                      </p>
+                      <MathContent html={question.questionText} className="mt-2 text-sm font-semibold text-slate-900" />
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-3">
+                      <p className="mb-1 text-[11px] font-bold uppercase text-slate-500">Your response</p>
+                      <p className="whitespace-pre-wrap text-sm text-slate-800">{answer || "No answer entered."}</p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+                      <p className="mb-1 text-[11px] font-bold uppercase text-emerald-700">Model answer</p>
+                      {question.modelAnswer
+                        ? <MathContent html={question.modelAnswer} className="text-sm text-slate-800" />
+                        : <p className="text-sm text-slate-600">No model answer was provided for this question.</p>}
+                    </div>
+                    {question.rubric && question.rubric.length > 0 && (
+                      <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+                        <p className="mb-2 text-[11px] font-bold uppercase text-amber-800">Marking rubric</p>
+                        <ul className="space-y-1 text-sm text-slate-700">
+                          {question.rubric.map((criterion, criterionIndex) => (
+                            <li key={`${criterionIndex}-${criterion.step}`} className="flex justify-between gap-3">
+                              <span>{criterion.step}</span>
+                              <span className="shrink-0 font-semibold">{criterion.points} marks</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {question.explanation && (
+                      <MathContent html={question.explanation} className="text-sm text-slate-600" />
+                    )}
+                    <div className="grid grid-cols-3 gap-2">
+                      {gradeOptions.map((grade) => (
+                        <button
+                          key={grade}
+                          type="button"
+                          aria-pressed={manualGrades[index] === grade}
+                          disabled={manualGradingConfirmed}
+                          onClick={() => setManualGrades((previous) => {
+                            const next = [...previous];
+                            next[index] = grade;
+                            return next;
+                          })}
+                          className={`min-h-11 rounded-xl border px-2 py-2 text-xs font-bold ${
+                            manualGrades[index] === grade
+                              ? "border-blue-500 bg-blue-50 text-blue-700"
+                              : "border-slate-200 bg-white text-slate-700"
+                          }`}
+                        >
+                          {grade} / {points} marks
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
+                <p className="mb-3 text-sm text-slate-600">
+                  {manualGradingConfirmed
+                    ? "Self-grades confirmed. Saving your final score..."
+                    : manualGradingComplete
+                      ? "Review your marks, then confirm to calculate and save your final score."
+                      : "Grade every written answer to continue."}
+                </p>
+                <button
+                  type="button"
+                  disabled={!manualGradingComplete || manualGradingConfirmed}
+                  onClick={() => setManualGradingConfirmed(true)}
+                  className="min-h-11 w-full rounded-xl bg-[#1D70F5] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {manualGradingConfirmed ? "Finalizing score..." : "Confirm self-grades and save score"}
+                </button>
+              </div>
+            </section>
+          )}
 
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center">
             <p className="text-sm font-semibold text-slate-800">
-              {scorePercentage >= 70
-                ? `Good job! You scored ${scorePercentage}% — keep it up!`
-                : scorePercentage >= 40
-                ? "Nice effort! Review the explanations below to improve."
-                : "Don't give up — review the explanations and try again."}
+              {!finalScoreReady
+                ? "The final score will appear after you grade all written answers."
+                : scorePercentage >= 70
+                  ? `Good job! You scored ${scorePercentage}% — keep it up!`
+                  : scorePercentage >= 40
+                    ? "Nice effort! Review the explanations below to improve."
+                    : "Don't give up — review the explanations and try again."}
             </p>
             <p className="text-xs text-slate-500 mt-1">
               Time used: {formatTime(timeSpentSoFar)}
@@ -974,7 +1373,22 @@ export default function ExamRunner({
             <div className="space-y-3">
               {filteredQuestions.map((q, i) => {
                 const chosen = answers[i];
-                const isCorrect = chosen === q.correctAnswer;
+                const matchingPairs = q.matchingPairs ?? [];
+                const matchingScore = matchingPairs.length
+                  ? questionPoints(q) * matchingPairs.reduce((count, pair, pairIndex) => (
+                      normalizeMatchingValue(matchingAnswers[i]?.[pairIndex] ?? "") === normalizeMatchingValue(pair.right)
+                        ? count + 1
+                        : count
+                    ), 0) / matchingPairs.length
+                  : 0;
+                const questionEarned = isManuallyGraded(q)
+                  ? manualGrades[i] ?? 0
+                  : q.type === "matching"
+                    ? matchingScore
+                    : q.correctAnswer !== undefined && chosen === q.correctAnswer
+                      ? questionPoints(q)
+                      : 0;
+                const isCorrect = questionEarned >= questionPoints(q);
                 return (
                   <div
                     key={q.id}
@@ -985,9 +1399,9 @@ export default function ExamRunner({
                         className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
                           isCorrect
                             ? "bg-emerald-100 text-emerald-700"
-                            : chosen === null
-                            ? "bg-slate-100 text-slate-500"
-                            : "bg-red-100 text-red-600"
+                            : questionEarned > 0
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-red-100 text-red-600"
                         }`}
                       >
                         {i + 1}
@@ -995,27 +1409,61 @@ export default function ExamRunner({
                       <MathContent html={q.questionText} className="text-sm font-semibold text-slate-900 flex-1" />
                     </div>
                     <div className="space-y-1.5 ml-8">
-                      {q.options.map((opt, oi) => {
-                        const isAnswer = oi === q.correctAnswer;
-                        const isChosen = oi === chosen;
-                        return (
-                          <div
-                            key={oi}
-                            className={`text-xs px-3 py-2 rounded-xl border-2 flex items-center gap-2 ${
-                              isAnswer
-                                ? "border-emerald-500 bg-emerald-50/70 text-emerald-900 rounded-xl p-3 font-medium"
-                                : isChosen
-                                ? "border-rose-500 bg-rose-50/70 text-rose-900 rounded-xl p-3"
-                                : "border-slate-100 text-slate-600"
-                            }`}
-                          >
-                            <span className="font-bold">{OPTION_LETTERS[oi]}.</span>
-                            <MathContent html={opt} className="flex-1" />
-                            {isAnswer && <CheckCircle2 className="w-4 h-4 shrink-0" />}
-                            {isChosen && !isAnswer && <XCircle className="w-4 h-4 shrink-0" />}
-                          </div>
-                        );
-                      })}
+                      {isManuallyGraded(q) ? (
+                        <>
+                          <p className="text-xs font-bold uppercase text-slate-500">Your answer</p>
+                          <p className="whitespace-pre-wrap text-sm text-slate-800">
+                            {writtenAnswers[i]?.trim() || "No answer entered."}
+                          </p>
+                          <p className="mt-2 text-xs font-bold uppercase text-emerald-700">Model answer</p>
+                          {q.modelAnswer
+                            ? <MathContent html={q.modelAnswer} className="text-sm text-slate-800" />
+                            : <p className="text-sm text-slate-600">No model answer was provided.</p>}
+                          <p className="mt-2 text-xs font-semibold text-blue-700">
+                            Self-grade: {manualGrades[i]} / {questionPoints(q)} marks
+                          </p>
+                        </>
+                      ) : q.type === "matching" ? (
+                        matchingPairs.map((pair, pairIndex) => {
+                          const selectedMatch = matchingAnswers[i]?.[pairIndex];
+                          const pairIsCorrect = normalizeMatchingValue(selectedMatch ?? "") === normalizeMatchingValue(pair.right);
+                          return (
+                            <div key={`${q.id}-${pairIndex}`} className="grid gap-1 border-b border-slate-100 py-2 sm:grid-cols-3">
+                              <MathContent html={pair.left} className="text-sm text-slate-700" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase text-slate-500">Your match</p>
+                                <MathContent html={selectedMatch || "No match selected"} className={`text-sm ${pairIsCorrect ? "text-emerald-800" : "text-red-700"}`} />
+                              </div>
+                              {!pairIsCorrect && (
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase text-emerald-700">Correct match</p>
+                                  <MathContent html={pair.right} className="text-sm font-semibold text-emerald-800" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : q.options.map((opt, oi) => {
+                          const isAnswer = oi === q.correctAnswer;
+                          const isChosen = oi === chosen;
+                          return (
+                            <div
+                              key={oi}
+                              className={`text-xs px-3 py-2 rounded-xl border-2 flex items-center gap-2 ${
+                                isAnswer
+                                  ? "border-emerald-500 bg-emerald-50/70 text-emerald-900 rounded-xl p-3 font-medium"
+                                  : isChosen
+                                    ? "border-rose-500 bg-rose-50/70 text-rose-900 rounded-xl p-3"
+                                    : "border-slate-100 text-slate-600"
+                              }`}
+                            >
+                              <span className="font-bold">{OPTION_LETTERS[oi]}.</span>
+                              <MathContent html={opt} className="flex-1" />
+                              {isAnswer && <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                              {isChosen && !isAnswer && <XCircle className="w-4 h-4 shrink-0" />}
+                            </div>
+                          );
+                        })}
                     </div>
                     {q.explanation && (
                       <div className="mt-3 ml-8 bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -1077,7 +1525,9 @@ export default function ExamRunner({
           <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">Total Questions</span>
-              <span className="text-sm font-bold text-slate-900">{total}</span>
+              <span className="text-sm font-bold text-slate-900">
+                {total}{interactive ? ` • ${totalPoints} marks` : ""}
+              </span>
             </div>
             <div className="flex items-center justify-between border-t border-slate-50 pt-3">
               <span className="text-sm text-slate-500">Time Limit</span>
@@ -1087,7 +1537,7 @@ export default function ExamRunner({
             </div>
             <div className="flex items-center justify-between border-t border-slate-50 pt-3">
               <span className="text-sm text-slate-500">Question Type</span>
-              <span className="text-sm font-bold text-slate-900">Multiple Choice</span>
+              <span className="text-sm font-bold text-slate-900">{questionTypeLabel}</span>
             </div>
           </div>
 
@@ -1182,9 +1632,9 @@ export default function ExamRunner({
             <div>
               <p className="text-sm font-semibold text-blue-900 mb-1">Instructions</p>
               <p className="text-xs text-blue-800 leading-relaxed">
-                Read each question carefully and pick the best answer. You can flag questions to
-                review later and jump between them from the question grid. Your score and full
-                explanations are shown when you submit.
+                Answer objective questions and type your written/workout answers as you go. Written
+                model answers stay hidden until you submit, then you self-grade those questions.
+                Multiple-choice, true/false, and matching questions are scored automatically.
               </p>
             </div>
           </div>
@@ -1350,8 +1800,8 @@ export default function ExamRunner({
             </span>
           </div>
           <div className="grid grid-cols-8 gap-1.5 max-h-44 overflow-y-auto custom-scrollbar">
-            {filteredQuestions?.map((_, i) => {
-              const answered = answers[i] !== null;
+            {filteredQuestions?.map((question, i) => {
+              const answered = questionAnswered(question, i);
               const flagged = flags.includes(i);
               return (
                 <button
@@ -1388,7 +1838,9 @@ export default function ExamRunner({
       <div className="flex-1 px-4 py-4 overflow-y-auto">
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-[#1D70F5]">Question {current + 1}</span>
+            <span className="text-xs font-bold text-[#1D70F5]">
+              Question {current + 1} · {questionTypeLabelFor(q.type)} · {questionPoints(q)} {questionPoints(q) === 1 ? "mark" : "marks"}
+            </span>
             {flags.includes(current) && (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
                 <Flag className="w-3 h-3" /> FLAGGED
@@ -1396,40 +1848,91 @@ export default function ExamRunner({
             )}
           </div>
           <MathContent html={q.questionText} className="text-[15px] font-semibold text-slate-900 leading-relaxed mb-4" />
-          <div className="space-y-2">
-            {q.options.map((opt, oi) => {
-              const selected = answers[current] === oi;
-              return (
-                <button
-                  key={oi}
-                  onClick={() =>
-                    setAnswers((prev) => {
-                      const next = [...prev];
-                      next[current] = oi;
-                      answersRef.current = next;
-                      return next;
-                    })
-                  }
-                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-colors flex items-center gap-3 active:scale-[0.99] ${
-                    selected
-                      ? "border-[#1D70F5] bg-blue-50/60"
-                      : "border-slate-100 bg-slate-50/50"
-                  }`}
-                >
-                  <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      selected ? "bg-[#1D70F5] text-white" : "bg-white text-slate-500 border border-slate-200"
+          {(q.type === "mcq" || q.type === "true_false") && (
+            <div className="space-y-2">
+              {q.options.map((opt, oi) => {
+                const selected = answers[current] === oi;
+                return (
+                  <button
+                    key={oi}
+                    onClick={() =>
+                      setAnswers((prev) => {
+                        const next = [...prev];
+                        next[current] = oi;
+                        answersRef.current = next;
+                        return next;
+                      })
+                    }
+                    className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-colors flex items-center gap-3 active:scale-[0.99] ${
+                      selected
+                        ? "border-[#1D70F5] bg-blue-50/60"
+                        : "border-slate-100 bg-slate-50/50"
                     }`}
                   >
-                    {OPTION_LETTERS[oi]}
-                  </span>
-                  <span className={`flex-1 text-sm ${selected ? "font-semibold text-slate-900" : "text-slate-700"}`}>
-                    <MathContent as="span" html={opt} className="math-option-content" />
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                        selected ? "bg-[#1D70F5] text-white" : "bg-white text-slate-500 border border-slate-200"
+                      }`}
+                    >
+                      {OPTION_LETTERS[oi]}
+                    </span>
+                    <span className={`flex-1 text-sm ${selected ? "font-semibold text-slate-900" : "text-slate-700"}`}>
+                      <MathContent as="span" html={opt} className="math-option-content" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {q.type === "matching" && (
+            <div className="space-y-3">
+              {(q.matchingPairs ?? []).map((pair, pairIndex) => {
+                const pairOptions = (q.matchingPairs ?? []).map((item) => item.right);
+                const rotateBy = pairOptions.length ? q.id % pairOptions.length : 0;
+                const shuffledOptions = pairOptions.map((_, index) => (
+                  pairOptions[(index + rotateBy) % pairOptions.length]
+                ));
+                return (
+                  <label key={`${q.id}-${pairIndex}`} className="grid gap-2 sm:grid-cols-2 sm:items-center">
+                    <MathContent html={pair.left} className="text-sm font-medium text-slate-800" />
+                    <select
+                      value={matchingAnswers[current]?.[pairIndex] ?? ""}
+                      onChange={(event) => setMatchingAnswers((previous) => {
+                        const next = previous.map((response) => [...response]);
+                        next[current][pairIndex] = event.target.value;
+                        return next;
+                      })}
+                      className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Choose a match</option>
+                      {shuffledOptions.map((option, optionIndex) => (
+                        <option key={`${optionIndex}-${option}`} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {isManuallyGraded(q) && (
+            <div className="space-y-2">
+              <textarea
+                value={writtenAnswers[current] ?? ""}
+                onChange={(event) => setWrittenAnswers((previous) => {
+                  const next = [...previous];
+                  next[current] = event.target.value;
+                  return next;
+                })}
+                rows={q.type === "workout" ? 7 : 3}
+                placeholder={q.type === "workout" ? "Write your solution or show your work..." : "Type your answer..."}
+                className="w-full resize-y rounded-xl border border-slate-200 px-4 py-3 text-sm leading-relaxed outline-none focus:border-[#1D70F5] focus:ring-2 focus:ring-blue-100"
+              />
+              {q.formatRule && <p className="text-xs text-slate-500">{q.formatRule}</p>}
+              <p className="text-xs text-slate-500">
+                Your model answer stays hidden until you submit the exam. You can self-grade this response afterward.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

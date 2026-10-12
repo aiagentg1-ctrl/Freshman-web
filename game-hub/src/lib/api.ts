@@ -230,6 +230,8 @@ export interface SavedExamProgress {
   exam: ExamMeta;
   currentQuestion: number;
   answers: (number | null)[];
+  writtenAnswers?: string[];
+  matchingAnswers?: string[][];
   flags: number[];
   timed: boolean;
   secondsLeft: number;
