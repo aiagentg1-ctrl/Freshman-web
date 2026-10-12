@@ -112,6 +112,52 @@ function extractJsonValue(source: string, openIndex: number): string | null {
   return null;
 }
 
+function escapeInvalidJsonStringEscapes(source: string): string {
+  const output: string[] = [];
+  let inString = false;
+
+  for (let index = 0; index < source.length; index++) {
+    const character = source[index];
+    if (!inString) {
+      output.push(character);
+      if (character === '"') inString = true;
+      continue;
+    }
+    if (character === '"') {
+      output.push(character);
+      inString = false;
+      continue;
+    }
+    if (character !== "\\") {
+      output.push(character);
+      continue;
+    }
+
+    const next = source[index + 1];
+    const escapedCommand = next
+      ? source.slice(index + 1).match(/^[a-z]+/i)?.[0]?.toLowerCase()
+      : undefined;
+    const latexCommand = escapedCommand && [
+      "bar", "begin", "beta", "big", "frac", "forall", "nabla", "neg", "neq",
+      "nu", "right", "tan", "text", "theta", "therefore", "times", "to",
+    ].includes(escapedCommand);
+    if (next && '"\\/bfnrt'.includes(next) && !latexCommand) {
+      output.push(character, next);
+      index++;
+    } else if (
+      next === "u"
+      && /^[\da-f]{4}$/i.test(source.slice(index + 2, index + 6))
+    ) {
+      output.push(source.slice(index, index + 6));
+      index += 5;
+    } else {
+      output.push("\\\\");
+    }
+  }
+
+  return output.join("");
+}
+
 function normalizeQuestions(raw: unknown[], defaultUniversity?: string): ExamQuestion[] {
   const out: ExamQuestion[] = [];
   raw.forEach((item, i) => {
@@ -312,7 +358,7 @@ export function parseExamQuestions(html: string): ExamQuestion[] | null {
 
   for (const candidate of candidates) {
     try {
-      let parsed: unknown = JSON.parse(candidate.trim());
+      let parsed: unknown = JSON.parse(escapeInvalidJsonStringEscapes(candidate.trim()));
       let defaultUniversity: string | undefined;
       if (parsed && !Array.isArray(parsed) && typeof parsed === "object") {
         const payload = parsed as Record<string, unknown>;
@@ -530,7 +576,6 @@ export default function ExamRunner({
   const [writtenAnswers, setWrittenAnswers] = useState<string[]>([]);
   const [matchingAnswers, setMatchingAnswers] = useState<string[][]>([]);
   const [manualGrades, setManualGrades] = useState<(number | null)[]>([]);
-  const [manualGradingConfirmed, setManualGradingConfirmed] = useState(false);
   const [flags, setFlags] = useState<number[]>([]);
   const [secondsLeft, setSecondsLeft] = useState(exam.duration_minutes * 60);
   const [elapsed, setElapsed] = useState(0);
@@ -894,7 +939,6 @@ export default function ExamRunner({
       question.matchingPairs?.map(() => "") ?? []
     )));
     setManualGrades(new Array<number | null>(examQuestions.length).fill(null));
-    setManualGradingConfirmed(false);
     setFlags([]);
     setCurrent(0);
     setSecondsLeft(exam.duration_minutes * 60);
@@ -907,16 +951,15 @@ export default function ExamRunner({
     if (submitted.current) return;
     submitted.current = true;
     if (chapterExamId === undefined) clearExamProgress(exam.id);
+    setShowAnswers(true);
     setStage("result");
   };
 
   const manualQuestions = filteredQuestions?.filter(isManuallyGraded) ?? [];
-  const manualGradingComplete = manualQuestions.every((question) => (
-    manualGrades[filteredQuestions?.indexOf(question) ?? -1] !== null
-  ));
-  const finalScoreReady = manualGradingComplete
-    && (manualQuestions.length === 0 || manualGradingConfirmed);
+  const autoScoredQuestions = filteredQuestions?.filter((question) => !isManuallyGraded(question)) ?? [];
+  const autoScoredQuestionCount = autoScoredQuestions.length;
   const totalPoints = filteredQuestions?.reduce((sum, question) => sum + questionPoints(question), 0) ?? 0;
+  const autoScoredPoints = autoScoredQuestions.reduce((sum, question) => sum + questionPoints(question), 0);
   const objectivelyEarnedPoints = filteredQuestions?.reduce((sum, question, index) => {
     if (question.type === "matching") {
       const pairs = question.matchingPairs ?? [];
@@ -935,25 +978,29 @@ export default function ExamRunner({
     }
     return sum;
   }, 0) ?? 0;
-  const manualEarnedPoints = filteredQuestions?.reduce((sum, question, index) => (
-    isManuallyGraded(question) ? sum + (manualGrades[index] ?? 0) : sum
-  ), 0) ?? 0;
-  const earnedPoints = objectivelyEarnedPoints + manualEarnedPoints;
-  const scorePercentage = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-  const correctCount = filteredQuestions?.reduce((count, question, index) => {
-    const earned = isManuallyGraded(question)
-      ? manualGrades[index] ?? 0
-      : question.type === "matching"
-        ? (questionPoints(question) * (question.matchingPairs ?? []).reduce((pairs, pair, pairIndex) => (
-            normalizeMatchingValue(matchingAnswers[index]?.[pairIndex] ?? "") === normalizeMatchingValue(pair.right)
-              ? pairs + 1
-              : pairs
-          ), 0) / Math.max(1, question.matchingPairs?.length ?? 0))
-        : question.correctAnswer !== undefined && answers[index] === question.correctAnswer
-          ? questionPoints(question)
-          : 0;
+  const earnedPoints = objectivelyEarnedPoints;
+  const scorePercentage = autoScoredPoints > 0 ? Math.round((earnedPoints / autoScoredPoints) * 100) : 0;
+  const correctCount = autoScoredQuestions.reduce((count, question) => {
+    const index = filteredQuestions?.indexOf(question) ?? -1;
+    const earned = question.type === "matching"
+      ? questionPoints(question) * (question.matchingPairs ?? []).reduce((pairs, pair, pairIndex) => (
+          normalizeMatchingValue(matchingAnswers[index]?.[pairIndex] ?? "") === normalizeMatchingValue(pair.right)
+            ? pairs + 1
+            : pairs
+        ), 0) / Math.max(1, question.matchingPairs?.length ?? 0)
+      : question.correctAnswer !== undefined && answers[index] === question.correctAnswer
+        ? questionPoints(question)
+        : 0;
     return earned >= questionPoints(question) ? count + 1 : count;
-  }, 0) ?? 0;
+  }, 0);
+  const autoAnsweredCount = autoScoredQuestions.reduce((count, question) => {
+    const index = filteredQuestions?.indexOf(question) ?? -1;
+    const answered = question.type === "matching"
+      ? Boolean(matchingAnswers[index]?.length)
+        && matchingAnswers[index].every((answer) => answer.length > 0)
+      : answers[index] !== null && answers[index] !== undefined;
+    return count + (answered ? 1 : 0);
+  }, 0);
   const answeredCount = filteredQuestions?.reduce((count, question, index) => {
     if (isManuallyGraded(question)) return count + (writtenAnswers[index]?.trim() ? 1 : 0);
     if (question.type === "matching") {
@@ -961,8 +1008,8 @@ export default function ExamRunner({
     }
     return count + (answers[index] !== null ? 1 : 0);
   }, 0) ?? 0;
-  const incorrect = total - correctCount;
-  const unanswered = total - answeredCount;
+  const incorrect = autoAnsweredCount - correctCount;
+  const unanswered = autoScoredQuestionCount - autoAnsweredCount;
   const timeSpentSoFar = timed
     ? exam.duration_minutes * 60 - secondsLeft
     : elapsed;
@@ -980,13 +1027,11 @@ export default function ExamRunner({
       stage !== "result"
       || !interactive
       || !filteredQuestions
-      || !manualGradingComplete
-      || !finalScoreReady
       || finalized.current
     ) return;
 
     finalized.current = true;
-    const totalQuestions = filteredQuestions.length;
+    const totalQuestions = autoScoredQuestionCount;
     const timeSpent = Math.round((Date.now() - (startedAt.current || Date.now())) / 1000);
     const completedAt = new Date().toISOString();
     const results = filteredQuestions.map((question, index) => {
@@ -1021,11 +1066,12 @@ export default function ExamRunner({
         earnedPoints: questionEarned,
         points: questionPoints(question),
         selfGrade: isManual ? manualGrades[index] : undefined,
+        selfGraded: isManual ? manualGrades[index] !== null : undefined,
         explanation: question.explanation || "",
       };
     });
     const wrongQuestions = results
-      .filter((result) => result.earnedPoints < result.points)
+      .filter((result) => result.earnedPoints < result.points && result.selfGraded !== false)
       .map(({ id, question, selected, correct, explanation, ...grading }) => ({
         id, question, selectedOption: selected, correctOption: correct, explanation, ...grading,
       }));
@@ -1096,8 +1142,6 @@ export default function ExamRunner({
     filteredQuestions,
     interactive,
     manualGrades,
-    manualGradingComplete,
-    manualGradingConfirmed,
     matchingAnswers,
     persistSubmission,
     scorePercentage,
@@ -1105,7 +1149,7 @@ export default function ExamRunner({
     timed,
     telegramFirstName,
     writtenAnswers,
-    finalScoreReady,
+    autoScoredQuestionCount,
   ]);
 
   // ---------- Stage 3: Result ----------
@@ -1178,12 +1222,15 @@ export default function ExamRunner({
     // Original interactive exam result
     const radius = 52;
     const circumference = 2 * Math.PI * radius;
+    const gradingReportUrl = `https://t.me/Mirkuz_support?text=${encodeURIComponent(
+      `Please review grading or answer content for "${exam.title}" (exam ID ${exam.id}).`,
+    )}`;
 
     return (
       <div className="flex flex-col flex-1 overflow-y-auto">
         <div className="px-4 pt-6 pb-6 bg-gradient-to-br from-[#1D70F5] to-[#4C8DFF] text-white text-center rounded-b-3xl">
           <p className="text-blue-100 text-xs mb-1">{exam.title}</p>
-          {finalScoreReady ? (
+          {autoScoredQuestionCount > 0 ? (
             <>
               <div className="relative w-36 h-36 mx-auto mt-3">
                 <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
@@ -1207,29 +1254,26 @@ export default function ExamRunner({
                 </div>
               </div>
               <p className="mt-3 font-semibold">
-                {earnedPoints} / {totalPoints} marks • {correctCount} / {total} full-credit questions
+                {earnedPoints} / {autoScoredPoints} auto-scored marks • {correctCount} / {autoScoredQuestionCount} correct
               </p>
             </>
           ) : (
             <div className="mx-auto mt-4 max-w-sm rounded-xl bg-white/15 p-4">
-              <p className="font-semibold">Self-grade your written answers to calculate the final score.</p>
-              <p className="mt-1 text-sm text-blue-100">
-                Objective questions have been checked. Written-answer scores will be added after grading.
-              </p>
+              <p className="font-semibold">There are no automatically graded questions in this exam.</p>
+              <p className="mt-1 text-sm text-blue-100">Review the answers and explanations below. Written self-grading is optional.</p>
             </div>
           )}
         </div>
 
         <div className="px-4 py-4 space-y-4">
-          {!finalScoreReady && (
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-center">
-              <p className="text-sm font-semibold text-blue-900">
-                Automatically scored: {objectivelyEarnedPoints} marks. Final score is waiting for your self-grading.
-              </p>
-            </div>
-          )}
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-center">
+            <p className="text-sm font-semibold text-blue-900">
+              Automatically scored: {correctCount} of {autoScoredQuestionCount} questions ({scorePercentage}%).
+              Written answers and workouts are excluded from this score.
+            </p>
+          </div>
 
-          {finalScoreReady && (
+          {autoScoredQuestionCount > 0 && (
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm text-center">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
@@ -1252,9 +1296,10 @@ export default function ExamRunner({
           {manualQuestions.length > 0 && filteredQuestions && (
             <section className="space-y-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900">Self-grade written answers</h2>
+                <h2 className="text-base font-bold text-slate-900">Optional self-grading</h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  Compare your completed responses with the model answer and rubric, then award yourself marks.
+                  Compare your written answers with the model answer and rubric, then optionally award yourself marks.
+                  You can skip this section; it will not block your automatically scored result, and these optional marks do not change it.
                 </p>
               </div>
               {manualQuestions.map((question) => {
@@ -1302,7 +1347,6 @@ export default function ExamRunner({
                           key={grade}
                           type="button"
                           aria-pressed={manualGrades[index] === grade}
-                          disabled={manualGradingConfirmed}
                           onClick={() => setManualGrades((previous) => {
                             const next = [...previous];
                             next[index] = grade;
@@ -1321,32 +1365,27 @@ export default function ExamRunner({
                   </article>
                 );
               })}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center">
-                <p className="mb-3 text-sm text-slate-600">
-                  {manualGradingConfirmed
-                    ? "Self-grades confirmed. Saving your final score..."
-                    : manualGradingComplete
-                      ? "Review your marks, then confirm to calculate and save your final score."
-                      : "Grade every written answer to continue."}
-                </p>
-                <button
-                  type="button"
-                  disabled={!manualGradingComplete || manualGradingConfirmed}
-                  onClick={() => setManualGradingConfirmed(true)}
-                  className="min-h-11 w-full rounded-xl bg-[#1D70F5] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {manualGradingConfirmed ? "Finalizing score..." : "Confirm self-grades and save score"}
-                </button>
-              </div>
             </section>
           )}
 
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p>If a grading control, answer, or explanation looks wrong, report this exam to the admin. You can still review the automatically graded result and all provided explanations.</p>
+            <a
+              href={gradingReportUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-amber-100 px-3 font-semibold text-amber-900 underline"
+            >
+              Report this exam to support
+            </a>
+          </div>
+
           <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm text-center">
             <p className="text-sm font-semibold text-slate-800">
-              {!finalScoreReady
-                ? "The final score will appear after you grade all written answers."
+              {autoScoredQuestionCount === 0
+                ? "Review the answers and explanations below."
                 : scorePercentage >= 70
-                  ? `Good job! You scored ${scorePercentage}% — keep it up!`
+                  ? `Good job! You scored ${scorePercentage}% on automatically graded questions — keep it up!`
                   : scorePercentage >= 40
                     ? "Nice effort! Review the explanations below to improve."
                     : "Don't give up — review the explanations and try again."}
@@ -1389,6 +1428,7 @@ export default function ExamRunner({
                       ? questionPoints(q)
                       : 0;
                 const isCorrect = questionEarned >= questionPoints(q);
+                const isAwaitingSelfGrade = isManuallyGraded(q) && manualGrades[i] === null;
                 return (
                   <div
                     key={q.id}
@@ -1397,7 +1437,9 @@ export default function ExamRunner({
                     <div className="flex items-start gap-2 mb-2">
                       <span
                         className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
-                          isCorrect
+                          isAwaitingSelfGrade
+                            ? "bg-slate-100 text-slate-500"
+                            : isCorrect
                             ? "bg-emerald-100 text-emerald-700"
                             : questionEarned > 0
                               ? "bg-amber-100 text-amber-700"
@@ -1418,9 +1460,13 @@ export default function ExamRunner({
                           <p className="mt-2 text-xs font-bold uppercase text-emerald-700">Model answer</p>
                           {q.modelAnswer
                             ? <MathContent html={q.modelAnswer} className="text-sm text-slate-800" />
-                            : <p className="text-sm text-slate-600">No model answer was provided.</p>}
+                            : q.type === "workout" && q.explanation
+                              ? <MathContent html={q.explanation} className="text-sm text-slate-800" />
+                              : <p className="text-sm text-slate-600">No model answer was provided.</p>}
                           <p className="mt-2 text-xs font-semibold text-blue-700">
-                            Self-grade: {manualGrades[i]} / {questionPoints(q)} marks
+                            {manualGrades[i] === null
+                              ? "Not self-graded (optional)"
+                              : `Self-grade: ${manualGrades[i]} / ${questionPoints(q)} marks`}
                           </p>
                         </>
                       ) : q.type === "matching" ? (
