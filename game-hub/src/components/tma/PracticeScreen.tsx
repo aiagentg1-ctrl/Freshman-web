@@ -92,6 +92,7 @@ export default function PracticeScreen({
   const [view, setView] = useState<View>({ kind: "subjectList" });
   const [mode, setMode] = useState<"subject" | "year" | "chapter">("subject");
   const [exams, setExams] = useState<ExamMeta[]>([]);
+  const [examLoadError, setExamLoadError] = useState("");
   const [chapterExams, setChapterExams] = useState<ChapterExamMeta[]>([]);
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,9 +114,17 @@ export default function PracticeScreen({
     setLoading(true);
     getExams()
       .then((data) => {
-        if (!cancelled) setExams(data);
+        if (!cancelled) {
+          setExams(data);
+          setExamLoadError("");
+        }
       })
-      .catch(() => {})
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          console.error("Failed to load exams:", error);
+          setExamLoadError(error instanceof Error ? error.message : "The exam service is unavailable.");
+        }
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -123,6 +132,35 @@ export default function PracticeScreen({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const refreshExamsWhenVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      getExams()
+        .then((data) => {
+          setExams(data);
+          setExamLoadError("");
+        })
+        .catch((error: unknown) => {
+          console.error("Failed to refresh exams:", error);
+        });
+    };
+
+    document.addEventListener("visibilitychange", refreshExamsWhenVisible);
+    return () => document.removeEventListener("visibilitychange", refreshExamsWhenVisible);
+  }, []);
+
+  const retryLoadExams = () => {
+    setLoading(true);
+    setExamLoadError("");
+    getExams()
+      .then(setExams)
+      .catch((error: unknown) => {
+        console.error("Failed to reload exams:", error);
+        setExamLoadError(error instanceof Error ? error.message : "The exam service is unavailable.");
+      })
+      .finally(() => setLoading(false));
+  };
 
   // Load university logos for exams
   useEffect(() => {
@@ -704,6 +742,18 @@ export default function PracticeScreen({
         {loading || (mode === "chapter" && loadingChapterExams) ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1D70F5]" />
+          </div>
+        ) : mode !== "chapter" && examLoadError ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-center">
+            <h3 className="font-bold text-rose-800">Exams could not be loaded</h3>
+            <p className="mt-1 text-sm text-rose-700">{examLoadError}</p>
+            <button
+              type="button"
+              onClick={retryLoadExams}
+              className="mt-4 rounded-xl bg-rose-700 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Try again
+            </button>
           </div>
         ) : mode === "chapter" ? (
           view.kind === "chapterSubjects" ? (

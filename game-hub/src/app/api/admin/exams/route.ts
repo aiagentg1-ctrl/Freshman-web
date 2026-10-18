@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BACKEND_URL } from "@/lib/backend";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_KEY || process.env.ADMIN_PASSWORD || "mirkuz123";
+const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_KEY || process.env.ADMIN_PASSWORD || "";
 
 function getProvidedKey(request: NextRequest): string {
   return (
@@ -17,7 +17,10 @@ function getProvidedKey(request: NextRequest): string {
 
 export async function GET(request: NextRequest) {
   const providedKey = getProvidedKey(request);
-  if (!ADMIN_SECRET || providedKey !== ADMIN_SECRET) {
+  if (!ADMIN_SECRET) {
+    return NextResponse.json({ error: "Admin authentication is not configured on the server." }, { status: 503 });
+  }
+  if (providedKey !== ADMIN_SECRET) {
     return NextResponse.json({ error: "Invalid admin key" }, { status: 401 });
   }
 

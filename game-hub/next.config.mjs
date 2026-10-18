@@ -5,6 +5,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_BOT_TOKEN: process.env.NEXT_PUBLIC_BOT_TOKEN,
     NEXT_PUBLIC_BACKEND_URL:
+      process.env.BACKEND_URL ||
       process.env.FRESHO_BACKEND_URL ||
       (process.env.NODE_ENV === "production"
         ? "https://freshman-web.onrender.com"

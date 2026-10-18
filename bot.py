@@ -24,8 +24,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN environment variable is required")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "1439864634"))
-MINI_APP_URL = os.getenv("MINI_APP_URL", "https://freshman-web.onrender.com/tma")
-ADMIN_URL = os.getenv("ADMIN_URL", "https://freshman-web.onrender.com/admin")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://fresho-backend.onrender.com/tma")
+ADMIN_URL = os.getenv("ADMIN_URL", "https://fresho-backend.onrender.com/admin")
 SUPPORT_URL = "https://t.me/Mirkuz_support"
 PREMIUM_CHANNEL_IDS = {
     "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "-1004479037964"),

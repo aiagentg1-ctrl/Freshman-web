@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { BACKEND_URL } from "@/lib/backend";
 import { freshoSessionHeaders } from "@/lib/serverSession";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_KEY || process.env.ADMIN_PASSWORD || "mirkuz123";
+const ADMIN_SECRET = process.env.ADMIN_SECRET || process.env.ADMIN_KEY || process.env.ADMIN_PASSWORD || "";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -36,7 +36,11 @@ export async function POST(request: NextRequest) {
     request.headers.get("X-Admin-Secret") ||
     request.headers.get("X-Admin-Password") || "";
 
-  if (!ADMIN_SECRET || providedKey !== ADMIN_SECRET) {
+  if (!ADMIN_SECRET) {
+    return NextResponse.json({ error: "Admin authentication is not configured on the server." }, { status: 503 });
+  }
+
+  if (providedKey !== ADMIN_SECRET) {
     return NextResponse.json({ error: "Invalid admin key" }, { status: 401 });
   }
 
