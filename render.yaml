@@ -17,6 +17,12 @@ services:
         sync: false
       - key: ADMIN_SECRET
         sync: false
+      - key: CHANNEL_1_ID
+        value: "-1002656898914"
+      - key: CHANNEL_1_URL
+        value: https://t.me/AAU101
+      - key: CHANNEL_1_NAME
+        value: AAU101
       - key: BOT_MODE
         value: polling
       - key: BROWSER_DEMO_MODE

@@ -27,6 +27,9 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "1439864634"))
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://fresho-backend.onrender.com/tma")
 ADMIN_URL = os.getenv("ADMIN_URL", "https://fresho-backend.onrender.com/admin")
 SUPPORT_URL = "https://t.me/Mirkuz_support"
+REQUIRED_CHANNEL_ID = int(os.getenv("CHANNEL_1_ID", "-1002656898914"))
+REQUIRED_CHANNEL_URL = os.getenv("CHANNEL_1_URL", "https://t.me/AAU101")
+REQUIRED_CHANNEL_NAME = os.getenv("CHANNEL_1_NAME", "AAU101")
 PREMIUM_CHANNEL_IDS = {
     "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "-1004479037964"),
     "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "-1004342138729"),
@@ -84,6 +87,20 @@ def get_admin_menu():
         [InlineKeyboardButton(text="📝 Admin Dashboard", web_app=WebAppInfo(url=ADMIN_URL))],
         [InlineKeyboardButton(text="📊 View Stats", callback_data="admin_stats")],
     ])
+
+
+def get_required_channel_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"Join {REQUIRED_CHANNEL_NAME}", url=REQUIRED_CHANNEL_URL)],
+        [InlineKeyboardButton(text="I've joined — check again", callback_data="start:verify_channel")],
+    ])
+
+
+async def is_required_channel_member(user_id: int) -> bool:
+    member = await bot.get_chat_member(REQUIRED_CHANNEL_ID, user_id)
+    return member.status in {"member", "administrator", "creator"} or (
+        member.status == "restricted" and getattr(member, "is_member", False)
+    )
 
 
 def subject_options(stream):
@@ -345,31 +362,87 @@ async def show_quiz_question(message, user_id: int, quiz):
     )
 
 
-@dp.message(CommandStart())
-async def cmd_start(message: Message):
+async def send_start_welcome(message: Message, user_id: int, *, edit: bool = False):
     try:
         async with AsyncSessionLocal() as session:
-            registered = await session.get(User, message.from_user.id) is not None
+            registered = await session.get(User, user_id) is not None
     except Exception as error:
         print(f"Could not load Telegram student profile: {error}")
-        await message.answer("Could not load your Fresho profile right now. Please try again.")
+        text = "Could not load your Fresho profile right now. Please try again."
+        if edit:
+            await message.edit_text(text)
+        else:
+            await message.answer(text)
         return
 
     if registered:
-        await message.answer(
+        text = (
             "👋 Welcome back to Fresho!\n\n"
-            "Open the study app or choose Exams below to start a chat-based quiz.",
-            reply_markup=get_student_menu(message.from_user.id == ADMIN_ID),
+            "Open the study app or choose Exams below to start a chat-based quiz."
+        )
+        keyboard = get_student_menu(user_id == ADMIN_ID)
+    else:
+        text = (
+            "👋 Welcome to Fresho!\n\n"
+            "Register or get support by contacting our Telegram support account:\n"
+            f"{SUPPORT_URL}\n\n"
+            "Then open the Freshman study app below. Chat quizzes become available after registration."
+        )
+        keyboard = get_app_button(user_id == ADMIN_ID)
+
+    if edit:
+        await message.edit_text(text, reply_markup=keyboard)
+    else:
+        await message.answer(text, reply_markup=keyboard)
+
+
+@dp.message(CommandStart())
+async def cmd_start(message: Message):
+    try:
+        is_member = await is_required_channel_member(message.from_user.id)
+    except Exception as error:
+        print(f"Could not verify {REQUIRED_CHANNEL_NAME} membership: {error}")
+        await message.answer(
+            f"Could not verify your {REQUIRED_CHANNEL_NAME} membership right now. Please try again.",
+            reply_markup=get_required_channel_keyboard(),
         )
         return
 
-    await message.answer(
-        "👋 Welcome to Fresho!\n\n"
-        "Register or get support by contacting our Telegram support account:\n"
-        f"{SUPPORT_URL}\n\n"
-        "Then open the Freshman study app below. Chat quizzes become available after registration.",
-        reply_markup=get_app_button(message.from_user.id == ADMIN_ID),
-    )
+    if not is_member:
+        await message.answer(
+            f"Please join {REQUIRED_CHANNEL_NAME} to use Fresho, then tap “I've joined — check again”.",
+            reply_markup=get_required_channel_keyboard(),
+        )
+        return
+
+    await send_start_welcome(message, message.from_user.id)
+
+
+@dp.callback_query(lambda callback: callback.data == "start:verify_channel")
+async def verify_start_channel(callback: CallbackQuery):
+    if not callback.message:
+        await callback.answer()
+        return
+
+    try:
+        is_member = await is_required_channel_member(callback.from_user.id)
+    except Exception as error:
+        print(f"Could not verify {REQUIRED_CHANNEL_NAME} membership: {error}")
+        await callback.answer(
+            f"Could not verify {REQUIRED_CHANNEL_NAME} membership. Please try again.",
+            show_alert=True,
+        )
+        return
+
+    if not is_member:
+        await callback.answer(
+            f"Please join {REQUIRED_CHANNEL_NAME} first.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer("Membership verified.")
+    await send_start_welcome(callback.message, callback.from_user.id, edit=True)
 
 
 @dp.message(Command("admin"))
