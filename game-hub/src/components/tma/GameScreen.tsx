@@ -15,17 +15,22 @@ import {
 } from "../../lib/flashcards";
 import Leaderboard from "./Leaderboard";
 import GPACalculatorScreen from "./GPACalculatorScreen";
+import PremiumContentProtection from "./PremiumContentProtection";
 
 type GameView = "tools" | "flashcards" | "leaderboard" | "gpa";
 
 export default function GameScreen({
   stream,
   university,
+  telegramUserId,
+  telegramFirstName,
   isPremium,
   onGetPremium,
 }: {
   stream: StreamKey;
   university: string;
+  telegramUserId?: number;
+  telegramFirstName?: string;
   isPremium: boolean;
   onGetPremium: () => void;
 }) {
@@ -142,6 +147,7 @@ export default function GameScreen({
       .sort((left, right) => left - right)[0];
 
     return (
+      <>
       <div className="flex flex-col flex-1 min-h-0">
         <header className="sticky top-0 z-10 border-b border-slate-100 bg-white px-4 md:px-8 lg:px-12 py-4">
           <button
@@ -345,6 +351,12 @@ export default function GameScreen({
           </section>
         </div>
       </div>
+      <PremiumContentProtection
+        enabled={activeDeck?.is_premium === true}
+        telegramUserId={telegramUserId}
+        firstName={telegramFirstName}
+      />
+      </>
     );
   }
 

@@ -5,15 +5,18 @@ import { ChevronLeft, FileQuestion, Maximize2, Minimize2 } from "lucide-react";
 import { ChapterExamMeta, Note } from "../../lib/api";
 import { subjectLabel } from "../../lib/subjects";
 import HtmlViewer from "./HtmlViewer";
+import PremiumContentProtection from "./PremiumContentProtection";
 
 export default function NotesReader({
   note,
   chapterExams,
+  telegramUserId,
   onTakeChapterExam,
   onBack,
 }: {
   note: Note;
   chapterExams: ChapterExamMeta[];
+  telegramUserId?: number;
   onTakeChapterExam: (examId: number) => void;
   onBack: () => void;
 }) {
@@ -63,6 +66,10 @@ export default function NotesReader({
             ))}
           </div>
         )}
+        <PremiumContentProtection
+          enabled={note.is_premium}
+          telegramUserId={telegramUserId}
+        />
       </div>
     );
   }
@@ -115,6 +122,10 @@ export default function NotesReader({
           ))}
         </div>
       )}
+      <PremiumContentProtection
+        enabled={note.is_premium}
+        telegramUserId={telegramUserId}
+      />
     </div>
   );
 }

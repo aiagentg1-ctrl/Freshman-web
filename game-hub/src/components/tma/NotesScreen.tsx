@@ -8,6 +8,7 @@ import NotesReader from "./NotesReader";
 import { EmptyState } from "./PracticeScreen";
 import ExamRunner from "./ExamRunner";
 import PremiumBanner from "./PremiumBanner";
+import PremiumContentProtection from "./PremiumContentProtection";
 
 type View =
   | { kind: "subjects" }
@@ -142,6 +143,7 @@ export default function NotesScreen({
     };
     console.log("Starting chapter exam from notes - telegramUserId:", telegramUserId);
     return (
+      <>
       <ExamRunner
         exam={exam}
         chapterExamId={view.chapterExam.id}
@@ -153,6 +155,11 @@ export default function NotesScreen({
           chapters: view.chapters,
         })}
       />
+      <PremiumContentProtection
+        enabled={view.chapterExam.is_premium}
+        telegramUserId={telegramUserId}
+      />
+      </>
     );
   }
 
@@ -162,6 +169,7 @@ export default function NotesScreen({
       <NotesReader
         note={note}
         chapterExams={view.chapterExams}
+        telegramUserId={telegramUserId}
         onTakeChapterExam={(chapterExamId) => openChapterExam(note, chapterExamId, view.chapterExams)}
         onBack={() => setView({ kind: "chapters", subject: note.subject, chapters: view.chapters })}
       />
