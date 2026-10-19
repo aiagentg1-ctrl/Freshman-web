@@ -395,8 +395,6 @@ export default function TMAPage() {
             <GameScreen
               stream={profile.stream}
               university={profile.university}
-              telegramUserId={telegramUser?.id}
-              telegramFirstName={telegramUser?.first_name}
               isPremium={isPremium}
               onGetPremium={() => setShowPremiumDialog(true)}
             />

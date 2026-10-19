@@ -19,7 +19,6 @@ import { streamLabel, subjectLabel, subjectsForStream } from "../../lib/subjects
 import { universities } from "../../lib/universities";
 import ExamRunner, { HtmlExamView, PdfExamView } from "./ExamRunner";
 import PremiumBanner from "./PremiumBanner";
-import PremiumContentProtection from "./PremiumContentProtection";
 import UniversityLogo from "./UniversityLogo";
 
 type View =
@@ -345,7 +344,6 @@ export default function PracticeScreen({
     };
     console.log("Starting chapter exam - telegramUserId:", telegramUserId, "telegramFirstName:", telegramFirstName);
     return (
-      <>
       <ExamRunner
         exam={chapterAsExam}
         chapterExamId={chapter.id}
@@ -353,12 +351,6 @@ export default function PracticeScreen({
         telegramFirstName={telegramFirstName}
         onExit={() => setView({ kind: "chapterList", subject: chapter.subject })}
       />
-      <PremiumContentProtection
-        enabled={chapter.is_premium}
-        telegramUserId={telegramUserId}
-        firstName={telegramFirstName}
-      />
-      </>
     );
   }
 
@@ -366,8 +358,25 @@ export default function PracticeScreen({
   if (view.kind === "exam") {
     if (view.exam.content_type === "pdf") {
       return (
-        <>
-          <PdfExamView
+        <PdfExamView
+          exam={view.exam}
+          onExit={() => {
+            if (mode === "year") {
+              const year = view.exam.year;
+              setView({ kind: "yearExams", year, examType: view.exam.exam_type });
+            } else {
+              setView({ kind: "subjectList" });
+            }
+          }}
+        />
+      );
+    }
+    if (view.exam.content_type === "html") {
+      const content = view.exam.content_data;
+      const hasExamScript = /<script\b/i.test(content) || /EXAM_QUESTIONS/i.test(content);
+      if (!hasExamScript) {
+        return (
+          <HtmlExamView
             exam={view.exam}
             onExit={() => {
               if (mode === "year") {
@@ -378,43 +387,11 @@ export default function PracticeScreen({
               }
             }}
           />
-          <PremiumContentProtection
-            enabled={view.exam.is_premium}
-            telegramUserId={telegramUserId}
-            firstName={telegramFirstName}
-          />
-        </>
-      );
-    }
-    if (view.exam.content_type === "html") {
-      const content = view.exam.content_data;
-      const hasExamScript = /<script\b/i.test(content) || /EXAM_QUESTIONS/i.test(content);
-      if (!hasExamScript) {
-        return (
-          <>
-            <HtmlExamView
-              exam={view.exam}
-              onExit={() => {
-                if (mode === "year") {
-                  const year = view.exam.year;
-                  setView({ kind: "yearExams", year, examType: view.exam.exam_type });
-                } else {
-                  setView({ kind: "subjectList" });
-                }
-              }}
-            />
-            <PremiumContentProtection
-              enabled={view.exam.is_premium}
-              telegramUserId={telegramUserId}
-              firstName={telegramFirstName}
-            />
-          </>
         );
       }
     }
     console.log("Starting regular exam - telegramUserId:", telegramUserId, "telegramFirstName:", telegramFirstName);
     return (
-      <>
       <ExamRunner
         exam={view.exam}
         telegramUserId={telegramUserId}
@@ -429,12 +406,6 @@ export default function PracticeScreen({
           }
         }}
       />
-      <PremiumContentProtection
-        enabled={view.exam.is_premium}
-        telegramUserId={telegramUserId}
-        firstName={telegramFirstName}
-      />
-      </>
     );
   }
 
