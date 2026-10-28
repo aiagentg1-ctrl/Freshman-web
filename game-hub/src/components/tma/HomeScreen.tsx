@@ -20,9 +20,6 @@ export default function HomeScreen({
   onContinueExam,
   onGoToPractice,
   onGetPremium,
-  premiumVerificationError,
-  premiumStatusRefreshing,
-  onRefreshPremiumStatus,
 }: {
   telegramUser: TelegramUser | null;
   fullName: string;
@@ -35,9 +32,6 @@ export default function HomeScreen({
   onContinueExam: (exam: ExamMeta) => void;
   onGoToPractice: () => void;
   onGetPremium: () => void;
-  premiumVerificationError?: string | null;
-  premiumStatusRefreshing: boolean;
-  onRefreshPremiumStatus: () => void;
 }) {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [progress, setProgress] = useState<UserProgress | null>(null);
@@ -237,14 +231,7 @@ export default function HomeScreen({
           </button>
         </section>
 
-        {!isPremium && (
-          <PremiumBanner
-            onGetPremium={onGetPremium}
-            onRefreshPremiumStatus={onRefreshPremiumStatus}
-            premiumVerificationError={premiumVerificationError}
-            premiumStatusRefreshing={premiumStatusRefreshing}
-          />
-        )}
+        {!isPremium && <PremiumBanner onGetPremium={onGetPremium} />}
 
         <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between">

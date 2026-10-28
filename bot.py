@@ -31,8 +31,8 @@ REQUIRED_CHANNEL_ID = int(os.getenv("CHANNEL_1_ID", "-1002656898914"))
 REQUIRED_CHANNEL_URL = os.getenv("CHANNEL_1_URL", "https://t.me/AAU101")
 REQUIRED_CHANNEL_NAME = os.getenv("CHANNEL_1_NAME", "AAU101")
 PREMIUM_CHANNEL_IDS = {
-    "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "-1004479037964"),
-    "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "-1004342138729"),
+    "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "").strip(),
+    "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "").strip(),
 }
 
 NATURAL_SUBJECTS = {
@@ -124,6 +124,8 @@ async def get_student_access(user_id: int):
         return user, False, None
 
     channel_id = PREMIUM_CHANNEL_IDS[user.stream.name]
+    if not channel_id:
+        return user, False, f"The {user.stream.name.title()} Science Premium channel ID is not configured."
     try:
         member = await bot.get_chat_member(channel_id, user_id)
     except Exception as error:

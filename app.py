@@ -137,8 +137,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 BROWSER_DEMO_MODE = os.getenv("BROWSER_DEMO_MODE", "false").lower() == "true"
 BROWSER_DEMO_USER_ID = int(os.getenv("BROWSER_DEMO_USER_ID", "900000001"))
 PREMIUM_CHANNEL_IDS = {
-    "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "-1004479037964"),
-    "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "-1004342138729"),
+    "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "").strip(),
+    "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "").strip(),
 }
 
 
@@ -283,6 +283,8 @@ async def get_premium_membership_status(session, user_id: int) -> tuple[bool, st
 
     stream_name = stream.name
     channel_id = PREMIUM_CHANNEL_IDS[stream_name]
+    if not channel_id:
+        return False, f"The {stream_name.title()} Science Premium channel ID is not configured"
     telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember"
     try:
         timeout = aiohttp.ClientTimeout(total=6)

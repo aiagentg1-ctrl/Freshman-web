@@ -422,9 +422,6 @@ export default function TMAPage() {
               telegramFirstName={telegramUser?.first_name}
               resumeExam={resumeExam}
               isPremium={isPremium}
-              premiumVerificationError={premiumStatusError || profile.premium_verification_error}
-              premiumStatusRefreshing={premiumStatusRefreshing}
-              onRefreshPremiumStatus={() => void refreshPremiumStatus()}
               onResumeHandled={() => setResumeExam(null)}
               onGoHome={() => setActiveTab("home")}
               onGetPremium={() => setShowPremiumDialog(true)}
@@ -436,9 +433,6 @@ export default function TMAPage() {
               university={profile.university}
               telegramUserId={telegramUser?.id}
               isPremium={isPremium}
-              premiumVerificationError={premiumStatusError || profile.premium_verification_error}
-              premiumStatusRefreshing={premiumStatusRefreshing}
-              onRefreshPremiumStatus={() => void refreshPremiumStatus()}
               onGetPremium={() => setShowPremiumDialog(true)}
             />
           )}
@@ -450,9 +444,6 @@ export default function TMAPage() {
               university={profile.university}
               selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}
-              premiumVerificationError={premiumStatusError || profile.premium_verification_error}
-              premiumStatusRefreshing={premiumStatusRefreshing}
-              onRefreshPremiumStatus={() => void refreshPremiumStatus()}
               darkMode={darkMode}
               onToggleTheme={() => setDarkMode((value) => !value)}
               onContinueExam={handleContinueExam}

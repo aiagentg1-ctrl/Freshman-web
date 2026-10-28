@@ -78,9 +78,6 @@ export default function PracticeScreen({
   onResumeHandled,
   onGoHome,
   onGetPremium,
-  premiumVerificationError,
-  premiumStatusRefreshing,
-  onRefreshPremiumStatus,
 }: {
   stream: StreamKey;
   university: string;
@@ -91,9 +88,6 @@ export default function PracticeScreen({
   onResumeHandled?: () => void;
   onGoHome?: () => void;
   onGetPremium: () => void;
-  premiumVerificationError?: string | null;
-  premiumStatusRefreshing: boolean;
-  onRefreshPremiumStatus: () => void;
 }) {
   const [view, setView] = useState<View>({ kind: "subjectList" });
   const [mode, setMode] = useState<"subject" | "year" | "chapter">("subject");
@@ -684,16 +678,7 @@ export default function PracticeScreen({
           </div>
         </div>
 
-        {!isPremium && (
-          <div className="mt-3">
-            <PremiumBanner
-              onGetPremium={onGetPremium}
-              onRefreshPremiumStatus={onRefreshPremiumStatus}
-              premiumVerificationError={premiumVerificationError}
-              premiumStatusRefreshing={premiumStatusRefreshing}
-            />
-          </div>
-        )}
+        {!isPremium && <div className="mt-3"><PremiumBanner onGetPremium={onGetPremium} /></div>}
 
         {/* Segmented hub toggle */}
         <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 mt-3">
