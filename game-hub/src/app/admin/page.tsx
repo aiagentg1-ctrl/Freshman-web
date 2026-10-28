@@ -250,6 +250,7 @@ function ExamsManager() {
   const [batchError, setBatchError] = useState("");
   const [batchMessage, setBatchMessage] = useState("");
   const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [deletingScope, setDeletingScope] = useState<string | null>(null);
   const [questionCountEdited, setQuestionCountEdited] = useState(false);
   const [durationEdited, setDurationEdited] = useState(false);
   const detectedExamMetadata = form.content_type === "html" ? getExamMetadata(form.content_data) : null;
@@ -265,7 +266,17 @@ function ExamsManager() {
     ).length + 1;
     return buildAutoExamTitle(effectiveExamSubject, effectiveExamType, number);
   })();
-  const load = () => { setLoading(true); setError(""); adminGetExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      setItems(await adminGetExams());
+    } catch (value) {
+      setError(message(value));
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => { load(); }, []);
   function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); setQuestionCountEdited(false); setDurationEdited(false); }
   function updateBatchItem(id: string, changes: Partial<ExamBatchItem>) {
@@ -535,7 +546,51 @@ function ExamsManager() {
       }
     }
   }
-  async function remove(id: number) { if (!window.confirm("Delete this exam?")) return; try { await adminDeleteExam(id); load(); } catch (value) { setError(message(value)); } }
+  async function deleteExamGroup(scope: string, examIds: number[], confirmation: string) {
+    if (!examIds.length || deletingScope) return;
+    if (!window.confirm(confirmation)) return;
+    setDeletingScope(scope);
+    setError("");
+    let deletedCount = 0;
+    const failures: unknown[] = [];
+    for (const id of examIds) {
+      try {
+        await adminDeleteExam(id);
+        deletedCount += 1;
+      } catch (value) {
+        failures.push(value);
+      }
+    }
+    await load();
+    if (failures.length) {
+      const firstError = message(failures[0]);
+      setError(`Deleted ${deletedCount} of ${examIds.length} exams. ${failures.length} could not be deleted. First error: ${firstError}`);
+    }
+    setDeletingScope(null);
+  }
+  async function remove(id: number) {
+    await deleteExamGroup(
+      `exam:${id}`,
+      [id],
+      "Permanently delete this exam? This cannot be undone.",
+    );
+  }
+  function removeSubject(subject: string) {
+    const group = items.filter((item) => (item.subject || "general") === subject);
+    const subjectLabel = subject === "general" ? "General / Unclassified" : SUBJECTS[subject]?.label ?? subject.replace(/_/g, " ");
+    return deleteExamGroup(
+      `subject:${subject}`,
+      group.map((item) => item.id),
+      `Permanently delete all ${group.length} exam${group.length === 1 ? "" : "s"} in "${subjectLabel}"? This cannot be undone.`,
+    );
+  }
+  function removeAllExams() {
+    return deleteExamGroup(
+      "all",
+      items.map((item) => item.id),
+      `Permanently delete all ${items.length} exams? This cannot be undone.`,
+    );
+  }
   return (
     <ResourcePanel
       title="Exam management"
@@ -551,9 +606,12 @@ function ExamsManager() {
         is_published: item.is_published,
       }))}
       groupBySubject
+      deletingScope={deletingScope}
       onEdit={edit}
       onTogglePublish={(id) => adminToggleExamPublish(id).then(load).catch((value) => setError(message(value)))}
       onDelete={remove}
+      onDeleteGroup={removeSubject}
+      onDeleteAll={removeAllExams}
       onTogglePremium={(id) => adminToggleExamPremium(id).then(load).catch((value) => setError(message(value)))}
       form={
         <div className="space-y-5">
@@ -1235,6 +1293,9 @@ function ResourcePanel({
   error,
   items,
   onDelete,
+  onDeleteGroup,
+  onDeleteAll,
+  deletingScope,
   onEdit,
   onTogglePremium,
   onTogglePublish,
@@ -1247,6 +1308,9 @@ function ResourcePanel({
   error: string;
   items: { id: number; name: string; subject?: string; status: string; is_premium?: boolean; is_published?: boolean }[];
   onDelete?: (id: number) => void;
+  onDeleteGroup?: (subject: string) => void;
+  onDeleteAll?: () => void;
+  deletingScope?: string | null;
   onEdit?: (id: number) => void;
   onTogglePremium?: (id: number) => void;
   onTogglePublish?: (id: number) => void;
@@ -1274,10 +1338,10 @@ function ResourcePanel({
         </p>
       </div>
       <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end mt-2 sm:mt-0">
-        {onEdit && <button type="button" onClick={() => onEdit(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
-        {onTogglePublish && <button type="button" onClick={() => onTogglePublish(item.id)} className="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700">{item.is_published ? "Unpublish" : "Publish"}</button>}
-        {onTogglePremium && <button type="button" onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-700">Make {item.is_premium ? "Free" : "Premium"}</button>}
-        {onDelete && <button type="button" onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">Delete</button>}
+        {onEdit && <button type="button" disabled={Boolean(deletingScope)} onClick={() => onEdit(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
+        {onTogglePublish && <button type="button" disabled={Boolean(deletingScope)} onClick={() => onTogglePublish(item.id)} className="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">{item.is_published ? "Unpublish" : "Publish"}</button>}
+        {onTogglePremium && <button type="button" disabled={Boolean(deletingScope)} onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-700 disabled:cursor-not-allowed disabled:opacity-50">Make {item.is_premium ? "Free" : "Premium"}</button>}
+        {onDelete && <button type="button" disabled={Boolean(deletingScope)} onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-50">{deletingScope === `exam:${item.id}` ? "Deleting..." : "Delete"}</button>}
       </div>
     </div>
   );
@@ -1286,21 +1350,43 @@ function ResourcePanel({
       <section className="rounded-2xl bg-white p-5 shadow-sm flex flex-col max-h-[calc(100vh-250px)]">
         <h2 className="text-xl font-black">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+        {onDeleteAll && items.length > 0 && (
+          <button
+            type="button"
+            disabled={Boolean(deletingScope) || loading}
+            onClick={onDeleteAll}
+            className="mt-4 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deletingScope === "all" ? "Deleting all exams..." : `Delete all ${items.length} exams`}
+          </button>
+        )}
         {loading ? <p className="mt-5 text-sm text-slate-500">Loading...</p> : error ? <ErrorBanner error={error} /> : (
           <div className="mt-5 space-y-2 overflow-y-auto flex-1 custom-scrollbar">
             {groupBySubject && items.length === 0
               ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No exams have been added yet.</p>
               : groupBySubject
               ? groupedItems.map(([subject, group]) => (
-                <details key={subject} className="rounded-xl border border-slate-200 bg-white p-3">
-                  <summary className="cursor-pointer list-none font-black">
-                    <span className="flex items-center justify-between gap-3">
-                      <span>{subject === "general" ? "General / Unclassified" : SUBJECTS[subject]?.label ?? subject.replace(/_/g, " ")}</span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{group.length}</span>
-                    </span>
-                  </summary>
-                  <div className="mt-3 space-y-2">{group.map(renderItem)}</div>
-                </details>
+                <div key={subject} className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-3">
+                  <details className="min-w-0 flex-1">
+                    <summary className="cursor-pointer list-none font-black">
+                      <span className="flex items-center justify-between gap-3">
+                        <span>{subject === "general" ? "General / Unclassified" : SUBJECTS[subject]?.label ?? subject.replace(/_/g, " ")}</span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{group.length}</span>
+                      </span>
+                    </summary>
+                    <div className="mt-3 space-y-2">{group.map(renderItem)}</div>
+                  </details>
+                  {onDeleteGroup && (
+                    <button
+                      type="button"
+                      disabled={Boolean(deletingScope)}
+                      onClick={() => onDeleteGroup(subject)}
+                      className="shrink-0 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {deletingScope === `subject:${subject}` ? "Deleting..." : "Delete subject"}
+                    </button>
+                  )}
+                </div>
               ))
               : items.map(renderItem)}
           </div>
