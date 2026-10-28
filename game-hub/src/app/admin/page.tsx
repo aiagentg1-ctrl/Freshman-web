@@ -52,7 +52,7 @@ import {
   type Broadcast,
 } from "@/lib/api";
 import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
-import { getExamMetadata, getExamQuestionCount, getNoteMetadata, getSuggestedExamDuration, normalizeExamYear } from "@/lib/examMetadata";
+import { getExamMetadata, getExamQuestionCount, getNoteMetadata, getSuggestedExamDuration, normalizeExamYear, parseExamFilenameMetadata } from "@/lib/examMetadata";
 import { migrateLegacyStorage } from "@/lib/legacyStorage";
 
 type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing" | "broadcasts";
@@ -123,6 +123,19 @@ const allStudentSubjects = [...new Set([
   "english",
   "aptitude",
 ])];
+const MAX_BATCH_FILES = 100;
+
+function buildAutoExamTitle(subject: string, examType: "mid" | "final" | "", itemNumber: number): string {
+  const normalizedSubject = subject.trim().replace(/_/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalizedSubject || !examType) return "";
+  return `${normalizedSubject.toLowerCase()} ${examType} exam ${itemNumber}`;
+}
+
+function nextBatchTitleNumber(subject: string, examType: "mid" | "final" | "", items: ExamBatchItem[], excludeId?: string): number {
+  if (!subject || !examType) return 1;
+  const matching = items.filter((item) => item.id !== excludeId && item.subject === subject && item.examType === examType);
+  return matching.length + 1;
+}
 
 type ExamBatchItem = {
   id: string;
@@ -247,25 +260,29 @@ function ExamsManager() {
     : detectedExamMetadata?.year ?? null;
   const generatedTitlePreview = (() => {
     if (!effectiveExamSubject || !effectiveExamType) return null;
-    const escapedSubject = effectiveExamSubject.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/_/g, "[ _]");
-    const pattern = new RegExp(`^${effectiveExamType} exam (\\d+) \\(${escapedSubject}\\)(?:\\s|$)`, "i");
-    let number = items.filter(
-      (item) => item.subject === effectiveExamSubject && item.exam_type.toLowerCase() === effectiveExamType
+    const number = items.filter(
+      (item) => item.subject === effectiveExamSubject && item.exam_type.toLowerCase() === effectiveExamType,
     ).length + 1;
-    while (items.some((item) =>
-      item.subject === effectiveExamSubject
-      && item.exam_type.toLowerCase() === effectiveExamType
-      && pattern.test(item.title)
-      && Number(item.title.match(pattern)?.[1]) === number
-    )) number += 1;
-    const label = effectiveExamSubject.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
-    return `${effectiveExamType === "mid" ? "Mid" : "Final"} Exam ${number} (${label})`;
+    return buildAutoExamTitle(effectiveExamSubject, effectiveExamType, number);
   })();
   const load = () => { setLoading(true); setError(""); adminGetExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
   function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); setQuestionCountEdited(false); setDurationEdited(false); }
   function updateBatchItem(id: string, changes: Partial<ExamBatchItem>) {
-    setBatchItems((current) => current.map((item) => item.id === id ? { ...item, ...changes, error: undefined } : item));
+    setBatchItems((current) => current.map((item) => {
+      if (item.id !== id) return item;
+      const nextItem = { ...item, ...changes, error: undefined };
+      const subject = nextItem.subject.trim();
+      const examType = nextItem.examType === "mid" || nextItem.examType === "final" ? nextItem.examType : "";
+      const shouldAutoTitle = ("subject" in changes || "examType" in changes) && subject && examType && (!("title" in changes) || !changes.title);
+      if (shouldAutoTitle) {
+        return {
+          ...nextItem,
+          title: buildAutoExamTitle(subject, examType, nextBatchTitleNumber(subject, examType, current, id)),
+        };
+      }
+      return nextItem;
+    }));
     setBatchMessage("");
   }
   async function addBatchFiles(files: FileList | File[] | null) {
@@ -273,7 +290,7 @@ function ExamsManager() {
     setBatchPreparing(true);
     setBatchError("");
     setBatchMessage("");
-    const availableSlots = 30 - batchItems.length;
+    const availableSlots = MAX_BATCH_FILES - batchItems.length;
     const selectedFiles = Array.from(files);
     const supportedFiles = selectedFiles.filter((file) => /\.(html?|pdf)$/i.test(file.name));
     const selectionWarnings: string[] = [];
@@ -281,7 +298,7 @@ function ExamsManager() {
       selectionWarnings.push("Only HTML and PDF files are supported; unsupported files were skipped.");
     }
     if (availableSlots <= 0) {
-      setBatchError("A batch can contain at most 30 files. Remove a file before adding more.");
+      setBatchError(`A batch can contain at most ${MAX_BATCH_FILES} files. Remove a file before adding more.`);
       setBatchPreparing(false);
       return;
     }
@@ -292,15 +309,22 @@ function ExamsManager() {
     const addedItems: ExamBatchItem[] = [];
     for (const file of acceptedFiles) {
       const contentType = file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "html";
-      let detected = getExamMetadata("");
+      let detected = parseExamFilenameMetadata(file.name);
       let questionCount: number | "" = "";
+      let detectedDurationMinutes: number | null = null;
       let title = file.name.replace(/\.(html?|pdf)$/i, "").replace(/[_-]+/g, " ").trim();
       if (contentType === "html") {
         try {
           const html = await readLocalFile(file, "html");
-          detected = getExamMetadata(html);
+          const htmlMetadata = getExamMetadata(html);
+          detected = {
+            subject: detected.subject ?? htmlMetadata.subject ?? "",
+            university: detected.university ?? htmlMetadata.university ?? "",
+            year: detected.year ?? htmlMetadata.year ?? "",
+            examType: detected.examType ?? htmlMetadata.examType ?? null,
+          };
           questionCount = getExamQuestionCount(html) ?? "";
-          title = getNoteMetadata(html).title?.trim() || title;
+          detectedDurationMinutes = htmlMetadata.durationMinutes ?? null;
         } catch (value) {
           addedItems.push({
             id: crypto.randomUUID(),
@@ -324,21 +348,24 @@ function ExamsManager() {
         }
       }
       const subject = detected.subject ?? "";
+      const examType = detected.examType ?? "";
+      const generatedTitle = subject && examType
+        ? buildAutoExamTitle(subject, examType, nextBatchTitleNumber(subject, examType, [...batchItems, ...addedItems]))
+        : title;
       addedItems.push({
         id: crypto.randomUUID(),
         file,
         contentType,
         subject,
         year: detected.year ?? "",
-        title,
+        title: generatedTitle,
         university: detected.university ?? "",
         customTag: "",
         questionCount,
-        durationMinutes: detected.durationMinutes
-          ?? (questionCount ? getSuggestedExamDuration(subject, questionCount) : ""),
-        durationEdited: Boolean(detected.durationMinutes),
+        durationMinutes: detectedDurationMinutes ?? (questionCount ? getSuggestedExamDuration(subject, questionCount) : ""),
+        durationEdited: Boolean(detectedDurationMinutes),
         semester: "all",
-        examType: detected.examType ?? "",
+        examType,
         isPremium: true,
         isPublished: true,
       });
@@ -468,8 +495,10 @@ function ExamsManager() {
       const durationMinutes = typeof form.duration_minutes === "number" && form.duration_minutes > 0
         ? form.duration_minutes
         : detectedMetadata?.durationMinutes ?? getSuggestedExamDuration(subject, questionCount);
+      const fallbackTitle = `${subject.replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase()} ${examType} exam ${items.filter((item) => item.subject === subject && item.exam_type.toLowerCase() === examType).length + 1}`;
       const payload = {
         ...form,
+        title: form.title.trim() || fallbackTitle,
         subject,
         exam_type: examType,
         university: form.university,
@@ -532,9 +561,9 @@ function ExamsManager() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h4 className="font-black">Batch upload and review</h4>
-              <p className="mt-1 text-xs leading-5 text-slate-600">Add up to 30 HTML or PDF exams. Review and correct each file’s details before confirming submission.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-600">Add up to {MAX_BATCH_FILES} HTML or PDF exams. Review and correct each file’s details before confirming submission.</p>
             </div>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">{batchItems.length}/30 files</span>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">{batchItems.length}/{MAX_BATCH_FILES} files</span>
           </div>
           <div
             className="mt-3 rounded-xl border-2 border-dashed border-blue-200 bg-white p-4 text-center"
@@ -550,7 +579,7 @@ function ExamsManager() {
                 type="file"
                 multiple
                 accept=".html,.htm,.pdf,text/html,application/pdf"
-                disabled={batchSubmitting || batchPreparing || batchItems.length >= 30}
+                disabled={batchSubmitting || batchPreparing || batchItems.length >= MAX_BATCH_FILES}
                 onChange={(event) => {
                   setSelectedBatchFiles(Array.from(event.currentTarget.files ?? []));
                   event.currentTarget.value = "";
@@ -567,7 +596,7 @@ function ExamsManager() {
               </p>
               <button
                 type="button"
-                disabled={!selectedBatchFiles.length || batchSubmitting || batchPreparing || batchItems.length >= 30}
+                disabled={!selectedBatchFiles.length || batchSubmitting || batchPreparing || batchItems.length >= MAX_BATCH_FILES}
                 onClick={() => {
                   const filesToAdd = selectedBatchFiles;
                   setSelectedBatchFiles([]);

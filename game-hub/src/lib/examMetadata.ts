@@ -105,7 +105,7 @@ function normalizeSubject(value: string): string | null {
     ["chemistry", ["chemistry"]],
     ["biology", ["biology"]],
     ["logic", ["logic", "critical thinking"]],
-    ["psychology", ["psychology"]],
+    ["psychology", ["psychology", "psycho"]],
     ["emerging_technology", ["emerging technology"]],
     ["anthropology", ["anthropology"]],
     ["global_trends", ["global trends"]],
@@ -118,6 +118,73 @@ function normalizeSubject(value: string): string | null {
     ["e_she", ["e she", "eshe"]],
   ];
   return subjects.find(([, aliases]) => aliases.some((alias) => normalized === alias || normalized.includes(alias)))?.[0] ?? null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function parseExamFilenameMetadata(fileName: string): Pick<ExamMetadata, "subject" | "university" | "year" | "examType"> {
+  const stem = fileName.replace(/\.[^./\\]+$/, "").replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+  const normalizedStem = stem.toLowerCase();
+  const examType: "mid" | "final" | null = /\bmid(?:term)?\b/.test(normalizedStem)
+    ? "mid"
+    : /\bfinal\b/.test(normalizedStem)
+      ? "final"
+      : null;
+
+  const university = universities.find((option) => {
+    const abbreviations = option.abbreviation
+      .split(/[\/]/)
+      .map((part) => part.trim())
+      .flatMap((part) => [part, part.replace(/[^A-Za-z0-9]/g, "")])
+      .filter(Boolean)
+      .map((part) => part.toLowerCase());
+    const nameText = option.name.toLowerCase();
+    return abbreviations.some((abbreviation) => normalizedStem.includes(abbreviation))
+      || normalizedStem.includes(nameText);
+  })?.name ?? null;
+
+  const year = stem.match(/\b(20\d{2}|19\d{2})\b/)?.[1] ?? null;
+
+  const subjectCandidates = [
+    "physics",
+    "mathematics",
+    "math",
+    "chemistry",
+    "biology",
+    "logic",
+    "critical thinking",
+    "psychology",
+    "psycho",
+    "emerging technology",
+    "anthropology",
+    "global trends",
+    "entrepreneurship",
+    "english",
+    "communicative english",
+    "aptitude",
+    "civics",
+    "moral education",
+    "geography",
+    "economics",
+    "e she",
+    "eshe",
+    "history",
+    "history of ethiopia",
+  ];
+
+  const subject = subjectCandidates
+    .find((candidate) => new RegExp(`\\b${escapeRegExp(candidate).replace(/\\s+/g, "\\s+")}\\b`, "i").test(stem))
+    ? normalizeSubject(subjectCandidates.find((candidate) => new RegExp(`\\b${escapeRegExp(candidate).replace(/\\s+/g, "\\s+")}\\b`, "i").test(stem)) ?? stem)
+    : normalizeSubject(stem) ?? null;
+
+  return {
+    subject,
+    university,
+    year,
+    examType,
+  };
 }
 
 function getHtmlMetadataValue(html: string, name: string): string | null {
