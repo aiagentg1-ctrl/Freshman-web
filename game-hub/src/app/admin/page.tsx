@@ -232,6 +232,7 @@ function ExamsManager() {
   const [editing, setEditing] = useState<AdminExamMeta | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [batchItems, setBatchItems] = useState<ExamBatchItem[]>([]);
+  const [selectedBatchFiles, setSelectedBatchFiles] = useState<File[]>([]);
   const [batchPreparing, setBatchPreparing] = useState(false);
   const [batchError, setBatchError] = useState("");
   const [batchMessage, setBatchMessage] = useState("");
@@ -267,7 +268,7 @@ function ExamsManager() {
     setBatchItems((current) => current.map((item) => item.id === id ? { ...item, ...changes, error: undefined } : item));
     setBatchMessage("");
   }
-  async function addBatchFiles(files: FileList | null) {
+  async function addBatchFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
     setBatchPreparing(true);
     setBatchError("");
@@ -543,22 +544,40 @@ function ExamsManager() {
               void addBatchFiles(event.dataTransfer.files);
             }}
           >
-            <p className="text-sm font-bold text-slate-700">Select multiple files together or drag them here</p>
-            <p className="mt-1 text-xs text-slate-500">In the file picker, use Ctrl+A to select all, or Ctrl/Shift-click to choose several.</p>
-            <label className="mt-3 inline-flex cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
-              Choose exam files
+            <label className="block text-left">
+              <span className="mb-2 block text-sm font-bold text-slate-700">Choose multiple exam files</span>
               <input
                 type="file"
                 multiple
                 accept=".html,.htm,.pdf,text/html,application/pdf"
                 disabled={batchSubmitting || batchPreparing || batchItems.length >= 30}
                 onChange={(event) => {
-                  void addBatchFiles(event.currentTarget.files);
+                  setSelectedBatchFiles(Array.from(event.currentTarget.files ?? []));
                   event.currentTarget.value = "";
                 }}
-                className="sr-only"
+                className="block w-full cursor-pointer rounded-lg border border-slate-200 bg-white p-2 text-sm file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:font-bold file:text-white disabled:opacity-50"
               />
             </label>
+            <p className="mt-2 text-left text-xs text-slate-500">Use Ctrl+A or Ctrl/Shift-click in the file picker. On a phone, use the picker’s multi-select option if available, or drag several files here.</p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-700" aria-live="polite">
+                {selectedBatchFiles.length
+                  ? `${selectedBatchFiles.length} file${selectedBatchFiles.length === 1 ? "" : "s"} selected`
+                  : "No files selected"}
+              </p>
+              <button
+                type="button"
+                disabled={!selectedBatchFiles.length || batchSubmitting || batchPreparing || batchItems.length >= 30}
+                onClick={() => {
+                  const filesToAdd = selectedBatchFiles;
+                  setSelectedBatchFiles([]);
+                  void addBatchFiles(filesToAdd);
+                }}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Add selected files to review
+              </button>
+            </div>
           </div>
           {batchPreparing && <p className="mt-3 text-xs font-semibold text-blue-700">Reading selected HTML files and detecting metadata...</p>}
           {batchError && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{batchError}</p>}
