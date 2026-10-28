@@ -1157,7 +1157,7 @@ async def get_user(user_id: int, authenticated_user_id: int = Depends(verify_dev
         user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        is_premium, _ = await get_premium_membership_status(session, user_id)
+        is_premium, premium_verification_error = await get_premium_membership_status(session, user_id)
         return {
             "user_id": user.user_id,
             "first_name": user.first_name,
@@ -1171,6 +1171,7 @@ async def get_user(user_id: int, authenticated_user_id: int = Depends(verify_dev
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
             "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
             "is_premium": is_premium,
+            "premium_verification_error": premium_verification_error,
         }
 
 
@@ -1378,7 +1379,7 @@ async def upsert_user_profile(update: UserProfileUpsert):
 
         await session.commit()
         await session.refresh(user)
-        is_premium, _ = await get_premium_membership_status(session, user.user_id)
+        is_premium, premium_verification_error = await get_premium_membership_status(session, user.user_id)
         return {
             "user_id": user.user_id,
             "first_name": user.first_name,
@@ -1392,6 +1393,7 @@ async def upsert_user_profile(update: UserProfileUpsert):
             "selected_subjects": json.loads(user.selected_subjects or "[]"),
             "premium_expires_at": user.premium_expires_at.isoformat() if user.premium_expires_at else None,
             "is_premium": is_premium,
+            "premium_verification_error": premium_verification_error,
         }
 
 

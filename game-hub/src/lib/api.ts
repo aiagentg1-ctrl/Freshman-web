@@ -150,6 +150,7 @@ export interface UserProfile {
   selected_subjects: string[];
   premium_expires_at?: string | null;
   is_premium?: boolean;
+  premium_verification_error?: string | null;
 }
 
 export interface SubjectSuggestion {
@@ -556,9 +557,13 @@ export async function getUserProgress(userId: number): Promise<UserProgress> {
   return request<UserProgress>(`/api/user/${userId}/profile`);
 }
 
+export async function refreshUser(userId: number): Promise<UserProfile> {
+  return request<UserProfile>(`/api/user/${userId}`);
+}
+
 export async function getUser(userId: number): Promise<UserProfile | null> {
   try {
-    return await request<UserProfile>(`/api/user/${userId}`);
+    return await refreshUser(userId);
   } catch {
     return null;
   }

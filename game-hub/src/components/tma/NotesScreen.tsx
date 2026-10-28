@@ -21,12 +21,18 @@ export default function NotesScreen({
   telegramUserId,
   isPremium,
   onGetPremium,
+  premiumVerificationError,
+  premiumStatusRefreshing,
+  onRefreshPremiumStatus,
 }: {
   stream: StreamKey;
   university: string;
   telegramUserId?: number;
   isPremium: boolean;
   onGetPremium: () => void;
+  premiumVerificationError?: string | null;
+  premiumStatusRefreshing: boolean;
+  onRefreshPremiumStatus: () => void;
 }) {
   const [view, setView] = useState<View>({ kind: "subjects" });
   const [loading, setLoading] = useState(false);
@@ -281,7 +287,14 @@ export default function NotesScreen({
       </div>
 
       <div className="flex-1 px-4 md:px-8 lg:px-12 py-4 space-y-3">
-        {!isPremium && <PremiumBanner onGetPremium={onGetPremium} />}
+        {!isPremium && (
+          <PremiumBanner
+            onGetPremium={onGetPremium}
+            onRefreshPremiumStatus={onRefreshPremiumStatus}
+            premiumVerificationError={premiumVerificationError}
+            premiumStatusRefreshing={premiumStatusRefreshing}
+          />
+        )}
         {subjects.map((subject) => {
           const Icon = subject.icon;
           return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Flame, Lock, RefreshCw, X } from "lucide-react";
 import BottomNav, { Tab } from "../../components/tma/BottomNav";
 import HomeScreen from "../../components/tma/HomeScreen";
@@ -10,7 +10,7 @@ import PracticeScreen from "../../components/tma/PracticeScreen";
 import ProfileScreen from "../../components/tma/ProfileScreen";
 import GameScreen from "../../components/tma/GameScreen";
 import { DevUserSetup } from "../../components/DevUserSetup";
-import { dailyCheckIn, DailyCheckIn, ExamMeta, getSubscriptionPricing, getUser, releaseDeviceSession, startDeviceSession, StreamKey, SubscriptionPricing, updateUser } from "../../lib/api";
+import { dailyCheckIn, DailyCheckIn, ExamMeta, getSubscriptionPricing, getUser, refreshUser, releaseDeviceSession, startDeviceSession, StreamKey, SubscriptionPricing, updateUser } from "../../lib/api";
 import { expandTelegramApp, getTelegramInitData, getTelegramUser, TelegramUser } from "../../lib/telegram";
 import { migrateLegacyStorage } from "../../lib/legacyStorage";
 import PremiumDialog from "../../components/tma/PremiumDialog";
@@ -25,6 +25,7 @@ interface LocalProfile {
   stream: StreamKey;
   selected_subjects: string[];
   is_premium: boolean;
+  premium_verification_error?: string | null;
 }
 
 const VALID_STREAMS: StreamKey[] = ["natural", "social"];
@@ -60,6 +61,9 @@ export default function TMAPage() {
   const [showPremiumDialog, setShowPremiumDialog] = useState(false);
   const [subscriptionPricing, setSubscriptionPricing] = useState<SubscriptionPricing | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [premiumStatusRefreshing, setPremiumStatusRefreshing] = useState(false);
+  const [premiumStatusError, setPremiumStatusError] = useState("");
+  const premiumRefreshAt = useRef(0);
 
   useEffect(() => {
     setDarkMode(localStorage.getItem("freshoTheme") === "dark");
@@ -164,11 +168,17 @@ export default function TMAPage() {
             stream: remote.stream.toLowerCase() as StreamKey,
             selected_subjects: remote.selected_subjects || [],
             is_premium: remote.is_premium === true,
+            premium_verification_error: remote.premium_verification_error ?? null,
           });
         } else {
           try {
             const saved = JSON.parse(localStorage.getItem("freshoProfile") || "null") as LocalProfile | null;
-            if (isCompleteProfile(saved)) setProfile(saved);
+            if (isCompleteProfile(saved)) {
+              setProfile({
+                ...saved,
+                premium_verification_error: "Could not verify your channel membership. Refresh the check before purchasing Premium.",
+              });
+            }
             else setProfile(null);
           } catch {
             setProfile(null);
@@ -245,6 +255,7 @@ export default function TMAPage() {
           selected_subjects,
         });
         next.is_premium = savedProfile.is_premium === true;
+        next.premium_verification_error = savedProfile.premium_verification_error ?? null;
       } catch (error) {
         console.error("Failed to save onboarding profile:", error);
       }
@@ -300,6 +311,55 @@ export default function TMAPage() {
       setBooting(false);
     }
   };
+
+  const refreshPremiumStatus = useCallback(async () => {
+    const userId = telegramUser?.id;
+    if (!userId || premiumStatusRefreshing) return;
+    setPremiumStatusRefreshing(true);
+    setPremiumStatusError("");
+    try {
+      const remote = await refreshUser(userId);
+      setProfile((current) => {
+        if (!current) return current;
+        const isPremium = remote.is_premium === true;
+        const verificationError = remote.premium_verification_error ?? null;
+        if (
+          current.is_premium === isPremium
+          && (current.premium_verification_error ?? null) === verificationError
+        ) return current;
+        return {
+          ...current,
+          is_premium: isPremium,
+          premium_verification_error: verificationError,
+        };
+      });
+      if (remote.premium_verification_error) {
+        setPremiumStatusError(remote.premium_verification_error);
+      } else {
+        setPremiumStatusError("");
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not refresh Premium status.";
+      setPremiumStatusError(message);
+    } finally {
+      setPremiumStatusRefreshing(false);
+    }
+  }, [premiumStatusRefreshing, telegramUser?.id]);
+
+  useEffect(() => {
+    if (deviceStatus !== "active" || !profile) return;
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== "visible" || Date.now() - premiumRefreshAt.current < 10_000) return;
+      premiumRefreshAt.current = Date.now();
+      void refreshPremiumStatus();
+    };
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    window.addEventListener("focus", refreshIfVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+      window.removeEventListener("focus", refreshIfVisible);
+    };
+  }, [deviceStatus, profile, refreshPremiumStatus]);
 
   const handleContinueExam = (exam: ExamMeta) => {
     setResumeExam(exam);
@@ -362,6 +422,9 @@ export default function TMAPage() {
               telegramFirstName={telegramUser?.first_name}
               resumeExam={resumeExam}
               isPremium={isPremium}
+              premiumVerificationError={premiumStatusError || profile.premium_verification_error}
+              premiumStatusRefreshing={premiumStatusRefreshing}
+              onRefreshPremiumStatus={() => void refreshPremiumStatus()}
               onResumeHandled={() => setResumeExam(null)}
               onGoHome={() => setActiveTab("home")}
               onGetPremium={() => setShowPremiumDialog(true)}
@@ -373,6 +436,9 @@ export default function TMAPage() {
               university={profile.university}
               telegramUserId={telegramUser?.id}
               isPremium={isPremium}
+              premiumVerificationError={premiumStatusError || profile.premium_verification_error}
+              premiumStatusRefreshing={premiumStatusRefreshing}
+              onRefreshPremiumStatus={() => void refreshPremiumStatus()}
               onGetPremium={() => setShowPremiumDialog(true)}
             />
           )}
@@ -384,6 +450,9 @@ export default function TMAPage() {
               university={profile.university}
               selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}
+              premiumVerificationError={premiumStatusError || profile.premium_verification_error}
+              premiumStatusRefreshing={premiumStatusRefreshing}
+              onRefreshPremiumStatus={() => void refreshPremiumStatus()}
               darkMode={darkMode}
               onToggleTheme={() => setDarkMode((value) => !value)}
               onContinueExam={handleContinueExam}
@@ -411,6 +480,9 @@ export default function TMAPage() {
               stream={profile.stream}
               selectedSubjects={profile.selected_subjects}
               isPremium={isPremium}
+              premiumVerificationError={premiumStatusError || profile.premium_verification_error}
+              premiumStatusRefreshing={premiumStatusRefreshing}
+              onRefreshPremiumStatus={() => void refreshPremiumStatus()}
               premiumPrice={subscriptionPricing?.price ?? null}
               onProfileChange={handleProfileChange}
               onSignOut={handleDeviceSignOut}

@@ -21,6 +21,9 @@ export default function ProfileScreen({
   stream,
   selectedSubjects,
   isPremium,
+  premiumVerificationError,
+  premiumStatusRefreshing,
+  onRefreshPremiumStatus,
   premiumPrice,
   onProfileChange,
   onSignOut,
@@ -35,6 +38,9 @@ export default function ProfileScreen({
   stream: StreamKey;
   selectedSubjects: string[];
   isPremium: boolean;
+  premiumVerificationError?: string | null;
+  premiumStatusRefreshing: boolean;
+  onRefreshPremiumStatus: () => void;
   premiumPrice: number | null;
   onProfileChange: (profile: {
     full_name: string;
@@ -329,14 +335,31 @@ export default function ProfileScreen({
             </div>
             <div>
               <p className={`text-xs font-bold uppercase tracking-[0.14em] ${isPremium ? "text-amber-200" : "text-white/75"}`}>Fresho Premium</p>
-              <h3 className="text-lg font-black">{isPremium ? "Premium Member" : "Get Premium"}</h3>
+              <h3 className="text-lg font-black">
+                {isPremium ? "Premium Member" : premiumVerificationError ? "Membership check needed" : "Get Premium"}
+              </h3>
             </div>
           </div>
           <p className="relative mt-3 text-xs leading-5 text-white/85">
             {isPremium
               ? "Your all-access pass is active. Premium exams, notes, chapter questions, and flashcards are unlocked."
-              : `${premiumPrice === null ? "See the Premium offer for the current price" : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(premiumPrice)} ETB`} for 5 months. Includes daily plans, detailed notes, exams, AAU resources, and videos.`}
+              : premiumVerificationError
+                ? "We could not confirm your channel membership. Refresh the check, or try again later."
+                : `${premiumPrice === null ? "See the Premium offer for the current price" : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(premiumPrice)} ETB`} for 5 months. Includes daily plans, detailed notes, exams, AAU resources, and videos.`}
           </p>
+          {!isPremium && (
+            <div className="relative mt-3">
+              {premiumVerificationError && <p role="alert" className="mb-2 text-xs leading-5 text-amber-100">{premiumVerificationError}</p>}
+              <button
+                type="button"
+                onClick={onRefreshPremiumStatus}
+                disabled={premiumStatusRefreshing}
+                className="rounded-lg border border-white/40 bg-white/10 px-3 py-2 text-xs font-bold text-white disabled:cursor-wait disabled:opacity-70"
+              >
+                {premiumStatusRefreshing ? "Checking channel membership..." : "Already joined? Refresh status"}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
