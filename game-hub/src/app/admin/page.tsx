@@ -291,7 +291,7 @@ function ExamsManager() {
     const addedItems: ExamBatchItem[] = [];
     for (const file of acceptedFiles) {
       const contentType = file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "html";
-      let detected = { subject: null as string | null, year: null as string | null, examType: null as "final" | "mid" | null, durationMinutes: null as number | null };
+      let detected = getExamMetadata("");
       let questionCount: number | "" = "";
       let title = file.name.replace(/\.(html?|pdf)$/i, "").replace(/[_-]+/g, " ").trim();
       if (contentType === "html") {
@@ -535,20 +535,31 @@ function ExamsManager() {
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">{batchItems.length}/30 files</span>
           </div>
-          <label className="mt-3 block">
-            <span className="sr-only">Choose up to 30 exam files</span>
-            <input
-              type="file"
-              multiple
-              accept=".html,.htm,.pdf,text/html,application/pdf"
-              disabled={batchSubmitting || batchPreparing || batchItems.length >= 30}
-              onChange={(event) => {
-                void addBatchFiles(event.target.files);
-                event.target.value = "";
-              }}
-              className="block w-full rounded-xl border border-blue-200 bg-white p-3 text-sm disabled:opacity-50"
-            />
-          </label>
+          <div
+            className="mt-3 rounded-xl border-2 border-dashed border-blue-200 bg-white p-4 text-center"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              void addBatchFiles(event.dataTransfer.files);
+            }}
+          >
+            <p className="text-sm font-bold text-slate-700">Select multiple files together or drag them here</p>
+            <p className="mt-1 text-xs text-slate-500">In the file picker, use Ctrl+A to select all, or Ctrl/Shift-click to choose several.</p>
+            <label className="mt-3 inline-flex cursor-pointer rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+              Choose exam files
+              <input
+                type="file"
+                multiple
+                accept=".html,.htm,.pdf,text/html,application/pdf"
+                disabled={batchSubmitting || batchPreparing || batchItems.length >= 30}
+                onChange={(event) => {
+                  void addBatchFiles(event.currentTarget.files);
+                  event.currentTarget.value = "";
+                }}
+                className="sr-only"
+              />
+            </label>
+          </div>
           {batchPreparing && <p className="mt-3 text-xs font-semibold text-blue-700">Reading selected HTML files and detecting metadata...</p>}
           {batchError && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{batchError}</p>}
           {batchMessage && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">{batchMessage}</p>}
