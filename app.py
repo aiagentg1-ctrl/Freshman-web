@@ -31,18 +31,6 @@ from models import (
 
 VALID_SUBJECTS = [s.value for s in SubjectEnum]
 VALID_STREAMS = [s.name for s in StreamEnum]
-NATURAL_ONLY_SUBJECTS = {
-    SubjectEnum.LOGIC,
-    SubjectEnum.PSYCHOLOGY,
-    SubjectEnum.PHYSICS,
-    SubjectEnum.HISTORY,
-}
-SOCIAL_ONLY_SUBJECTS = {
-    SubjectEnum.CIVICS,
-    SubjectEnum.GLOBAL_TRENDS,
-    SubjectEnum.ENTREPRENEURSHIP,
-    SubjectEnum.ECONOMICS,
-}
 SHARED_SUBJECTS = {
     SubjectEnum.ANTHROPOLOGY,
     SubjectEnum.COMMUNICATIVE_ENGLISH,
@@ -137,8 +125,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 BROWSER_DEMO_MODE = os.getenv("BROWSER_DEMO_MODE", "false").lower() == "true"
 BROWSER_DEMO_USER_ID = int(os.getenv("BROWSER_DEMO_USER_ID", "900000001"))
 PREMIUM_CHANNEL_IDS = {
-    "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "").strip(),
-    "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "").strip(),
+    "NATURAL": "-1004479037964",
+    "SOCIAL": "-1004342138729",
 }
 
 
@@ -274,35 +262,40 @@ async def verify_device_session(
 
 
 async def get_premium_membership_status(session, user_id: int) -> tuple[bool, str | None]:
-    user_result = await session.execute(select(User.stream).where(User.user_id == user_id))
-    stream = user_result.scalar_one_or_none()
-    if stream not in (StreamEnum.NATURAL, StreamEnum.SOCIAL):
-        return False, None
     if not BOT_TOKEN:
         return False, "Premium membership verification is not configured"
 
-    stream_name = stream.name
-    channel_id = PREMIUM_CHANNEL_IDS[stream_name]
-    if not channel_id:
-        return False, f"The {stream_name.title()} Science Premium channel ID is not configured"
     telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getChatMember"
-    try:
-        timeout = aiohttp.ClientTimeout(total=6)
-        async with aiohttp.ClientSession(timeout=timeout) as client:
-            async with client.get(telegram_url, params={"chat_id": channel_id, "user_id": user_id}) as response:
-                payload = await response.json(content_type=None)
-    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
-        print(f"Premium membership check failed for stream {stream_name}: {error}")
-        return False, "Could not verify premium membership right now"
+    verification_errors: list[str] = []
+    timeout = aiohttp.ClientTimeout(total=6)
+    async with aiohttp.ClientSession(timeout=timeout) as client:
+        for channel_id in dict.fromkeys(PREMIUM_CHANNEL_IDS.values()):
+            try:
+                async with client.get(
+                    telegram_url,
+                    params={"chat_id": channel_id, "user_id": user_id},
+                ) as response:
+                    payload = await response.json(content_type=None)
+            except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+                print(f"Premium membership check failed for channel {channel_id}: {error}")
+                verification_errors.append("Could not verify premium membership right now")
+                continue
 
-    if not payload.get("ok"):
-        print(f"Telegram getChatMember failed for stream {stream_name}: {payload.get('description', 'unknown error')}")
-        return False, "Could not verify premium membership right now"
+            if not payload.get("ok"):
+                description = payload.get("description", "unknown error")
+                print(f"Telegram getChatMember failed for channel {channel_id}: {description}")
+                verification_errors.append("Could not verify premium membership right now")
+                continue
 
-    member = payload.get("result", {})
-    is_member = member.get("status") in {"member", "administrator", "creator"}
-    is_restricted_member = member.get("status") == "restricted" and member.get("is_member") is True
-    return is_member or is_restricted_member, None
+            member = payload.get("result", {})
+            is_member = member.get("status") in {"member", "administrator", "creator"}
+            is_restricted_member = member.get("status") == "restricted" and member.get("is_member") is True
+            if is_member or is_restricted_member:
+                return True, None
+
+    if verification_errors:
+        return False, verification_errors[0]
+    return False, None
 
 
 async def require_premium_membership(session, user_id: int) -> None:
@@ -318,44 +311,9 @@ async def require_premium_membership(session, user_id: int) -> None:
             detail={
                 "code": "PREMIUM_MEMBERSHIP_REQUIRED",
                 "stream": stream_name.lower(),
-                "message": f"Join the {stream_name.title()} Science channel to unlock this premium material.",
+                "message": "Join the Natural Science or Social Science Telegram channel to unlock this premium material.",
             },
         )
-
-
-async def require_material_stream_access(
-    session,
-    user_id: int,
-    material_stream: StreamEnum | None,
-    material_subject: SubjectEnum | None = None,
-) -> None:
-    if material_stream is None or material_subject in SHARED_SUBJECTS:
-        return
-    result = await session.execute(select(User.stream).where(User.user_id == user_id))
-    user_stream = result.scalar_one_or_none()
-    if user_stream != material_stream:
-        raise HTTPException(
-            status_code=403,
-            detail={
-                "code": "MATERIAL_STREAM_MISMATCH",
-                "message": "This premium material is not available for your science stream.",
-            },
-        )
-
-
-def exam_material_stream(subject: SubjectEnum) -> StreamEnum | None:
-    if subject in NATURAL_ONLY_SUBJECTS:
-        return StreamEnum.NATURAL
-    if subject in SOCIAL_ONLY_SUBJECTS:
-        return StreamEnum.SOCIAL
-    return None
-
-
-async def chapter_exam_stream(session, exam: ChapterExam) -> StreamEnum | None:
-    if exam.stream is not None or exam.note_id is None:
-        return exam.stream
-    result = await session.execute(select(Note.stream).where(Note.id == exam.note_id))
-    return result.scalar_one_or_none()
 
 
 class DeviceSessionRequest(BaseModel):
@@ -2110,7 +2068,6 @@ async def get_exam(
                     session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
                 )
                 await require_premium_membership(session, user_id)
-                await require_material_stream_access(session, user_id, exam_material_stream(exam.subject))
         return serialize_exam(exam, include_content=True)
 
 
@@ -2334,9 +2291,6 @@ async def submit_exam_attempt(
 
         if exam.is_premium:
             await require_premium_membership(session, attempt.user_id)
-            await require_material_stream_access(
-                session, attempt.user_id, exam_material_stream(exam.subject)
-            )
 
         result = await session.execute(select(User).where(User.user_id == attempt.user_id))
         db_user = result.scalar_one_or_none()
@@ -2561,9 +2515,6 @@ async def get_note(
                 session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
             )
             await require_premium_membership(session, user_id)
-            await require_material_stream_access(
-                session, user_id, note.stream, note.subject
-            )
         return serialize_note(note, include_content=True)
 
 
@@ -2798,12 +2749,6 @@ async def get_chapter_exam(
                         session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
                     )
                     await require_premium_membership(session, user_id)
-                    await require_material_stream_access(
-                        session,
-                        user_id,
-                        await chapter_exam_stream(session, exam),
-                        exam.subject,
-                    )
             return serialize_chapter_exam(exam, include_content=True)
     except HTTPException:
         raise
@@ -2942,12 +2887,6 @@ async def submit_chapter_exam_attempt(
             raise HTTPException(status_code=404, detail="Chapter exam not found")
         if exam.is_premium:
             await require_premium_membership(session, attempt.user_id)
-            await require_material_stream_access(
-                session,
-                attempt.user_id,
-                await chapter_exam_stream(session, exam),
-                exam.subject,
-            )
 
         user_result = await session.execute(select(User).where(User.user_id == attempt.user_id))
         user = user_result.scalar_one_or_none()

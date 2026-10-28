@@ -17,10 +17,6 @@ services:
         sync: false
       - key: ADMIN_SECRET
         sync: false
-      - key: NATURAL_SCIENCE_CHANNEL_ID
-        value: "-1004479037964"
-      - key: SOCIAL_SCIENCE_CHANNEL_ID
-        value: "-1004342138729"
       - key: CHANNEL_1_ID
         value: "-1002656898914"
       - key: CHANNEL_1_URL

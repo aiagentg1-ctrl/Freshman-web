@@ -31,8 +31,8 @@ REQUIRED_CHANNEL_ID = int(os.getenv("CHANNEL_1_ID", "-1002656898914"))
 REQUIRED_CHANNEL_URL = os.getenv("CHANNEL_1_URL", "https://t.me/AAU101")
 REQUIRED_CHANNEL_NAME = os.getenv("CHANNEL_1_NAME", "AAU101")
 PREMIUM_CHANNEL_IDS = {
-    "NATURAL": os.getenv("NATURAL_SCIENCE_CHANNEL_ID", "").strip(),
-    "SOCIAL": os.getenv("SOCIAL_SCIENCE_CHANNEL_ID", "").strip(),
+    "NATURAL": "-1004479037964",
+    "SOCIAL": "-1004342138729",
 }
 
 NATURAL_SUBJECTS = {
@@ -120,21 +120,22 @@ async def get_student_access(user_id: int):
         raise RuntimeError("Could not load your Fresho profile right now. Please try again.") from error
     if not user:
         return None, False, None
-    if user.stream not in (StreamEnum.NATURAL, StreamEnum.SOCIAL):
-        return user, False, None
-
-    channel_id = PREMIUM_CHANNEL_IDS[user.stream.name]
-    if not channel_id:
-        return user, False, f"The {user.stream.name.title()} Science Premium channel ID is not configured."
-    try:
-        member = await bot.get_chat_member(channel_id, user_id)
-    except Exception as error:
-        print(f"Could not verify Telegram Premium membership: {error}")
+    verification_failed = False
+    for channel_id in dict.fromkeys(PREMIUM_CHANNEL_IDS.values()):
+        try:
+            member = await bot.get_chat_member(channel_id, user_id)
+        except Exception as error:
+            print(f"Could not verify Telegram Premium membership in channel {channel_id}: {error}")
+            verification_failed = True
+            continue
+        is_member = member.status in {"member", "administrator", "creator"} or (
+            member.status == "restricted" and getattr(member, "is_member", False)
+        )
+        if is_member:
+            return user, True, None
+    if verification_failed:
         return user, False, "Could not verify Premium access right now. Please try again."
-    is_premium = member.status in {"member", "administrator", "creator"} or (
-        member.status == "restricted" and getattr(member, "is_member", False)
-    )
-    return user, is_premium, None
+    return user, False, None
 
 
 def exams_home_keyboard():
