@@ -385,23 +385,29 @@ function ExamsManager() {
     if (selectionWarnings.length) setBatchError(selectionWarnings.join(" "));
     setBatchPreparing(false);
   }
-  function batchItemProblem(item: ExamBatchItem): string | null {
-    if (item.readError) return `Could not read this file. Remove it and try adding it again. ${item.readError}`;
-    if (!item.subject) return "Choose a subject.";
-    if (!item.examType) return "Choose mid or final.";
-    if (typeof item.questionCount !== "number" || !Number.isInteger(item.questionCount) || item.questionCount < 1 || item.questionCount > 200) return "Enter a question count from 1 to 200.";
-    if (typeof item.durationMinutes !== "number" || !Number.isInteger(item.durationMinutes) || item.durationMinutes < 1 || item.durationMinutes > 1200) return "Enter a duration from 1 to 1,200 minutes.";
-    return null;
+  function batchItemProblems(item: ExamBatchItem): string[] {
+    if (item.readError) return [`Could not read this file. Remove it and try adding it again. ${item.readError}`];
+    const problems: string[] = [];
+    if (!item.subject) problems.push("Choose a subject.");
+    if (!item.examType) problems.push("Choose mid or final.");
+    if (typeof item.questionCount !== "number" || !Number.isInteger(item.questionCount) || item.questionCount < 1 || item.questionCount > 200) {
+      problems.push("Enter a question count from 1 to 200.");
+    }
+    if (typeof item.durationMinutes !== "number" || !Number.isInteger(item.durationMinutes) || item.durationMinutes < 1 || item.durationMinutes > 1200) {
+      problems.push("Enter a duration from 1 to 1,200 minutes.");
+    }
+    return problems;
   }
   async function submitBatch() {
     if (!batchItems.length || batchSubmitting) return;
-    const invalidCount = batchItems.filter((item) => batchItemProblem(item)).length;
-    if (invalidCount) {
-      setBatchError(`${invalidCount} file(s) need attention. Complete the highlighted review fields before submitting.`);
+    const readyItems = batchItems.filter((item) => batchItemProblems(item).length === 0);
+    const incompleteCount = batchItems.length - readyItems.length;
+    if (!readyItems.length) {
+      setBatchError("No exams are ready to submit yet. Complete the highlighted review fields; incomplete files will stay in the review list.");
       return;
     }
     const confirmed = window.confirm(
-      `Submit all ${batchItems.length} reviewed exam file(s)? Exams marked “Publish immediately” will become visible to students.`,
+      `Submit ${readyItems.length} complete exam file(s)? ${incompleteCount ? `${incompleteCount} incomplete file(s) will stay in the review list. ` : ""}Exams marked “Publish immediately” will become visible to students.`,
     );
     if (!confirmed) return;
     setBatchSubmitting(true);
@@ -409,7 +415,7 @@ function ExamsManager() {
     setBatchMessage("");
     let succeeded = 0;
     const failedItems: ExamBatchItem[] = [];
-    for (const item of batchItems) {
+    for (const item of readyItems) {
       try {
         const examType = item.examType;
         if (examType !== "final" && examType !== "mid") {
@@ -436,12 +442,11 @@ function ExamsManager() {
         failedItems.push({ ...item, error: message(value) });
       }
     }
-    setBatchItems(failedItems);
+    const remainingItems = batchItems.filter((item) => batchItemProblems(item).length > 0);
+    setBatchItems([...remainingItems, ...failedItems]);
     if (succeeded) await load();
     setBatchMessage(
-      failedItems.length
-        ? `Submitted ${succeeded} file(s). ${failedItems.length} failed and remain in the review list with error details.`
-        : `Successfully submitted all ${succeeded} exam file(s).`,
+      `Submitted ${succeeded} exam file(s). ${remainingItems.length ? `${remainingItems.length} incomplete file(s) remain in review.` : ""}${failedItems.length ? ` ${failedItems.length} submission(s) failed and remain in review with error details.` : ""}`.trim(),
     );
     setBatchSubmitting(false);
   }
@@ -673,7 +678,7 @@ function ExamsManager() {
             <>
               <div className="mt-4 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
                 {batchItems.map((item, index) => {
-                  const problem = batchItemProblem(item);
+                  const problems = batchItemProblems(item);
                   return (
                     <fieldset key={item.id} disabled={batchSubmitting} className="rounded-xl border border-slate-200 bg-white p-3 disabled:opacity-70">
                       <div className="flex items-start justify-between gap-3">
@@ -689,7 +694,11 @@ function ExamsManager() {
                           Remove
                         </button>
                       </div>
-                      {problem && <p className="mt-2 text-xs font-bold text-red-700">{problem}</p>}
+                      {problems.length > 0 && (
+                        <ul className="mt-2 list-inside list-disc space-y-0.5 text-xs font-bold text-red-700">
+                          {problems.map((problem) => <li key={problem}>{problem}</li>)}
+                        </ul>
+                      )}
                       {item.error && <p className="mt-2 break-words rounded-lg bg-red-50 p-2 text-xs text-red-700">Submission error: {item.error}</p>}
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         <label className="block">
@@ -763,11 +772,13 @@ function ExamsManager() {
               </div>
               <button
                 type="button"
-                disabled={batchSubmitting || batchPreparing || batchItems.some((item) => batchItemProblem(item) !== null)}
+                disabled={batchSubmitting || batchPreparing || batchItems.length === 0}
                 onClick={() => void submitBatch()}
                 className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {batchSubmitting ? "Submitting reviewed exams..." : `Review complete — confirm and submit ${batchItems.length} file${batchItems.length === 1 ? "" : "s"}`}
+                {batchSubmitting
+                  ? "Submitting ready exams..."
+                  : `Submit ready exams (${batchItems.filter((item) => batchItemProblems(item).length === 0).length})`}
               </button>
             </>
           )}
