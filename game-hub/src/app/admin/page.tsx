@@ -124,6 +124,26 @@ const allStudentSubjects = [...new Set([
   "aptitude",
 ])];
 
+type ExamBatchItem = {
+  id: string;
+  file: File;
+  contentType: "html" | "pdf";
+  subject: string;
+  year: string;
+  title: string;
+  university: string;
+  customTag: string;
+  questionCount: number | "";
+  durationMinutes: number | "";
+  durationEdited: boolean;
+  semester: string;
+  examType: "final" | "mid" | "";
+  isPremium: boolean;
+  isPublished: boolean;
+  readError?: string;
+  error?: string;
+};
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "The admin API returned an unknown error.";
 }
@@ -211,6 +231,11 @@ function ExamsManager() {
   const [form, setForm] = useState(examPayload);
   const [editing, setEditing] = useState<AdminExamMeta | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [batchItems, setBatchItems] = useState<ExamBatchItem[]>([]);
+  const [batchPreparing, setBatchPreparing] = useState(false);
+  const [batchError, setBatchError] = useState("");
+  const [batchMessage, setBatchMessage] = useState("");
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [questionCountEdited, setQuestionCountEdited] = useState(false);
   const [durationEdited, setDurationEdited] = useState(false);
   const detectedExamMetadata = form.content_type === "html" ? getExamMetadata(form.content_data) : null;
@@ -238,6 +263,149 @@ function ExamsManager() {
   const load = () => { setLoading(true); setError(""); adminGetExams().then(setItems).catch((value) => setError(message(value))).finally(() => setLoading(false)); };
   useEffect(() => { load(); }, []);
   function reset() { setEditing(null); setForm({ ...examPayload }); setUploadedFile(null); setQuestionCountEdited(false); setDurationEdited(false); }
+  function updateBatchItem(id: string, changes: Partial<ExamBatchItem>) {
+    setBatchItems((current) => current.map((item) => item.id === id ? { ...item, ...changes, error: undefined } : item));
+    setBatchMessage("");
+  }
+  async function addBatchFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setBatchPreparing(true);
+    setBatchError("");
+    setBatchMessage("");
+    const availableSlots = 30 - batchItems.length;
+    const selectedFiles = Array.from(files);
+    const supportedFiles = selectedFiles.filter((file) => /\.(html?|pdf)$/i.test(file.name));
+    const selectionWarnings: string[] = [];
+    if (supportedFiles.length < selectedFiles.length) {
+      selectionWarnings.push("Only HTML and PDF files are supported; unsupported files were skipped.");
+    }
+    if (availableSlots <= 0) {
+      setBatchError("A batch can contain at most 30 files. Remove a file before adding more.");
+      setBatchPreparing(false);
+      return;
+    }
+    const acceptedFiles = supportedFiles.slice(0, availableSlots);
+    if (acceptedFiles.length < supportedFiles.length) {
+      selectionWarnings.push(`Only ${availableSlots} more file(s) fit in this batch; the remaining files were not added.`);
+    }
+    const addedItems: ExamBatchItem[] = [];
+    for (const file of acceptedFiles) {
+      const contentType = file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "html";
+      let detected = { subject: null as string | null, year: null as string | null, examType: null as "final" | "mid" | null, durationMinutes: null as number | null };
+      let questionCount: number | "" = "";
+      let title = file.name.replace(/\.(html?|pdf)$/i, "").replace(/[_-]+/g, " ").trim();
+      if (contentType === "html") {
+        try {
+          const html = await readLocalFile(file, "html");
+          detected = getExamMetadata(html);
+          questionCount = getExamQuestionCount(html) ?? "";
+          title = getNoteMetadata(html).title?.trim() || title;
+        } catch (value) {
+          addedItems.push({
+            id: crypto.randomUUID(),
+            file,
+            contentType,
+            subject: "",
+            year: "",
+            title,
+            university: "",
+            customTag: "",
+            questionCount,
+            durationMinutes: "",
+            durationEdited: false,
+            semester: "all",
+            examType: "",
+            isPremium: true,
+            isPublished: true,
+            readError: message(value),
+          });
+          continue;
+        }
+      }
+      const subject = detected.subject ?? "";
+      addedItems.push({
+        id: crypto.randomUUID(),
+        file,
+        contentType,
+        subject,
+        year: detected.year ?? "",
+        title,
+        university: detected.university ?? "",
+        customTag: "",
+        questionCount,
+        durationMinutes: detected.durationMinutes
+          ?? (questionCount ? getSuggestedExamDuration(subject, questionCount) : ""),
+        durationEdited: Boolean(detected.durationMinutes),
+        semester: "all",
+        examType: detected.examType ?? "",
+        isPremium: true,
+        isPublished: true,
+      });
+    }
+    setBatchItems((current) => [...current, ...addedItems]);
+    if (selectionWarnings.length) setBatchError(selectionWarnings.join(" "));
+    setBatchPreparing(false);
+  }
+  function batchItemProblem(item: ExamBatchItem): string | null {
+    if (item.readError) return `Could not read this file. Remove it and try adding it again. ${item.readError}`;
+    if (!item.subject) return "Choose a subject.";
+    if (!item.examType) return "Choose mid or final.";
+    if (typeof item.questionCount !== "number" || !Number.isInteger(item.questionCount) || item.questionCount < 1 || item.questionCount > 200) return "Enter a question count from 1 to 200.";
+    if (typeof item.durationMinutes !== "number" || !Number.isInteger(item.durationMinutes) || item.durationMinutes < 1 || item.durationMinutes > 1200) return "Enter a duration from 1 to 1,200 minutes.";
+    return null;
+  }
+  async function submitBatch() {
+    if (!batchItems.length || batchSubmitting) return;
+    const invalidCount = batchItems.filter((item) => batchItemProblem(item)).length;
+    if (invalidCount) {
+      setBatchError(`${invalidCount} file(s) need attention. Complete the highlighted review fields before submitting.`);
+      return;
+    }
+    const confirmed = window.confirm(
+      `Submit all ${batchItems.length} reviewed exam file(s)? Exams marked “Publish immediately” will become visible to students.`,
+    );
+    if (!confirmed) return;
+    setBatchSubmitting(true);
+    setBatchError("");
+    setBatchMessage("");
+    let succeeded = 0;
+    const failedItems: ExamBatchItem[] = [];
+    for (const item of batchItems) {
+      try {
+        const examType = item.examType;
+        if (examType !== "final" && examType !== "mid") {
+          throw new Error("Choose mid or final.");
+        }
+        const contentData = await readLocalFile(item.file, item.contentType);
+        await adminCreateExam({
+          subject: item.subject,
+          year: normalizeExamYear(item.year) ?? "",
+          title: item.title.trim(),
+          university: item.university.trim(),
+          custom_tag: item.customTag.trim(),
+          question_count: Number(item.questionCount),
+          duration_minutes: Number(item.durationMinutes),
+          content_type: item.contentType,
+          content_data: contentData,
+          semester: item.semester,
+          exam_type: examType,
+          is_premium: item.isPremium,
+          is_published: item.isPublished,
+        });
+        succeeded += 1;
+      } catch (value) {
+        failedItems.push({ ...item, error: message(value) });
+      }
+    }
+    setBatchItems(failedItems);
+    if (succeeded) await load();
+    setBatchMessage(
+      failedItems.length
+        ? `Submitted ${succeeded} file(s). ${failedItems.length} failed and remain in the review list with error details.`
+        : `Successfully submitted all ${succeeded} exam file(s).`,
+    );
+    setBatchSubmitting(false);
+  }
   function autoFillExamMetadata(content: string, force = false) {
     const detected = getExamMetadata(content);
     const detectedCount = getExamQuestionCount(content);
@@ -341,21 +509,154 @@ function ExamsManager() {
   return (
     <ResourcePanel
       title="Exam management"
-      subtitle="Create and publish freshman-level past exams."
+      subtitle="Create and publish freshman-level past exams. Existing exams are grouped by subject."
       loading={loading}
       error={error}
       items={items.map((item) => ({
         id: item.id,
         name: `${item.title} · ${item.year || "General"}`,
+        subject: item.subject,
         status: item.is_published ? "Published" : "Draft",
         is_premium: item.is_premium,
         is_published: item.is_published,
       }))}
+      groupBySubject
       onEdit={edit}
       onTogglePublish={(id) => adminToggleExamPublish(id).then(load).catch((value) => setError(message(value)))}
       onDelete={remove}
       onTogglePremium={(id) => adminToggleExamPremium(id).then(load).catch((value) => setError(message(value)))}
       form={
+        <div className="space-y-5">
+        <section className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h4 className="font-black">Batch upload and review</h4>
+              <p className="mt-1 text-xs leading-5 text-slate-600">Add up to 30 HTML or PDF exams. Review and correct each file’s details before confirming submission.</p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-700">{batchItems.length}/30 files</span>
+          </div>
+          <label className="mt-3 block">
+            <span className="sr-only">Choose up to 30 exam files</span>
+            <input
+              type="file"
+              multiple
+              accept=".html,.htm,.pdf,text/html,application/pdf"
+              disabled={batchSubmitting || batchPreparing || batchItems.length >= 30}
+              onChange={(event) => {
+                void addBatchFiles(event.target.files);
+                event.target.value = "";
+              }}
+              className="block w-full rounded-xl border border-blue-200 bg-white p-3 text-sm disabled:opacity-50"
+            />
+          </label>
+          {batchPreparing && <p className="mt-3 text-xs font-semibold text-blue-700">Reading selected HTML files and detecting metadata...</p>}
+          {batchError && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{batchError}</p>}
+          {batchMessage && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">{batchMessage}</p>}
+          {batchItems.length > 0 && (
+            <>
+              <div className="mt-4 max-h-[34rem] space-y-3 overflow-y-auto pr-1">
+                {batchItems.map((item, index) => {
+                  const problem = batchItemProblem(item);
+                  return (
+                    <fieldset key={item.id} disabled={batchSubmitting} className="rounded-xl border border-slate-200 bg-white p-3 disabled:opacity-70">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black">{index + 1}. {item.file.name}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">{item.contentType.toUpperCase()} · {(item.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setBatchItems((current) => current.filter((entry) => entry.id !== item.id))}
+                          className="shrink-0 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      {problem && <p className="mt-2 text-xs font-bold text-red-700">{problem}</p>}
+                      {item.error && <p className="mt-2 break-words rounded-lg bg-red-50 p-2 text-xs text-red-700">Submission error: {item.error}</p>}
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Subject</span>
+                          <select value={item.subject} onChange={(event) => {
+                            const subject = event.target.value;
+                            updateBatchItem(item.id, {
+                              subject,
+                              durationMinutes: !item.durationEdited && item.questionCount
+                                ? getSuggestedExamDuration(subject, item.questionCount)
+                                : item.durationMinutes,
+                            });
+                          }} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                            <option value="">Select subject</option>
+                            {allStudentSubjects.map((subject) => <option key={subject} value={subject}>{SUBJECTS[subject]?.label ?? subject}</option>)}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Title</span>
+                          <input value={item.title} onChange={(event) => updateBatchItem(item.id, { title: event.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Exam type</span>
+                          <select value={item.examType} onChange={(event) => updateBatchItem(item.id, { examType: event.target.value as "final" | "mid" | "" })} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                            <option value="">Select type</option><option value="mid">Mid exam</option><option value="final">Final exam</option>
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Year (optional)</span>
+                          <input placeholder="General if blank" value={item.year} onChange={(event) => updateBatchItem(item.id, { year: event.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                          {item.year.trim() && !normalizeExamYear(item.year) && <span className="mt-1 block text-[11px] text-amber-700">Outside 2010–2027; it will be saved as General.</span>}
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">University (optional)</span>
+                          <input value={item.university} onChange={(event) => updateBatchItem(item.id, { university: event.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Question count</span>
+                          <input type="number" min={1} max={200} value={item.questionCount} onChange={(event) => {
+                            const questionCount = event.target.value ? Number(event.target.value) : "";
+                            updateBatchItem(item.id, {
+                              questionCount,
+                              durationMinutes: !item.durationEdited && typeof questionCount === "number" && questionCount > 0
+                                ? getSuggestedExamDuration(item.subject, questionCount)
+                                : item.durationMinutes,
+                            });
+                          }} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Duration (minutes)</span>
+                          <input type="number" min={1} max={1200} value={item.durationMinutes} onChange={(event) => updateBatchItem(item.id, { durationMinutes: event.target.value ? Number(event.target.value) : "", durationEdited: true })} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Semester</span>
+                          <select value={item.semester} onChange={(event) => updateBatchItem(item.id, { semester: event.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm">
+                            <option value="all">All semesters</option><option value="1">Semester 1</option><option value="2">Semester 2</option>
+                          </select>
+                        </label>
+                        <label className="block sm:col-span-2">
+                          <span className="mb-1 block text-[11px] font-bold text-slate-600">Custom tag (optional)</span>
+                          <input value={item.customTag} onChange={(event) => updateBatchItem(item.id, { customTag: event.target.value })} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+                        </label>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-4 border-t border-slate-100 pt-3">
+                        <label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={item.isPremium} onChange={(event) => updateBatchItem(item.id, { isPremium: event.target.checked })} /> Premium access</label>
+                        <label className="flex items-center gap-2 text-xs font-semibold"><input type="checkbox" checked={item.isPublished} onChange={(event) => updateBatchItem(item.id, { isPublished: event.target.checked })} /> Publish immediately</label>
+                      </div>
+                    </fieldset>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                disabled={batchSubmitting || batchPreparing || batchItems.some((item) => batchItemProblem(item) !== null)}
+                onClick={() => void submitBatch()}
+                className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {batchSubmitting ? "Submitting reviewed exams..." : `Review complete — confirm and submit ${batchItems.length} file${batchItems.length === 1 ? "" : "s"}`}
+              </button>
+            </>
+          )}
+        </section>
+        <div className="border-t border-slate-200 pt-4">
+        <h4 className="mb-3 font-black">{editing ? "Edit one exam" : "Create one exam"}</h4>
         <form onSubmit={save} className="grid gap-3 md:grid-cols-2">
           <label className="block">
             <span className="mb-1 block text-xs font-bold text-slate-600">Subject</span>
@@ -502,6 +803,8 @@ function ExamsManager() {
             {editing && <button type="button" onClick={reset} className="rounded-xl bg-slate-200 px-4 py-2 font-bold">Cancel</button>}
           </div>
         </form>
+        </div>
+        </div>
       }
     />
   );
@@ -876,19 +1179,49 @@ function ResourcePanel({
   onEdit,
   onTogglePremium,
   onTogglePublish,
+  groupBySubject = false,
   form,
 }: {
   title: string;
   subtitle: string;
   loading: boolean;
   error: string;
-  items: { id: number; name: string; status: string; is_premium?: boolean; is_published?: boolean }[];
+  items: { id: number; name: string; subject?: string; status: string; is_premium?: boolean; is_published?: boolean }[];
   onDelete?: (id: number) => void;
   onEdit?: (id: number) => void;
   onTogglePremium?: (id: number) => void;
   onTogglePublish?: (id: number) => void;
+  groupBySubject?: boolean;
   form: ReactNode;
 }) {
+  const groupedItems = Object.entries(items.reduce<Record<string, typeof items>>((groups, item) => {
+    const subject = item.subject || "general";
+    (groups[subject] ||= []).push(item);
+    return groups;
+  }, {})).sort(([first], [second]) =>
+    (SUBJECTS[first]?.label ?? first).localeCompare(SUBJECTS[second]?.label ?? second),
+  );
+  const renderItem = (item: (typeof items)[number]) => (
+    <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between border border-slate-100">
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-bold text-sm">{item.name}</p>
+        <p className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+          {item.status}
+          {item.is_premium !== undefined && (
+            <span className={`rounded-full px-2 py-0.5 font-bold ${item.is_premium ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+              {item.is_premium ? "Premium" : "Free"}
+            </span>
+          )}
+        </p>
+      </div>
+      <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end mt-2 sm:mt-0">
+        {onEdit && <button type="button" onClick={() => onEdit(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
+        {onTogglePublish && <button type="button" onClick={() => onTogglePublish(item.id)} className="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700">{item.is_published ? "Unpublish" : "Publish"}</button>}
+        {onTogglePremium && <button type="button" onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-700">Make {item.is_premium ? "Free" : "Premium"}</button>}
+        {onDelete && <button type="button" onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">Delete</button>}
+      </div>
+    </div>
+  );
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
       <section className="rounded-2xl bg-white p-5 shadow-sm flex flex-col max-h-[calc(100vh-250px)]">
@@ -896,27 +1229,21 @@ function ResourcePanel({
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
         {loading ? <p className="mt-5 text-sm text-slate-500">Loading...</p> : error ? <ErrorBanner error={error} /> : (
           <div className="mt-5 space-y-2 overflow-y-auto flex-1 custom-scrollbar">
-            {items.map((item) => (
-              <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between border border-slate-100">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold text-sm">{item.name}</p>
-                  <p className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                    {item.status}
-                    {item.is_premium !== undefined && (
-                      <span className={`rounded-full px-2 py-0.5 font-bold ${item.is_premium ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
-                        {item.is_premium ? "Premium" : "Free"}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex w-full flex-wrap justify-start gap-1.5 sm:w-auto sm:shrink-0 sm:justify-end mt-2 sm:mt-0">
-                  {onEdit && <button type="button" onClick={() => onEdit(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700"><Pencil className="h-3.5 w-3.5" /> Edit</button>}
-                  {onTogglePublish && <button type="button" onClick={() => onTogglePublish(item.id)} className="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-700">{item.is_published ? "Unpublish" : "Publish"}</button>}
-                  {onTogglePremium && <button type="button" onClick={() => onTogglePremium(item.id)} className="rounded-lg bg-violet-50 px-2.5 py-1.5 text-xs font-bold text-violet-700">Make {item.is_premium ? "Free" : "Premium"}</button>}
-                  {onDelete && <button type="button" onClick={() => onDelete(item.id)} className="rounded-lg bg-red-50 px-2.5 py-1.5 text-xs font-bold text-red-700">Delete</button>}
-                </div>
-              </div>
-            ))}
+            {groupBySubject && items.length === 0
+              ? <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No exams have been added yet.</p>
+              : groupBySubject
+              ? groupedItems.map(([subject, group]) => (
+                <details key={subject} className="rounded-xl border border-slate-200 bg-white p-3">
+                  <summary className="cursor-pointer list-none font-black">
+                    <span className="flex items-center justify-between gap-3">
+                      <span>{subject === "general" ? "General / Unclassified" : SUBJECTS[subject]?.label ?? subject.replace(/_/g, " ")}</span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{group.length}</span>
+                    </span>
+                  </summary>
+                  <div className="mt-3 space-y-2">{group.map(renderItem)}</div>
+                </details>
+              ))
+              : items.map(renderItem)}
           </div>
         )}
       </section>
