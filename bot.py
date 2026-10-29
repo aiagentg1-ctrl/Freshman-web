@@ -3,6 +3,7 @@ import html
 import json
 import os
 import re
+from datetime import datetime
 from aiogram import Bot, Dispatcher
 from aiogram.types import (
     CallbackQuery,
@@ -120,6 +121,9 @@ async def get_student_access(user_id: int):
         raise RuntimeError("Could not load your Fresho profile right now. Please try again.") from error
     if not user:
         return None, False, None
+    if user.premium_expires_at and user.premium_expires_at > datetime.utcnow():
+        return user, True, None
+
     verification_failed = False
     for channel_id in dict.fromkeys(PREMIUM_CHANNEL_IDS.values()):
         try:

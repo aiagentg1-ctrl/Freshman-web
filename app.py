@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 import hashlib
 import hmac
 import asyncio
+import calendar
 import json
 import math
 import re
@@ -262,6 +263,13 @@ async def verify_device_session(
 
 
 async def get_premium_membership_status(session, user_id: int) -> tuple[bool, str | None]:
+    premium_result = await session.execute(
+        select(User.premium_expires_at).where(User.user_id == user_id)
+    )
+    premium_expires_at = premium_result.scalar_one_or_none()
+    if premium_expires_at and premium_expires_at > datetime.utcnow():
+        return True, None
+
     if not BOT_TOKEN:
         return False, "Premium membership verification is not configured"
 
@@ -1060,6 +1068,24 @@ class SubscriptionConfigUpdate(BaseModel):
     @validator('currency')
     def validate_currency(cls, v):
         return 'ETB'
+
+
+class PremiumGrantRequest(BaseModel):
+    months: int
+
+    @validator('months')
+    def validate_months(cls, v):
+        if v < 1 or v > 24:
+            raise ValueError('Months must be between 1 and 24')
+        return v
+
+
+def add_calendar_months(value: datetime, months: int) -> datetime:
+    month_index = value.month - 1 + months
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return value.replace(year=year, month=month, day=day)
 
 
 class ExamAttemptCreate(BaseModel):
@@ -3259,6 +3285,42 @@ async def admin_update_subscription_config(
             "price": config.price,
             "currency": "ETB",
             "monthly_operating_cost": config.monthly_operating_cost,
+        }
+
+
+@app.post("/api/admin/users/{user_id}/grant-premium")
+async def admin_grant_premium(
+    user_id: int,
+    payload: PremiumGrantRequest,
+    admin_verified: bool = Depends(verify_admin_secret),
+):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.user_id == user_id).with_for_update()
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        now = datetime.utcnow()
+        grant_starts_at = (
+            user.premium_expires_at
+            if user.premium_expires_at and user.premium_expires_at > now
+            else now
+        )
+        user.premium_expires_at = add_calendar_months(grant_starts_at, payload.months)
+        session.add(Subscription(
+            user_id=user_id,
+            amount=0,
+            currency="ETB",
+            started_at=now,
+            expires_at=user.premium_expires_at,
+            status="active",
+        ))
+        await session.commit()
+        return {
+            "user_id": user_id,
+            "premium_expires_at": user.premium_expires_at.isoformat(),
         }
 
 
