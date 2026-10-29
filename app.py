@@ -1075,8 +1075,8 @@ class PremiumGrantRequest(BaseModel):
 
     @validator('months')
     def validate_months(cls, v):
-        if v < 1 or v > 24:
-            raise ValueError('Months must be between 1 and 24')
+        if v < 0 or v > 24:
+            raise ValueError('Months must be between 0 and 24')
         return v
 
 
@@ -3251,27 +3251,30 @@ async def admin_get_subscription_config(admin_verified: bool = Depends(verify_ad
 
 @app.get("/api/admin/users")
 async def admin_search_users(
-    q: str,
+    q: str = "",
     admin_verified: bool = Depends(verify_admin_secret),
 ):
-    query = q.strip()
-    if len(query) < 2:
-        raise HTTPException(status_code=422, detail="Search with at least two characters")
+    query = (q or "").strip()
 
-    search_pattern = f"%{query}%"
-    search_conditions = [
-        User.first_name.ilike(search_pattern),
-        User.full_name.ilike(search_pattern),
-        User.custom_name.ilike(search_pattern),
-    ]
-    if query.isdecimal() and len(query) <= 19:
-        telegram_id = int(query)
-        if telegram_id <= 9_223_372_036_854_775_807:
-            search_conditions.append(User.user_id == telegram_id)
-    user_query = select(User).where(or_(*search_conditions))
+    search_conditions = []
+    if query:
+        search_pattern = f"%{query}%"
+        search_conditions = [
+            User.first_name.ilike(search_pattern),
+            User.full_name.ilike(search_pattern),
+            User.custom_name.ilike(search_pattern),
+        ]
+        if query.isdecimal() and len(query) <= 19:
+            telegram_id = int(query)
+            if telegram_id <= 9_223_372_036_854_775_807:
+                search_conditions.append(User.user_id == telegram_id)
+
+    user_query = select(User)
+    if search_conditions:
+        user_query = user_query.where(or_(*search_conditions))
 
     async with AsyncSessionLocal() as session:
-        result = await session.execute(user_query.order_by(User.first_name).limit(50))
+        result = await session.execute(user_query.order_by(User.first_name).limit(200))
         users = result.scalars().all()
         return [
             {
@@ -3284,7 +3287,7 @@ async def admin_search_users(
                     user.premium_expires_at.isoformat()
                     if user.premium_expires_at else None
                 ),
-                "is_manual_premium": bool(
+                "is_premium": bool(
                     user.premium_expires_at and user.premium_expires_at > datetime.utcnow()
                 ),
             }
@@ -3346,6 +3349,20 @@ async def admin_grant_premium(
             raise HTTPException(status_code=404, detail="User not found")
 
         now = datetime.utcnow()
+        if payload.months == 0:
+            user.premium_expires_at = None
+            await session.execute(
+                sqlalchemy_delete(Subscription).where(
+                    Subscription.user_id == user_id,
+                    Subscription.status == "active",
+                )
+            )
+            await session.commit()
+            return {
+                "user_id": user_id,
+                "premium_expires_at": None,
+            }
+
         grant_starts_at = (
             user.premium_expires_at
             if user.premium_expires_at and user.premium_expires_at > now

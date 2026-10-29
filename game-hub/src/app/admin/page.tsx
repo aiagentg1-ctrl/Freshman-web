@@ -241,20 +241,17 @@ function PremiumUsersManager() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  async function searchUsers(event: FormEvent) {
-    event.preventDefault();
-    const searchTerm = query.trim();
-    if (searchTerm.length < 2) {
-      setError("Enter at least two characters or a Telegram ID.");
-      return;
-    }
+  useEffect(() => {
+    void searchUsersInternal();
+  }, []);
 
+  async function searchUsersInternal(searchTerm = "") {
     setLoading(true);
     setError("");
     setNotice("");
     setUsers([]);
     try {
-      setUsers(await adminSearchUsers(searchTerm));
+      setUsers(await adminSearchUsers(searchTerm.trim()));
     } catch (value) {
       setError(message(value));
     } finally {
@@ -262,15 +259,22 @@ function PremiumUsersManager() {
     }
   }
 
+  async function searchUsers(event: FormEvent) {
+    event.preventDefault();
+    const searchTerm = query.trim();
+
+    await searchUsersInternal(searchTerm);
+  }
+
   async function grantPremium(user: AdminUser) {
-    if (!window.confirm(`Grant ${months} months of manual Premium to ${user.full_name}?`)) return;
+    if (!window.confirm(`Grant ${months} months of Premium to ${user.full_name}?`)) return;
     setGrantingUserId(user.user_id);
     setError("");
     setNotice("");
     try {
       const result = await adminGrantPremium(user.user_id, months);
       setUsers((current) => current.map((item) => item.user_id === user.user_id
-        ? { ...item, premium_expires_at: result.premium_expires_at, is_manual_premium: true }
+        ? { ...item, premium_expires_at: result.premium_expires_at, is_premium: true }
         : item));
       setNotice(`Premium approved for ${user.full_name} until ${new Date(result.premium_expires_at).toLocaleDateString()}.`);
     } catch (value) {
@@ -280,16 +284,34 @@ function PremiumUsersManager() {
     }
   }
 
+  async function revokePremium(user: AdminUser) {
+    if (!window.confirm(`Remove Premium from ${user.full_name}?`)) return;
+    setGrantingUserId(user.user_id);
+    setError("");
+    setNotice("");
+    try {
+      await adminGrantPremium(user.user_id, 0);
+      setUsers((current) => current.map((item) => item.user_id === user.user_id
+        ? { ...item, premium_expires_at: null, is_premium: false }
+        : item));
+      setNotice(`Premium removed from ${user.full_name}.`);
+    } catch (value) {
+      setError(message(value));
+    } finally {
+      setGrantingUserId(null);
+    }
+  }
+
   return <section className="space-y-5">
     <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <h2 className="text-xl font-black">Approve Premium users</h2>
-      <p className="mt-2 text-sm text-slate-600">Search registered students by their saved Telegram name or exact Telegram ID. Members of either premium channel also receive access automatically.</p>
+      <h2 className="text-xl font-black">All users</h2>
+      <p className="mt-2 text-sm text-slate-600">List students already in the database so you can approve or revoke premium manually. Channel membership is still checked automatically for access and overrides the manual state when active.</p>
       <form onSubmit={searchUsers} className="mt-5 flex flex-col gap-3 sm:flex-row">
-        <input value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100" placeholder="Telegram name or ID" />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100" placeholder="Search by name or Telegram ID (leave blank to list all users)" />
         <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">Months
-          <input type="number" min={1} max={24} value={months} onChange={(event) => setMonths(Number(event.target.value))} className="w-20 rounded-xl border border-slate-200 px-3 py-3" />
+          <input type="number" min={0} max={24} value={months} onChange={(event) => setMonths(Number(event.target.value))} className="w-20 rounded-xl border border-slate-200 px-3 py-3" />
         </label>
-        <button disabled={loading} className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50">{loading ? "Searching..." : "Search"}</button>
+        <button disabled={loading} className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50">{loading ? "Loading..." : "Search"}</button>
       </form>
     </div>
     {error && <ErrorBanner error={error} />}
@@ -300,17 +322,20 @@ function PremiumUsersManager() {
           <div className="min-w-0">
             <p className="truncate font-bold">{user.custom_name || user.full_name || user.first_name}</p>
             <p className="mt-1 text-sm text-slate-500">Telegram ID: {user.user_id} · {user.stream}</p>
-            <p className="mt-1 text-xs text-slate-500">{user.is_manual_premium && user.premium_expires_at
-              ? `Manual Premium until ${new Date(user.premium_expires_at).toLocaleDateString()}`
-              : "No active manual Premium grant"}</p>
+            <p className="mt-1 text-xs text-slate-500">{user.is_premium && user.premium_expires_at
+              ? `Premium until ${new Date(user.premium_expires_at).toLocaleDateString()}`
+              : "Not currently premium"}</p>
           </div>
-          <button type="button" disabled={grantingUserId !== null || !Number.isInteger(months) || months < 1 || months > 24} onClick={() => grantPremium(user)} className="flex items-center justify-center gap-2 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-50">
-            <Crown className="h-4 w-4" />{grantingUserId === user.user_id ? "Approving..." : user.is_manual_premium ? "Extend Premium" : "Approve Premium"}
-          </button>
+          <div className="flex gap-2">
+            <button type="button" disabled={grantingUserId !== null || !Number.isInteger(months) || months < 0 || months > 24} onClick={() => grantPremium(user)} className="flex items-center justify-center gap-2 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-50">
+              <Crown className="h-4 w-4" />{grantingUserId === user.user_id ? "Working..." : user.is_premium ? "Extend" : "Approve"}
+            </button>
+            {user.is_premium && <button type="button" disabled={grantingUserId !== null} onClick={() => revokePremium(user)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-bold text-red-700 disabled:opacity-50">Remove</button>}
+          </div>
         </li>
       ))}</ul>
     </div>}
-    {!loading && query.trim().length >= 2 && users.length === 0 && !error && <p className="rounded-xl bg-white p-5 text-sm text-slate-500 shadow-sm">No registered users matched that name or ID.</p>}
+    {!loading && users.length === 0 && !error && <p className="rounded-xl bg-white p-5 text-sm text-slate-500 shadow-sm">No users found.</p>}
   </section>;
 }
 

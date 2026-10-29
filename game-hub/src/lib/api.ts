@@ -841,16 +841,17 @@ export interface AdminUser {
   custom_name: string | null;
   stream: string;
   premium_expires_at: string | null;
-  is_manual_premium: boolean;
+  is_premium: boolean;
 }
 
-export async function adminSearchUsers(query: string): Promise<AdminUser[]> {
-  return request<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(query)}`, {
+export async function adminSearchUsers(query: string = ""): Promise<AdminUser[]> {
+  constParams = query ? `?q=${encodeURIComponent(query)}` : "";
+  return request<AdminUser[]>(`/api/admin/users${constParams}`, {
     headers: getAdminHeaders(),
   });
 }
 
-export async function adminGrantPremium(userId: number, months: number): Promise<{ user_id: number; premium_expires_at: string }> {
+export async function adminGrantPremium(userId: number, months: number): Promise<{ user_id: number; premium_expires_at: string | null }> {
   return request(`/api/admin/users/${userId}/grant-premium`, {
     method: "POST",
     headers: getAdminHeaders(),
