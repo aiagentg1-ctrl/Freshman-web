@@ -3249,6 +3249,49 @@ async def admin_get_subscription_config(admin_verified: bool = Depends(verify_ad
         }
 
 
+@app.get("/api/admin/users")
+async def admin_search_users(
+    q: str,
+    admin_verified: bool = Depends(verify_admin_secret),
+):
+    query = q.strip()
+    if len(query) < 2:
+        raise HTTPException(status_code=422, detail="Search with at least two characters")
+
+    search_pattern = f"%{query}%"
+    search_conditions = [
+        User.first_name.ilike(search_pattern),
+        User.full_name.ilike(search_pattern),
+        User.custom_name.ilike(search_pattern),
+    ]
+    if query.isdecimal() and len(query) <= 19:
+        telegram_id = int(query)
+        if telegram_id <= 9_223_372_036_854_775_807:
+            search_conditions.append(User.user_id == telegram_id)
+    user_query = select(User).where(or_(*search_conditions))
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(user_query.order_by(User.first_name).limit(50))
+        users = result.scalars().all()
+        return [
+            {
+                "user_id": user.user_id,
+                "first_name": user.first_name,
+                "full_name": user.full_name,
+                "custom_name": user.custom_name,
+                "stream": user.stream.value,
+                "premium_expires_at": (
+                    user.premium_expires_at.isoformat()
+                    if user.premium_expires_at else None
+                ),
+                "is_manual_premium": bool(
+                    user.premium_expires_at and user.premium_expires_at > datetime.utcnow()
+                ),
+            }
+            for user in users
+        ]
+
+
 @app.get("/api/subscription-pricing")
 async def get_subscription_pricing():
     async with AsyncSessionLocal() as session:

@@ -834,6 +834,30 @@ export interface SubscriptionConfig {
   monthly_operating_cost: number;
 }
 
+export interface AdminUser {
+  user_id: number;
+  first_name: string;
+  full_name: string;
+  custom_name: string | null;
+  stream: string;
+  premium_expires_at: string | null;
+  is_manual_premium: boolean;
+}
+
+export async function adminSearchUsers(query: string): Promise<AdminUser[]> {
+  return request<AdminUser[]>(`/api/admin/users?q=${encodeURIComponent(query)}`, {
+    headers: getAdminHeaders(),
+  });
+}
+
+export async function adminGrantPremium(userId: number, months: number): Promise<{ user_id: number; premium_expires_at: string }> {
+  return request(`/api/admin/users/${userId}/grant-premium`, {
+    method: "POST",
+    headers: getAdminHeaders(),
+    body: JSON.stringify({ months }),
+  });
+}
+
 export interface SubscriptionPricing {
   price: number | null;
   currency: string | null;

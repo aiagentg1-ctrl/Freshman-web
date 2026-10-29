@@ -38,6 +38,8 @@ import {
   adminReviewSubjectSuggestion,
   adminGetSubscriptionConfig,
   adminUpdateSubscriptionConfig,
+  adminSearchUsers,
+  adminGrantPremium,
   adminGetBroadcasts,
   adminCreateBroadcast,
   adminDeleteBroadcast,
@@ -50,12 +52,13 @@ import {
   type SubscriptionConfig,
   type UniversityLogo,
   type Broadcast,
+  type AdminUser,
 } from "@/lib/api";
 import { NATURAL_SUBJECTS, SOCIAL_SUBJECTS, SUBJECTS } from "@/lib/subjects";
 import { getExamMetadata, getExamQuestionCount, getNoteMetadata, getSuggestedExamDuration, normalizeExamYear, parseExamFilenameMetadata } from "@/lib/examMetadata";
 import { migrateLegacyStorage } from "@/lib/legacyStorage";
 
-type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "analytics" | "pricing" | "broadcasts";
+type Tab = "overview" | "exams" | "notes" | "chapter-exams" | "flash-cards" | "logos" | "suggestions" | "users" | "analytics" | "pricing" | "broadcasts";
 type ErrorState = string;
 
 const ADMIN_KEY_STORAGE = "freshoAdminKey";
@@ -67,6 +70,7 @@ const tabs: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
   { id: "flash-cards", label: "Flash Cards", icon: Layers },
   { id: "logos", label: "Logos", icon: Image },
   { id: "suggestions", label: "Suggestions", icon: User },
+  { id: "users", label: "Premium Users", icon: Crown },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "pricing", label: "Pricing", icon: CircleDollarSign },
   { id: "broadcasts", label: "Broadcasts", icon: Megaphone },
@@ -225,7 +229,89 @@ export default function AdminDashboard() {
     return <main className="min-h-screen bg-slate-950 px-4 py-16 text-white"><section className="mx-auto max-w-md rounded-3xl bg-white p-7 text-slate-900 shadow-2xl"><div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600"><Lock className="h-7 w-7 text-white" /></div><h1 className="text-2xl font-black">Freshman Admin</h1><p className="mt-2 text-sm leading-6 text-slate-500">Manage the study experience for new Fresho students.</p><form onSubmit={unlock} className="mt-6 space-y-3"><input type="password" value={key} onChange={(event) => setKey(event.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100" placeholder="Admin key" autoFocus />{authError && <p className="text-sm font-semibold text-red-600">{authError}</p>}<button disabled={authenticating} className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white disabled:opacity-50">{authenticating ? "Verifying..." : "Open Dashboard"}</button></form></section></main>;
   }
 
-  return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b bg-white px-4 py-5 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Fresho Control Center</p><h1 className="text-2xl font-black">Freshman Learning Dashboard</h1></div><button onClick={signOut} className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"><LogOut className="h-4 w-4" /> Sign out</button></div></header><div className="mx-auto max-w-7xl px-4 py-6 sm:px-8"><nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex min-w-max items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${activeTab === tab.id ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" />{tab.label}</button>; })}</nav>{activeTab === "overview" && <Overview />}{activeTab === "exams" && <ExamsManager />}{activeTab === "notes" && <NotesManager />}{activeTab === "chapter-exams" && <ChapterExamsManager />}{activeTab === "flash-cards" && <FlashCardsManager />}{activeTab === "logos" && <LogosManager />}{activeTab === "suggestions" && <SuggestionsManager />}{activeTab === "analytics" && <AnalyticsManager />}{activeTab === "pricing" && <PricingManager />}{activeTab === "broadcasts" && <BroadcastsManager />}</div></main>;
+  return <main className="min-h-screen bg-slate-50 text-slate-900"><header className="border-b bg-white px-4 py-5 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Fresho Control Center</p><h1 className="text-2xl font-black">Freshman Learning Dashboard</h1></div><button onClick={signOut} className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold"><LogOut className="h-4 w-4" /> Sign out</button></div></header><div className="mx-auto max-w-7xl px-4 py-6 sm:px-8"><nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm">{tabs.map((tab) => { const Icon = tab.icon; return <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex min-w-max items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${activeTab === tab.id ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" />{tab.label}</button>; })}</nav>{activeTab === "overview" && <Overview />}{activeTab === "exams" && <ExamsManager />}{activeTab === "notes" && <NotesManager />}{activeTab === "chapter-exams" && <ChapterExamsManager />}{activeTab === "flash-cards" && <FlashCardsManager />}{activeTab === "logos" && <LogosManager />}{activeTab === "suggestions" && <SuggestionsManager />}{activeTab === "users" && <PremiumUsersManager />}{activeTab === "analytics" && <AnalyticsManager />}{activeTab === "pricing" && <PricingManager />}{activeTab === "broadcasts" && <BroadcastsManager />}</div></main>;
+}
+
+function PremiumUsersManager() {
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [months, setMonths] = useState(5);
+  const [loading, setLoading] = useState(false);
+  const [grantingUserId, setGrantingUserId] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function searchUsers(event: FormEvent) {
+    event.preventDefault();
+    const searchTerm = query.trim();
+    if (searchTerm.length < 2) {
+      setError("Enter at least two characters or a Telegram ID.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setNotice("");
+    setUsers([]);
+    try {
+      setUsers(await adminSearchUsers(searchTerm));
+    } catch (value) {
+      setError(message(value));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function grantPremium(user: AdminUser) {
+    if (!window.confirm(`Grant ${months} months of manual Premium to ${user.full_name}?`)) return;
+    setGrantingUserId(user.user_id);
+    setError("");
+    setNotice("");
+    try {
+      const result = await adminGrantPremium(user.user_id, months);
+      setUsers((current) => current.map((item) => item.user_id === user.user_id
+        ? { ...item, premium_expires_at: result.premium_expires_at, is_manual_premium: true }
+        : item));
+      setNotice(`Premium approved for ${user.full_name} until ${new Date(result.premium_expires_at).toLocaleDateString()}.`);
+    } catch (value) {
+      setError(message(value));
+    } finally {
+      setGrantingUserId(null);
+    }
+  }
+
+  return <section className="space-y-5">
+    <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <h2 className="text-xl font-black">Approve Premium users</h2>
+      <p className="mt-2 text-sm text-slate-600">Search registered students by their saved Telegram name or exact Telegram ID. Members of either premium channel also receive access automatically.</p>
+      <form onSubmit={searchUsers} className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <input value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100" placeholder="Telegram name or ID" />
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">Months
+          <input type="number" min={1} max={24} value={months} onChange={(event) => setMonths(Number(event.target.value))} className="w-20 rounded-xl border border-slate-200 px-3 py-3" />
+        </label>
+        <button disabled={loading} className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50">{loading ? "Searching..." : "Search"}</button>
+      </form>
+    </div>
+    {error && <ErrorBanner error={error} />}
+    {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{notice}</p>}
+    {users.length > 0 && <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+      <ul className="divide-y divide-slate-100">{users.map((user) => (
+        <li key={user.user_id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="truncate font-bold">{user.custom_name || user.full_name || user.first_name}</p>
+            <p className="mt-1 text-sm text-slate-500">Telegram ID: {user.user_id} · {user.stream}</p>
+            <p className="mt-1 text-xs text-slate-500">{user.is_manual_premium && user.premium_expires_at
+              ? `Manual Premium until ${new Date(user.premium_expires_at).toLocaleDateString()}`
+              : "No active manual Premium grant"}</p>
+          </div>
+          <button type="button" disabled={grantingUserId !== null || !Number.isInteger(months) || months < 1 || months > 24} onClick={() => grantPremium(user)} className="flex items-center justify-center gap-2 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-50">
+            <Crown className="h-4 w-4" />{grantingUserId === user.user_id ? "Approving..." : user.is_manual_premium ? "Extend Premium" : "Approve Premium"}
+          </button>
+        </li>
+      ))}</ul>
+    </div>}
+    {!loading && query.trim().length >= 2 && users.length === 0 && !error && <p className="rounded-xl bg-white p-5 text-sm text-slate-500 shadow-sm">No registered users matched that name or ID.</p>}
+  </section>;
 }
 
 function Overview() {
