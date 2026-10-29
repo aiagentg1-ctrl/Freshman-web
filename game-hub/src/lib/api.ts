@@ -845,8 +845,8 @@ export interface AdminUser {
 }
 
 export async function adminSearchUsers(query: string = ""): Promise<AdminUser[]> {
-  constParams = query ? `?q=${encodeURIComponent(query)}` : "";
-  return request<AdminUser[]>(`/api/admin/users${constParams}`, {
+  const params = query ? `?q=${encodeURIComponent(query)}` : "";
+  return request<AdminUser[]>(`/api/admin/users${params}`, {
     headers: getAdminHeaders(),
   });
 }
