@@ -8,7 +8,6 @@ from urllib.parse import parse_qsl
 def validate_telegram_init_data(init_data: str, bot_token: str, now: int | None = None) -> int:
     fields = dict(parse_qsl(init_data, keep_blank_values=True))
     received_hash = fields.pop("hash", None)
-    fields.pop("signature", None)
     if not received_hash:
         raise ValueError("Telegram authentication data is missing")
 
