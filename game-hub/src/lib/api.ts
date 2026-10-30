@@ -564,8 +564,9 @@ export async function refreshUser(userId: number): Promise<UserProfile> {
 export async function getUser(userId: number): Promise<UserProfile | null> {
   try {
     return await refreshUser(userId);
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) return null;
+    throw error;
   }
 }
 

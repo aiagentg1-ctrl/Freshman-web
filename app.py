@@ -19,11 +19,11 @@ from typing import Any
 from pydantic import BaseModel, validator
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
-from urllib.parse import parse_qsl
 import aiohttp
 
 from database import AsyncSessionLocal, init_db
 from premium_access import PREMIUM_CHANNEL_IDS, is_telegram_member
+from telegram_auth import validate_telegram_init_data
 from models import (
     User, EueeExam, EueeExamAttempt, Note, SubjectEnum, StreamEnum,
     NoteCompletion, UserBadge, XpReward, ChapterExam, ChapterExamAttempt,
@@ -133,52 +133,11 @@ def telegram_user_from_init_data(init_data: str) -> int:
         print("ERROR: BOT_TOKEN is not set")
         raise HTTPException(status_code=503, detail="Fresho bot authentication is not configured")
 
-    # Debug logging
-    print(f"Received init_data length: {len(init_data)}")
-    print(f"BOT_TOKEN length: {len(BOT_TOKEN)}")
-
-    fields = dict(parse_qsl(init_data, keep_blank_values=True))
-
-    # Handle both 'hash' (standard WebApp) and 'signature' (some auth methods)
-    received_hash = fields.pop("hash", None) or fields.pop("signature", None)
-    if not received_hash:
-        print("ERROR: No hash or signature in init_data")
-        raise HTTPException(status_code=401, detail="Telegram authentication data is missing")
-
-    # Remove query_id from fields if present (it's not part of the hash calculation)
-    fields.pop("query_id", None)
-
-    # For signature field, try both standard validation and direct comparison
-    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(fields.items()))
-    secret_key = hmac.new(BOT_TOKEN.encode(), b"WebAppData", hashlib.sha256).digest()
-    expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-
-    print(f"Expected hash: {expected_hash[:16]}...")
-    print(f"Received hash: {received_hash[:16]}...")
-    print(f"Data check string (first 200 chars): {data_check_string[:200]}")
-
-    # Try standard hash comparison first
-    if not hmac.compare_digest(expected_hash, received_hash):
-        print("Standard hash validation failed, trying signature as-is...")
-        # If that fails, accept the signature directly (some Telegram implementations differ)
-        # This is a fallback for different Telegram client implementations
-        print("WARNING: Accepting signature without validation - IMPLEMENTATION-SPECIFIC")
-        # Don't raise error, just log warning and continue
-    else:
-        print("Hash validation successful")
-
     try:
-        auth_date = int(fields["auth_date"])
-        telegram_user_id = int(json.loads(fields["user"])["id"])
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
-        print(f"ERROR: Could not parse user data: {error}")
-        raise HTTPException(status_code=401, detail="Telegram authentication data is incomplete") from error
-
-    now = int(datetime.now(timezone.utc).timestamp())
-    if auth_date > now + 60 or now - auth_date > 86_400:
-        print(f"ERROR: Auth date expired - auth_date: {auth_date}, now: {now}")
-        raise HTTPException(status_code=401, detail="Telegram authentication data has expired")
-
+        telegram_user_id = validate_telegram_init_data(init_data, BOT_TOKEN)
+    except ValueError as error:
+        print(f"ERROR: Telegram authentication failed: {error}")
+        raise HTTPException(status_code=401, detail=str(error)) from error
     print(f"Successfully authenticated user: {telegram_user_id}")
     return telegram_user_id
 

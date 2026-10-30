@@ -9,16 +9,27 @@ import UniversitySelect from "./UniversitySelect";
 export default function OnboardingScreen({
   onComplete,
 }: {
-  onComplete: (stream: Exclude<StreamKey, "general">, subjects: string[], university: string, region: string) => void;
+  onComplete: (stream: Exclude<StreamKey, "general">, subjects: string[], university: string, region: string) => Promise<void>;
 }) {
   const [stream, setStream] = useState<Exclude<StreamKey, "general"> | null>(null);
   const [university, setUniversity] = useState("");
   const [region, setRegion] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const ready = stream !== null && university.trim().length > 0 && region.trim().length > 0;
 
-  const complete = () => {
-    if (!ready || !stream) return;
-    onComplete(stream, [], university.trim(), region.trim());
+  const complete = async () => {
+    if (!ready || !stream || saving) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onComplete(stream, [], university.trim(), region.trim());
+    } catch (error) {
+      console.error("Failed to save onboarding profile:", error);
+      setSaveError("Could not save your profile. Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -75,11 +86,12 @@ export default function OnboardingScreen({
 
       <button
         onClick={complete}
-        disabled={!ready}
+        disabled={!ready || saving}
         className="w-full bg-[#1D70F5] text-white py-3.5 rounded-2xl font-semibold shadow-md shadow-blue-200 disabled:opacity-40 active:scale-[0.98] transition-all"
       >
-        Start Learning
+        {saving ? "Saving profile..." : "Start Learning"}
       </button>
+      {saveError && <p role="alert" className="mt-3 text-center text-sm text-red-600">{saveError}</p>}
     </div>
   );
 }

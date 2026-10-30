@@ -171,16 +171,39 @@ export default function TMAPage() {
             premium_verification_error: remote.premium_verification_error ?? null,
           });
         } else {
+          let saved: LocalProfile | null = null;
           try {
-            const saved = JSON.parse(localStorage.getItem("freshoProfile") || "null") as LocalProfile | null;
-            if (isCompleteProfile(saved)) {
-              setProfile({
-                ...saved,
-                premium_verification_error: "Could not verify your channel membership. Refresh the check before purchasing Premium.",
-              });
-            }
-            else setProfile(null);
+            saved = JSON.parse(localStorage.getItem("freshoProfile") || "null") as LocalProfile | null;
           } catch {
+            saved = null;
+          }
+          if (isCompleteProfile(saved)) {
+            const restored = await updateUser(session.user_id, {
+              first_name: tgUser?.first_name,
+              full_name: saved.full_name,
+              custom_name: saved.custom_name,
+              university: saved.university,
+              region: saved.region,
+              school: saved.school,
+              city: saved.city,
+              stream: saved.stream,
+              selected_subjects: saved.selected_subjects,
+            });
+            if (cancelled) return;
+            setProfile({
+              ...saved,
+              full_name: restored.full_name,
+              custom_name: restored.custom_name || undefined,
+              university: restored.university || "",
+              region: restored.region || "",
+              school: restored.school || "",
+              city: restored.city || "",
+              stream: restored.stream.toLowerCase() as StreamKey,
+              selected_subjects: restored.selected_subjects || [],
+              is_premium: restored.is_premium === true,
+              premium_verification_error: restored.premium_verification_error ?? null,
+            });
+          } else {
             setProfile(null);
           }
         }
@@ -245,20 +268,16 @@ export default function TMAPage() {
       is_premium: false,
     };
     if (telegramUser) {
-      try {
-        const savedProfile = await updateUser(telegramUser.id, {
-          first_name: telegramUser.first_name,
-          full_name: fullName,
-          university,
-          region,
-          stream,
-          selected_subjects,
-        });
-        next.is_premium = savedProfile.is_premium === true;
-        next.premium_verification_error = savedProfile.premium_verification_error ?? null;
-      } catch (error) {
-        console.error("Failed to save onboarding profile:", error);
-      }
+      const savedProfile = await updateUser(telegramUser.id, {
+        first_name: telegramUser.first_name,
+        full_name: fullName,
+        university,
+        region,
+        stream,
+        selected_subjects,
+      });
+      next.is_premium = savedProfile.is_premium === true;
+      next.premium_verification_error = savedProfile.premium_verification_error ?? null;
     }
     localStorage.setItem("freshoProfile", JSON.stringify(next));
     setProfile(next);
