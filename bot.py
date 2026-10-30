@@ -406,22 +406,23 @@ async def send_start_welcome(message: Message, user_id: int, *, edit: bool = Fal
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
-    try:
-        is_member = await is_required_channel_member(message.from_user.id)
-    except Exception as error:
-        print(f"Could not verify {REQUIRED_CHANNEL_NAME} membership: {error}")
-        await message.answer(
-            f"Could not verify your {REQUIRED_CHANNEL_NAME} membership right now. Please try again.",
-            reply_markup=get_required_channel_keyboard(),
-        )
-        return
+    if not PREMIUM_ACCESS_FREE:
+        try:
+            is_member = await is_required_channel_member(message.from_user.id)
+        except Exception as error:
+            print(f"Could not verify {REQUIRED_CHANNEL_NAME} membership: {error}")
+            await message.answer(
+                f"Could not verify your {REQUIRED_CHANNEL_NAME} membership right now. Please try again.",
+                reply_markup=get_required_channel_keyboard(),
+            )
+            return
 
-    if not is_member:
-        await message.answer(
-            f"Please join {REQUIRED_CHANNEL_NAME} to use Fresho, then tap “I've joined — check again”.",
-            reply_markup=get_required_channel_keyboard(),
-        )
-        return
+        if not is_member:
+            await message.answer(
+                f"Please join {REQUIRED_CHANNEL_NAME} to use Fresho, then tap “I've joined — check again”.",
+                reply_markup=get_required_channel_keyboard(),
+            )
+            return
 
     await send_start_welcome(message, message.from_user.id)
 
@@ -430,6 +431,10 @@ async def cmd_start(message: Message):
 async def verify_start_channel(callback: CallbackQuery):
     if not callback.message:
         await callback.answer()
+        return
+    if PREMIUM_ACCESS_FREE:
+        await callback.answer("Free access is enabled.")
+        await send_start_welcome(callback.message, callback.from_user.id, edit=True)
         return
 
     try:

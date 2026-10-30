@@ -22,7 +22,12 @@ from datetime import datetime, timedelta, timezone
 import aiohttp
 
 from database import AsyncSessionLocal, init_db
-from premium_access import PREMIUM_ACCESS_FREE, PREMIUM_CHANNEL_IDS, is_telegram_member
+from premium_access import (
+    PREMIUM_ACCESS_FREE,
+    PREMIUM_CHANNEL_IDS,
+    is_telegram_member,
+    requires_premium_device_session,
+)
 from telegram_auth import validate_telegram_init_data
 from models import (
     User, EueeExam, EueeExamAttempt, Note, SubjectEnum, StreamEnum,
@@ -412,7 +417,11 @@ async def telegram_webhook(request: Request):
 
 @app.get("/")
 async def read_root():
-    return {"status": "ok", "message": "Fresho API"}
+    return {
+        "status": "ok",
+        "message": "Fresho API",
+        "premium_access_free": PREMIUM_ACCESS_FREE,
+    }
 
 
 # ---------- XP and Leveling System ----------
@@ -2051,7 +2060,7 @@ async def get_exam(
         exam = result.scalar_one_or_none()
         if not exam:
             raise HTTPException(status_code=404, detail="Exam not found")
-        if exam.is_premium:
+        if requires_premium_device_session(exam.is_premium):
             admin_key = x_admin_secret or x_admin_key or x_admin_password or ""
             is_admin = bool(ADMIN_SECRET) and hmac.compare_digest(admin_key, ADMIN_SECRET)
             if not is_admin:
@@ -2501,7 +2510,7 @@ async def get_note(
         is_admin = bool(ADMIN_SECRET) and hmac.compare_digest(admin_key, ADMIN_SECRET)
         if not note.is_published and not is_admin:
             raise HTTPException(status_code=404, detail="Note not found")
-        if note.is_premium and not is_admin:
+        if requires_premium_device_session(note.is_premium) and not is_admin:
             user_id = await require_active_device_session(
                 session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
             )
@@ -2732,7 +2741,7 @@ async def get_chapter_exam(
             exam = result.scalar_one_or_none()
             if not exam:
                 raise HTTPException(status_code=404, detail="Chapter exam not found")
-            if exam.is_premium:
+            if requires_premium_device_session(exam.is_premium):
                 admin_key = x_admin_secret or x_admin_key or x_admin_password or ""
                 is_admin = bool(ADMIN_SECRET) and hmac.compare_digest(admin_key, ADMIN_SECRET)
                 if not is_admin:
@@ -3110,7 +3119,7 @@ async def get_flash_card(
         is_admin = bool(ADMIN_SECRET) and hmac.compare_digest(admin_key, ADMIN_SECRET)
         if not flash_card.is_published and not is_admin:
             raise HTTPException(status_code=404, detail="Flash card not found")
-        if flash_card.is_premium and not is_admin:
+        if requires_premium_device_session(flash_card.is_premium) and not is_admin:
             user_id = await require_active_device_session(
                 session, x_fresho_user_id, x_fresho_device_id, x_fresho_session_token
             )

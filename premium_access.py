@@ -8,6 +8,10 @@ PREMIUM_CHANNEL_IDS = {
 PREMIUM_ACCESS_FREE = True
 
 
+def requires_premium_device_session(is_premium: bool) -> bool:
+    return is_premium and not PREMIUM_ACCESS_FREE
+
+
 def is_telegram_member(status: str, is_member: bool = False) -> bool:
     return status in {"member", "administrator", "creator"} or (
         status == "restricted" and is_member

@@ -1,6 +1,12 @@
 import unittest
+from unittest.mock import patch
 
-from premium_access import PREMIUM_ACCESS_FREE, PREMIUM_CHANNEL_IDS, is_telegram_member
+from premium_access import (
+    PREMIUM_ACCESS_FREE,
+    PREMIUM_CHANNEL_IDS,
+    is_telegram_member,
+    requires_premium_device_session,
+)
 
 
 class PremiumAccessTests(unittest.TestCase):
@@ -29,6 +35,15 @@ class PremiumAccessTests(unittest.TestCase):
 
     def test_temporary_free_access_is_enabled_for_everyone(self):
         self.assertTrue(PREMIUM_ACCESS_FREE)
+
+    def test_temporary_free_access_does_not_require_a_premium_device_session(self):
+        self.assertFalse(requires_premium_device_session(is_premium=True))
+        self.assertFalse(requires_premium_device_session(is_premium=False))
+
+    def test_premium_device_session_is_required_when_free_access_is_disabled(self):
+        with patch("premium_access.PREMIUM_ACCESS_FREE", False):
+            self.assertTrue(requires_premium_device_session(is_premium=True))
+            self.assertFalse(requires_premium_device_session(is_premium=False))
 
 
 if __name__ == "__main__":
