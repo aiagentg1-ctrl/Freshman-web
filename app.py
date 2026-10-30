@@ -138,17 +138,37 @@ BROWSER_DEMO_MODE = os.getenv("BROWSER_DEMO_MODE", "false").lower() == "true"
 BROWSER_DEMO_USER_ID = int(os.getenv("BROWSER_DEMO_USER_ID", "900000001"))
 
 
-def telegram_user_from_init_data(init_data: str) -> int:
+async def telegram_user_from_init_data(init_data: str, session) -> int:
     if not BOT_TOKEN:
         print("ERROR: BOT_TOKEN is not set")
         raise HTTPException(status_code=503, detail="Fresho bot authentication is not configured")
 
     try:
-        telegram_user_id = validate_telegram_init_data(init_data, BOT_TOKEN)
+        telegram_user_id, user_data = validate_telegram_init_data(init_data, BOT_TOKEN)
     except ValueError as error:
         print(f"ERROR: Telegram authentication failed: {error}")
         raise HTTPException(status_code=401, detail=str(error)) from error
     print(f"Successfully authenticated user: {telegram_user_id}")
+
+    # Auto-create user record if it doesn't exist
+    result = await session.execute(select(User).where(User.user_id == telegram_user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        first_name = user_data.get("first_name", "Student")
+        last_name = user_data.get("last_name", "")
+        full_name = f"{first_name} {last_name}".strip() or first_name
+        user = User(
+            user_id=telegram_user_id,
+            first_name=first_name,
+            full_name=full_name,
+            grade=12,
+            stream=StreamEnum.NATURAL,  # Default stream, will be updated by user
+            selected_subjects="[]",
+        )
+        session.add(user)
+        await session.commit()
+        print(f"Created new user record for {telegram_user_id}")
+
     return telegram_user_id
 
 
@@ -309,13 +329,13 @@ class DeviceSessionReleaseRequest(BaseModel):
 
 @app.post("/api/auth/device-session")
 async def start_device_session(request: DeviceSessionRequest):
-    telegram_user_id = telegram_user_from_init_data(request.init_data)
     if not request.device_id or len(request.device_id) > 128:
         raise HTTPException(status_code=400, detail="Invalid device installation ID")
 
     now = datetime.utcnow()
     new_token = secrets.token_urlsafe(32)
     async with AsyncSessionLocal() as session:
+        telegram_user_id = await telegram_user_from_init_data(request.init_data, session)
         claim = await session.execute(
             pg_insert(ActiveDeviceSession)
             .values(
@@ -370,8 +390,8 @@ async def start_device_session(request: DeviceSessionRequest):
 
 @app.delete("/api/auth/device-session")
 async def release_device_session(request: DeviceSessionReleaseRequest):
-    telegram_user_id = telegram_user_from_init_data(request.init_data)
     async with AsyncSessionLocal() as session:
+        telegram_user_id = await telegram_user_from_init_data(request.init_data, session)
         result = await session.execute(
             select(ActiveDeviceSession).where(ActiveDeviceSession.user_id == telegram_user_id)
         )

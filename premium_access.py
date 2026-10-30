@@ -1,11 +1,13 @@
+import os
+
 PREMIUM_CHANNEL_IDS = {
-    "NATURAL": "-1004479037964",
-    "SOCIAL": "-1004342138729",
+    "NATURAL": os.getenv("PREMIUM_CHANNEL_NATURAL_ID", "-1004479037964"),
+    "SOCIAL": os.getenv("PREMIUM_CHANNEL_SOCIAL_ID", "-1004342138729"),
 }
 
 # Temporary rollout switch. Set to False in the backend and frontend to restore
 # Telegram channel membership enforcement.
-PREMIUM_ACCESS_FREE = True
+PREMIUM_ACCESS_FREE = os.getenv("PREMIUM_ACCESS_FREE", "false").lower() == "true"
 
 
 def requires_premium_device_session(is_premium: bool) -> bool:

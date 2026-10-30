@@ -1,6 +1,7 @@
 export type StreamKey = "general" | "natural" | "social";
 
-export const PREMIUM_ACCESS_FREE = true;
+export const PREMIUM_ACCESS_FREE =
+  (process.env.NEXT_PUBLIC_PREMIUM_ACCESS_FREE || "false").toLowerCase() === "true";
 
 export type ExamContentType = "html" | "pdf";
 

@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl
 from aiogram.utils.web_app import check_webapp_signature
 
 
-def validate_telegram_init_data(init_data: str, bot_token: str, now: int | None = None) -> int:
+def validate_telegram_init_data(init_data: str, bot_token: str, now: int | None = None) -> tuple[int, dict]:
     try:
         fields = dict(parse_qsl(init_data, keep_blank_values=True, strict_parsing=True))
     except ValueError as error:
@@ -17,7 +17,8 @@ def validate_telegram_init_data(init_data: str, bot_token: str, now: int | None 
 
     try:
         auth_date = int(fields["auth_date"])
-        telegram_user_id = int(json.loads(fields["user"])["id"])
+        user_data = json.loads(fields["user"])
+        telegram_user_id = int(user_data["id"])
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise ValueError("Telegram authentication data is incomplete") from error
 
@@ -25,4 +26,4 @@ def validate_telegram_init_data(init_data: str, bot_token: str, now: int | None 
     if auth_date > current_time + 60 or current_time - auth_date > 86_400:
         raise ValueError("Telegram authentication data has expired")
 
-    return telegram_user_id
+    return telegram_user_id, user_data

@@ -12,6 +12,7 @@ const nextConfig = {
         : "http://localhost:8000"),
     NEXT_PUBLIC_BROWSER_DEMO_MODE: process.env.BROWSER_DEMO_MODE || "false",
     NEXT_PUBLIC_BROWSER_DEMO_USER_ID: process.env.BROWSER_DEMO_USER_ID || "900000001",
+    NEXT_PUBLIC_PREMIUM_ACCESS_FREE: process.env.PREMIUM_ACCESS_FREE || "false",
   },
   images: {
     domains: ["t.me"],
