@@ -20,12 +20,14 @@ export default function NotesScreen({
   university,
   telegramUserId,
   isPremium,
+  onPremiumAccessGranted,
   onGetPremium,
 }: {
   stream: StreamKey;
   university: string;
   telegramUserId?: number;
   isPremium: boolean;
+  onPremiumAccessGranted: () => void;
   onGetPremium: () => void;
 }) {
   const [view, setView] = useState<View>({ kind: "subjects" });
@@ -68,17 +70,13 @@ export default function NotesScreen({
   };
 
   const openChapter = async (noteId: number) => {
-    const noteMeta = view.kind === "chapters" ? view.chapters.find((chapter) => chapter.id === noteId) : undefined;
-    if (noteMeta?.is_premium && !isPremium) {
-      onGetPremium();
-      return;
-    }
     setLoading(true);
     try {
       const [note, chapterExams] = await Promise.all([
         getNote(noteId),
         getChapterExams({ note_id: noteId }).catch(() => []),
       ]);
+      if (note.is_premium) onPremiumAccessGranted();
       localStorage.setItem(
         "freshoLastNote",
         JSON.stringify({ id: note.id, title: note.title, subject: note.subject })
@@ -105,6 +103,7 @@ export default function NotesScreen({
     setLoading(true);
     try {
       const chapterExam = await getChapterExam(chapterExamId);
+      if (chapterExam.is_premium) onPremiumAccessGranted();
       setView({
         kind: "chapterExam",
         note,

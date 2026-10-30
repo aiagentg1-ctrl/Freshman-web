@@ -21,12 +21,12 @@ type GameView = "tools" | "flashcards" | "leaderboard" | "gpa";
 export default function GameScreen({
   stream,
   university,
-  isPremium,
+  onPremiumAccessGranted,
   onGetPremium,
 }: {
   stream: StreamKey;
   university: string;
-  isPremium: boolean;
+  onPremiumAccessGranted: () => void;
   onGetPremium: () => void;
 }) {
   const [view, setView] = useState<GameView>("tools");
@@ -61,14 +61,11 @@ export default function GameScreen({
   const newCardCount = studyCards.filter((studyCard) => !schedules[studyCard.id]).length;
 
   const openDeck = async (deck: FlashCard) => {
-    if (deck.is_premium && !isPremium) {
-      onGetPremium();
-      return;
-    }
     setLoadingDeck(true);
     setDeckError("");
     try {
       const detail = await getFlashCard(deck.id);
+      if (detail.is_premium) onPremiumAccessGranted();
       const parsedCards = parseFlashcardDeck(detail.html_content || "");
       const savedSchedules = loadDeckProgress(deck.id);
       setActiveDeck(deck);

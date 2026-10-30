@@ -287,6 +287,15 @@ export default function TMAPage() {
     setProfile((current) => current ? { ...current, ...next } : current);
   };
 
+  const handlePremiumAccessGranted = () => {
+    setProfile((current) => current ? {
+      ...current,
+      is_premium: true,
+      premium_verification_error: null,
+    } : current);
+    setPremiumStatusError("");
+  };
+
   const handleDeviceSignOut = async () => {
     const initData = getTelegramInitData();
     const deviceId = localStorage.getItem("freshoDeviceId");
@@ -441,6 +450,7 @@ export default function TMAPage() {
               telegramFirstName={telegramUser?.first_name}
               resumeExam={resumeExam}
               isPremium={isPremium}
+              onPremiumAccessGranted={handlePremiumAccessGranted}
               onResumeHandled={() => setResumeExam(null)}
               onGoHome={() => setActiveTab("home")}
               onGetPremium={() => setShowPremiumDialog(true)}
@@ -452,6 +462,7 @@ export default function TMAPage() {
               university={profile.university}
               telegramUserId={telegramUser?.id}
               isPremium={isPremium}
+              onPremiumAccessGranted={handlePremiumAccessGranted}
               onGetPremium={() => setShowPremiumDialog(true)}
             />
           )}
@@ -474,7 +485,7 @@ export default function TMAPage() {
             <GameScreen
               stream={profile.stream}
               university={profile.university}
-              isPremium={isPremium}
+              onPremiumAccessGranted={handlePremiumAccessGranted}
               onGetPremium={() => setShowPremiumDialog(true)}
             />
           )}
