@@ -20,7 +20,7 @@ class TelegramInitDataTests(unittest.TestCase):
             for key, value in sorted(fields.items())
             if key != "signature"
         )
-        secret_key = hmac.new(b"test-token", b"WebAppData", hashlib.sha256).digest()
+        secret_key = hmac.new(b"WebAppData", b"test-token", hashlib.sha256).digest()
         fields["hash"] = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         return urlencode(fields), now
 
@@ -44,6 +44,12 @@ class TelegramInitDataTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "invalid"):
             validate_telegram_init_data(init_data, "test-token", now)
+
+    def test_hash_from_wrong_bot_token_is_rejected(self):
+        init_data, now = self.make_init_data()
+
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            validate_telegram_init_data(init_data, "another-token", now)
 
     def test_signature_without_valid_hash_is_rejected(self):
         init_data, now = self.make_init_data()
