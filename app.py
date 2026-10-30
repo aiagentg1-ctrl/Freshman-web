@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 import aiohttp
 
 from database import AsyncSessionLocal, init_db
-from premium_access import PREMIUM_CHANNEL_IDS, is_telegram_member
+from premium_access import PREMIUM_ACCESS_FREE, PREMIUM_CHANNEL_IDS, is_telegram_member
 from telegram_auth import validate_telegram_init_data
 from models import (
     User, EueeExam, EueeExamAttempt, Note, SubjectEnum, StreamEnum,
@@ -46,6 +46,11 @@ SHARED_SUBJECTS = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    print(
+        "Temporary free access to premium materials is enabled"
+        if PREMIUM_ACCESS_FREE
+        else "Premium channel membership checks are enabled"
+    )
 
     # Ensure new columns have default values for existing users
     async with AsyncSessionLocal() as session:
@@ -219,6 +224,9 @@ async def verify_device_session(
 
 
 async def get_premium_membership_status(session, user_id: int) -> tuple[bool, str | None]:
+    if PREMIUM_ACCESS_FREE:
+        return True, None
+
     premium_result = await session.execute(
         select(User.premium_expires_at).where(User.user_id == user_id)
     )

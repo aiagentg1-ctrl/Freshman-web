@@ -1,6 +1,6 @@
 import unittest
 
-from premium_access import PREMIUM_CHANNEL_IDS, is_telegram_member
+from premium_access import PREMIUM_CHANNEL_IDS, is_telegram_member, premium_access_is_free
 
 
 class PremiumAccessTests(unittest.TestCase):
@@ -26,6 +26,16 @@ class PremiumAccessTests(unittest.TestCase):
         for status in ("left", "kicked", "unknown"):
             with self.subTest(status=status):
                 self.assertFalse(is_telegram_member(status))
+
+    def test_temporary_free_access_flag_accepts_explicit_true_values(self):
+        for value in ("true", "TRUE", "1", "yes", "on"):
+            with self.subTest(value=value):
+                self.assertTrue(premium_access_is_free(value))
+
+    def test_temporary_free_access_flag_can_be_disabled(self):
+        for value in ("false", "0", "no", "off", ""):
+            with self.subTest(value=value):
+                self.assertFalse(premium_access_is_free(value))
 
 
 if __name__ == "__main__":

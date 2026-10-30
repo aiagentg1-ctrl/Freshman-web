@@ -20,7 +20,7 @@ from aiohttp import web
 
 from database import AsyncSessionLocal, init_db
 from models import ChapterExam, EueeExam, Note, StreamEnum, SubjectEnum, User
-from premium_access import PREMIUM_CHANNEL_IDS, is_telegram_member
+from premium_access import PREMIUM_ACCESS_FREE, PREMIUM_CHANNEL_IDS, is_telegram_member
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 if not BOT_TOKEN:
@@ -118,6 +118,8 @@ async def get_student_access(user_id: int):
         raise RuntimeError("Could not load your Fresho profile right now. Please try again.") from error
     if not user:
         return None, False, None
+    if PREMIUM_ACCESS_FREE:
+        return user, True, None
     if user.premium_expires_at and user.premium_expires_at > datetime.utcnow():
         return user, True, None
 
