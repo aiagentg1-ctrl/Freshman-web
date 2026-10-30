@@ -20,6 +20,7 @@ from aiohttp import web
 
 from database import AsyncSessionLocal, init_db
 from models import ChapterExam, EueeExam, Note, StreamEnum, SubjectEnum, User
+from premium_access import PREMIUM_CHANNEL_IDS, is_telegram_member
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 if not BOT_TOKEN:
@@ -31,10 +32,6 @@ SUPPORT_URL = "https://t.me/Mirkuz_support"
 REQUIRED_CHANNEL_ID = int(os.getenv("CHANNEL_1_ID", "-1002656898914"))
 REQUIRED_CHANNEL_URL = os.getenv("CHANNEL_1_URL", "https://t.me/AAU101")
 REQUIRED_CHANNEL_NAME = os.getenv("CHANNEL_1_NAME", "AAU101")
-PREMIUM_CHANNEL_IDS = {
-    "NATURAL": os.getenv("PREMIUM_CHANNEL_NATURAL_ID", "-1004479037964").strip() or "-1004479037964",
-    "SOCIAL": os.getenv("PREMIUM_CHANNEL_SOCIAL_ID", "-1004342138729").strip() or "-1004342138729",
-}
 
 NATURAL_SUBJECTS = {
     "logic", "psychology", "geography", "communicative_english", "mathematics",
@@ -132,11 +129,13 @@ async def get_student_access(user_id: int):
             print(f"Could not verify Telegram Premium membership in channel {channel_id}: {error}")
             verification_failed = True
             continue
-        is_member = member.status in {"member", "administrator", "creator"} or (
-            member.status == "restricted" and getattr(member, "is_member", False)
-        )
-        if is_member:
+        if is_telegram_member(member.status, getattr(member, "is_member", False)):
+            print(f"Telegram Premium membership verified in channel {channel_id}")
             return user, True, None
+        print(
+            f"Telegram Premium membership not found in channel {channel_id} "
+            f"(status={member.status})"
+        )
     if verification_failed:
         return user, False, "Could not verify Premium access right now. Please try again."
     return user, False, None

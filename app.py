@@ -23,6 +23,7 @@ from urllib.parse import parse_qsl
 import aiohttp
 
 from database import AsyncSessionLocal, init_db
+from premium_access import PREMIUM_CHANNEL_IDS, is_telegram_member
 from models import (
     User, EueeExam, EueeExamAttempt, Note, SubjectEnum, StreamEnum,
     NoteCompletion, UserBadge, XpReward, ChapterExam, ChapterExamAttempt,
@@ -125,10 +126,6 @@ ADMIN_SECRET = (
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 BROWSER_DEMO_MODE = os.getenv("BROWSER_DEMO_MODE", "false").lower() == "true"
 BROWSER_DEMO_USER_ID = int(os.getenv("BROWSER_DEMO_USER_ID", "900000001"))
-PREMIUM_CHANNEL_IDS = {
-    "NATURAL": os.getenv("PREMIUM_CHANNEL_NATURAL_ID", "-1004479037964").strip() or "-1004479037964",
-    "SOCIAL": os.getenv("PREMIUM_CHANNEL_SOCIAL_ID", "-1004342138729").strip() or "-1004342138729",
-}
 
 
 def telegram_user_from_init_data(init_data: str) -> int:
@@ -296,10 +293,11 @@ async def get_premium_membership_status(session, user_id: int) -> tuple[bool, st
                 continue
 
             member = payload.get("result", {})
-            is_member = member.get("status") in {"member", "administrator", "creator"}
-            is_restricted_member = member.get("status") == "restricted" and member.get("is_member") is True
-            if is_member or is_restricted_member:
+            status = member.get("status", "unknown")
+            if is_telegram_member(status, member.get("is_member") is True):
+                print(f"Premium membership verified in channel {channel_id}")
                 return True, None
+            print(f"Premium membership not found in channel {channel_id} (status={status})")
 
     if verification_errors:
         return False, verification_errors[0]

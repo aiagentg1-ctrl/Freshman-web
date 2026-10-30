@@ -23,10 +23,6 @@ services:
         value: https://t.me/AAU101
       - key: CHANNEL_1_NAME
         value: AAU101
-      - key: PREMIUM_CHANNEL_NATURAL_ID
-        value: "-1004479037964"
-      - key: PREMIUM_CHANNEL_SOCIAL_ID
-        value: "-1004342138729"
       - key: BOT_MODE
         value: polling
       - key: BROWSER_DEMO_MODE
