@@ -394,9 +394,10 @@ export default function TMAPage() {
     setActiveTab("practice");
   };
 
-  const isPremium = (() => {
-    return PREMIUM_ACCESS_FREE || profile?.is_premium === true;
-  })();
+  const isPremium = PREMIUM_ACCESS_FREE || profile?.is_premium === true;
+  const handleGetPremium = () => {
+    if (!PREMIUM_ACCESS_FREE) setShowPremiumDialog(true);
+  };
 
   return (
     <div className="tma-desktop-shell">
@@ -453,7 +454,7 @@ export default function TMAPage() {
               onPremiumAccessGranted={handlePremiumAccessGranted}
               onResumeHandled={() => setResumeExam(null)}
               onGoHome={() => setActiveTab("home")}
-              onGetPremium={() => setShowPremiumDialog(true)}
+              onGetPremium={handleGetPremium}
             />
           )}
           {activeTab === "notes" && (
@@ -463,7 +464,7 @@ export default function TMAPage() {
               telegramUserId={telegramUser?.id}
               isPremium={isPremium}
               onPremiumAccessGranted={handlePremiumAccessGranted}
-              onGetPremium={() => setShowPremiumDialog(true)}
+              onGetPremium={handleGetPremium}
             />
           )}
           {activeTab === "home" && (
@@ -478,7 +479,7 @@ export default function TMAPage() {
               onToggleTheme={() => setDarkMode((value) => !value)}
               onContinueExam={handleContinueExam}
               onGoToPractice={() => setActiveTab("practice")}
-              onGetPremium={() => setShowPremiumDialog(true)}
+              onGetPremium={handleGetPremium}
             />
           )}
           {activeTab === "game" && (
@@ -486,7 +487,7 @@ export default function TMAPage() {
               stream={profile.stream}
               university={profile.university}
               onPremiumAccessGranted={handlePremiumAccessGranted}
-              onGetPremium={() => setShowPremiumDialog(true)}
+              onGetPremium={handleGetPremium}
             />
           )}
           {activeTab === "profile" && (
@@ -512,7 +513,7 @@ export default function TMAPage() {
           <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
         </>
       )}
-      {showPremiumDialog && profile && (
+      {showPremiumDialog && profile && !PREMIUM_ACCESS_FREE && (
         <PremiumDialog
           fullName={profile.full_name}
           university={profile.university}
