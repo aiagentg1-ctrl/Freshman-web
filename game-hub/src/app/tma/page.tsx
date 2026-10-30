@@ -10,7 +10,7 @@ import PracticeScreen from "../../components/tma/PracticeScreen";
 import ProfileScreen from "../../components/tma/ProfileScreen";
 import GameScreen from "../../components/tma/GameScreen";
 import { DevUserSetup } from "../../components/DevUserSetup";
-import { dailyCheckIn, DailyCheckIn, ExamMeta, getSubscriptionPricing, getUser, refreshUser, releaseDeviceSession, startDeviceSession, StreamKey, SubscriptionPricing, updateUser } from "../../lib/api";
+import { dailyCheckIn, DailyCheckIn, ExamMeta, getSubscriptionPricing, getUser, PREMIUM_ACCESS_FREE, refreshUser, releaseDeviceSession, startDeviceSession, StreamKey, SubscriptionPricing, updateUser } from "../../lib/api";
 import { expandTelegramApp, getTelegramInitData, getTelegramUser, TelegramUser } from "../../lib/telegram";
 import { migrateLegacyStorage } from "../../lib/legacyStorage";
 import PremiumDialog from "../../components/tma/PremiumDialog";
@@ -395,7 +395,7 @@ export default function TMAPage() {
   };
 
   const isPremium = (() => {
-    return profile?.is_premium === true;
+    return PREMIUM_ACCESS_FREE || profile?.is_premium === true;
   })();
 
   return (

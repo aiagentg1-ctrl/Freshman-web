@@ -1,5 +1,7 @@
 export type StreamKey = "general" | "natural" | "social";
 
+export const PREMIUM_ACCESS_FREE = true;
+
 export type ExamContentType = "html" | "pdf";
 
 export interface ExamMeta {

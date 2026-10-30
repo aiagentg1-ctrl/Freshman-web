@@ -17,9 +17,6 @@ services:
         sync: false
       - key: ADMIN_SECRET
         sync: false
-      # Temporary free access to all premium materials; set to "false" to restore channel checks.
-      - key: PREMIUM_ACCESS_FREE
-        value: "true"
       - key: CHANNEL_1_ID
         value: "-1002656898914"
       - key: CHANNEL_1_URL
