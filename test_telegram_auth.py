@@ -18,25 +18,25 @@ class TelegramInitDataTests(unittest.TestCase):
         data_check_string = "\n".join(
             f"{key}={value}"
             for key, value in sorted(fields.items())
-            if key != "signature"
         )
         secret_key = hmac.new(b"WebAppData", b"test-token", hashlib.sha256).digest()
         fields["hash"] = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         return urlencode(fields), now
 
-    def test_valid_init_data_includes_query_id_but_excludes_signature(self):
+    def test_valid_init_data_includes_query_id_and_signature(self):
         init_data, now = self.make_init_data()
 
         self.assertEqual(validate_telegram_init_data(init_data, "test-token", now), 12345)
 
-    def test_signature_field_does_not_change_hmac_validation(self):
+    def test_signature_field_is_included_in_hmac_validation(self):
         init_data, now = self.make_init_data()
         init_data = init_data.replace(
             "telegram-ed25519-signature",
             "different-telegram-signature",
         )
 
-        self.assertEqual(validate_telegram_init_data(init_data, "test-token", now), 12345)
+        with self.assertRaisesRegex(ValueError, "invalid"):
+            validate_telegram_init_data(init_data, "test-token", now)
 
     def test_tampered_init_data_is_rejected(self):
         init_data, now = self.make_init_data()
